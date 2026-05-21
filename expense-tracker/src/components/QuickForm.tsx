@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency } from '../types/expense';
-import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES } from '../types/expense';
+import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType } from '../types/expense';
+import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
 
 interface QuickFormProps {
   currentUser: User;
@@ -11,23 +11,30 @@ interface QuickFormProps {
   userName2: string;
 }
 
-const CATEGORY_ICONS: Record<Category, string> = {
+const CATEGORY_ICONS: Record<string, string> = {
   alimentacion: '🛒', transporte: '🚗', hogar: '🏠', salud: '💊',
   educacion: '📚', entretenimiento: '🎬', ropa: '👗', servicios: '💡',
   seguros: '🛡️', suscripciones: '📱', viajes: '✈️', restaurantes: '🍽️',
   mascotas: '🐾', belleza: '💅', inversiones: '📈', deudas: '💳', otro: '📦',
+  salario: '💼', freelance: '💻', negocio: '🏪', inversiones_ingreso: '📈',
+  renta: '🏠', bono: '🎁', reembolso: '💰', otro_ingreso: '📦',
 };
 
-const QUICK_CATEGORIES: Category[] = ['alimentacion', 'restaurantes', 'transporte', 'hogar', 'salud', 'entretenimiento', 'servicios', 'otro'];
+const QUICK_EXPENSE_CATS: Category[] = ['alimentacion', 'restaurantes', 'transporte', 'hogar', 'salud', 'entretenimiento', 'servicios', 'otro'];
+const QUICK_INCOME_CATS = ['salario', 'freelance', 'negocio', 'bono', 'renta', 'reembolso'];
 
 export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }: QuickFormProps) {
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  const [transactionType, setTransactionType] = useState<TransactionType>(
+    prefill?.transactionType ?? 'gasto'
+  );
 
   const [form, setForm] = useState({
     date: prefill?.date ?? today,
     amount: prefill?.amount ? String(prefill.amount) : '',
     concept: prefill?.concept ?? '',
-    category: prefill?.category ?? 'otro' as Category,
+    category: prefill?.category ?? 'otro' as string,
     paymentMethod: prefill?.paymentMethod ?? 'tarjeta_debito' as PaymentMethod,
     cardLast4: prefill?.cardLast4 ?? '',
     bank: prefill?.bank ?? '',
@@ -48,17 +55,27 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
 
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
 
+  const isIncome = transactionType === 'ingreso';
+  const quickCats = isIncome ? QUICK_INCOME_CATS : QUICK_EXPENSE_CATS;
+  const allCats = isIncome ? INCOME_CATEGORIES : CATEGORIES;
+
+  const handleTransactionSwitch = (t: TransactionType) => {
+    setTransactionType(t);
+    set('category', isIncome ? 'otro' : 'salario');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.amount || !form.concept) return;
 
     onSave({
+      transactionType,
       date: form.date,
       amount: parseFloat(form.amount),
       currency: 'MXN',
       paidBy: form.paidBy as User,
       concept: form.concept,
-      category: form.category,
+      category: form.category as Category,
       paymentMethod: form.paymentMethod,
       cardLast4: form.cardLast4 || undefined,
       bank: form.bank || undefined,
@@ -77,38 +94,47 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
 
-    // Reset form
     setForm({
-      date: today,
-      amount: '',
-      concept: '',
-      category: 'otro',
-      paymentMethod: 'tarjeta_debito',
-      cardLast4: '',
-      bank: '',
-      store: '',
-      expenseType: 'variable',
-      frequency: 'mensual',
-      installments: '',
-      isReimbursable: false,
-      isTaxDeductible: false,
-      invoiceRequested: false,
-      sharedExpense: false,
-      paidBy: currentUser,
-      notes: '',
+      date: today, amount: '', concept: '', category: 'otro',
+      paymentMethod: 'tarjeta_debito', cardLast4: '', bank: '', store: '',
+      expenseType: 'variable', frequency: 'mensual', installments: '',
+      isReimbursable: false, isTaxDeductible: false, invoiceRequested: false,
+      sharedExpense: false, paidBy: currentUser, notes: '',
     });
     setShowAdvanced(false);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Amount - big and prominent */}
-      <div className="bg-blue-50 rounded-2xl p-4 border-2 border-blue-100">
-        <label className="block text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">
+      {/* Transaction type toggle */}
+      <div className="flex gap-1 bg-gray-100 rounded-2xl p-1">
+        <button
+          type="button"
+          onClick={() => handleTransactionSwitch('gasto')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+            !isIncome ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500'
+          }`}
+        >
+          💸 Gasto
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTransactionSwitch('ingreso')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+            isIncome ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500'
+          }`}
+        >
+          💰 Ingreso
+        </button>
+      </div>
+
+      {/* Amount */}
+      <div className={`rounded-2xl p-4 border-2 ${isIncome ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'}`}>
+        <label className={`block text-xs font-semibold uppercase tracking-wide mb-1 ${isIncome ? 'text-green-600' : 'text-blue-600'}`}>
           Monto (MXN)
         </label>
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-bold text-blue-800">$</span>
+          <span className={`text-2xl font-bold ${isIncome ? 'text-green-800' : 'text-blue-800'}`}>$</span>
           <input
             type="number"
             inputMode="decimal"
@@ -118,7 +144,7 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
             value={form.amount}
             onChange={(e) => set('amount', e.target.value)}
             placeholder="0.00"
-            className="flex-1 text-3xl font-bold text-blue-900 bg-transparent border-none outline-none placeholder-blue-300"
+            className={`flex-1 text-3xl font-bold bg-transparent border-none outline-none ${isIncome ? 'text-green-900 placeholder-green-300' : 'text-blue-900 placeholder-blue-300'}`}
           />
         </div>
       </div>
@@ -126,14 +152,14 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
       {/* Concept */}
       <div>
         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Concepto *
+          {isIncome ? '¿De dónde proviene?' : 'Concepto *'}
         </label>
         <input
           type="text"
           required
           value={form.concept}
           onChange={(e) => set('concept', e.target.value)}
-          placeholder="¿En qué se gastó?"
+          placeholder={isIncome ? 'Ej. Quincena enero, Pago cliente...' : '¿En qué se gastó?'}
           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
       </div>
@@ -144,7 +170,7 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
           Categoría
         </label>
         <div className="grid grid-cols-4 gap-2">
-          {QUICK_CATEGORIES.map((cat) => (
+          {quickCats.map((cat) => (
             <button
               key={cat}
               type="button"
@@ -156,51 +182,50 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
               }`}
             >
               <span className="text-xl">{CATEGORY_ICONS[cat]}</span>
-              <span className="leading-tight text-center">{CATEGORIES[cat].replace(/^[^ ]+ /, '')}</span>
+              <span className="leading-tight text-center">{(allCats as Record<string,string>)[cat]?.replace(/^[^ ]+ /, '')}</span>
             </button>
           ))}
         </div>
-        {/* More categories */}
         <select
           value={form.category}
-          onChange={(e) => set('category', e.target.value as Category)}
+          onChange={(e) => set('category', e.target.value)}
           className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-300"
         >
-          {Object.entries(CATEGORIES).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
+          {Object.entries(allCats).map(([key, label]) => (
+            <option key={key} value={key}>{label as string}</option>
           ))}
         </select>
       </div>
 
-      {/* Payment method */}
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          Forma de pago
-        </label>
-        <div className="flex gap-2 flex-wrap">
-          {Object.entries(PAYMENT_METHODS).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => set('paymentMethod', key as PaymentMethod)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                form.paymentMethod === key
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-200 text-gray-500 hover:border-blue-300'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+      {/* Payment method — only for expenses */}
+      {!isIncome && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+            Forma de pago
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            {Object.entries(PAYMENT_METHODS).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => set('paymentMethod', key as PaymentMethod)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                  form.paymentMethod === key
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                }`}
+              >
+                {label as string}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Date + Who paid */}
+      {/* Date + Who */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Fecha
-          </label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha</label>
           <input
             type="date"
             value={form.date}
@@ -210,7 +235,7 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-            Quién pagó
+            {isIncome ? 'Quién recibió' : 'Quién pagó'}
           </label>
           <div className="flex gap-2">
             {(['Ivan', 'Esposa'] as User[]).map((user) => (
@@ -231,144 +256,116 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
         </div>
       </div>
 
-      {/* Advanced toggle */}
-      <button
-        type="button"
-        onClick={() => setShowAdvanced((v) => !v)}
-        className="w-full text-xs text-blue-500 font-medium py-1"
-      >
-        {showAdvanced ? '▲ Menos opciones' : '▼ Más opciones (establecimiento, tarjeta, MSI...)'}
-      </button>
+      {/* Advanced toggle — only for expenses */}
+      {!isIncome && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="w-full text-xs text-blue-500 font-medium py-1"
+          >
+            {showAdvanced ? '▲ Menos opciones' : '▼ Más opciones (establecimiento, tarjeta, MSI...)'}
+          </button>
 
-      {showAdvanced && (
-        <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Establecimiento</label>
-              <input
-                type="text"
-                value={form.store}
-                onChange={(e) => set('store', e.target.value)}
-                placeholder="Walmart, OXXO..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Banco / Emisor</label>
-              <input
-                type="text"
-                value={form.bank}
-                onChange={(e) => set('bank', e.target.value)}
-                placeholder="BBVA, Banamex..."
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-          </div>
+          {showAdvanced && (
+            <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Establecimiento</label>
+                  <input type="text" value={form.store} onChange={(e) => set('store', e.target.value)}
+                    placeholder="Walmart, OXXO..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Banco / Emisor</label>
+                  <input type="text" value={form.bank} onChange={(e) => set('bank', e.target.value)}
+                    placeholder="BBVA, Banamex..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Últimos 4 dígitos</label>
-              <input
-                type="text"
-                maxLength={4}
-                value={form.cardLast4}
-                onChange={(e) => set('cardLast4', e.target.value.replace(/\D/g, ''))}
-                placeholder="1234"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">MSI (meses)</label>
-              <input
-                type="number"
-                min="0"
-                max="48"
-                value={form.installments}
-                onChange={(e) => set('installments', e.target.value)}
-                placeholder="0"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Últimos 4 dígitos</label>
+                  <input type="text" maxLength={4} value={form.cardLast4}
+                    onChange={(e) => set('cardLast4', e.target.value.replace(/\D/g, ''))}
+                    placeholder="1234" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">MSI (meses)</label>
+                  <input type="number" min="0" max="48" value={form.installments}
+                    onChange={(e) => set('installments', e.target.value)}
+                    placeholder="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                </div>
+              </div>
 
-          {/* Expense type */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de gasto</label>
-            <div className="flex gap-2">
-              {(['variable', 'fijo'] as ExpenseType[]).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => set('expenseType', t)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all capitalize ${
-                    form.expenseType === t
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'border-gray-200 text-gray-500'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de gasto</label>
+                <div className="flex gap-2">
+                  {(['variable', 'fijo'] as ExpenseType[]).map((t) => (
+                    <button key={t} type="button" onClick={() => set('expenseType', t)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all capitalize ${
+                        form.expenseType === t ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500'
+                      }`}
+                    >{t}</button>
+                  ))}
+                </div>
+              </div>
 
-          {form.expenseType === 'fijo' && (
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Frecuencia</label>
-              <select
-                value={form.frequency}
-                onChange={(e) => set('frequency', e.target.value as Frequency)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              >
-                {Object.entries(FREQUENCIES).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
+              {form.expenseType === 'fijo' && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 mb-1">Frecuencia</label>
+                  <select value={form.frequency} onChange={(e) => set('frequency', e.target.value as Frequency)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    {Object.entries(FREQUENCIES).map(([key, label]) => (
+                      <option key={key} value={key}>{label as string}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'isReimbursable', label: '💰 Reembolsable' },
+                  { key: 'isTaxDeductible', label: '🧾 Deducible' },
+                  { key: 'invoiceRequested', label: '📋 Con factura' },
+                  { key: 'sharedExpense', label: '👥 Compartido' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                    <input type="checkbox" checked={form[key as keyof typeof form] as boolean}
+                      onChange={(e) => set(key, e.target.checked)} className="rounded" />
+                    {label}
+                  </label>
                 ))}
-              </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Notas</label>
+                <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)}
+                  placeholder="Observaciones adicionales..." rows={2}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" />
+              </div>
             </div>
           )}
+        </>
+      )}
 
-          {/* Checkboxes */}
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { key: 'isReimbursable', label: '💰 Reembolsable' },
-              { key: 'isTaxDeductible', label: '🧾 Deducible' },
-              { key: 'invoiceRequested', label: '📋 Con factura' },
-              { key: 'sharedExpense', label: '👥 Compartido' },
-            ].map(({ key, label }) => (
-              <label key={key} className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form[key as keyof typeof form] as boolean}
-                  onChange={(e) => set(key, e.target.checked)}
-                  className="rounded"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 mb-1">Notas</label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => set('notes', e.target.value)}
-              placeholder="Observaciones adicionales..."
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-            />
-          </div>
+      {isIncome && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1">Notas</label>
+          <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)}
+            placeholder="Detalles adicionales..." rows={2}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" />
         </div>
       )}
 
       <button
         type="submit"
         className={`w-full py-3 rounded-2xl font-bold text-white text-base transition-all ${
-          saved
-            ? 'bg-green-500'
+          saved ? 'bg-green-500' : isIncome
+            ? 'bg-green-600 hover:bg-green-700 active:scale-95'
             : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
         }`}
       >
-        {saved ? '✅ ¡Guardado!' : '💾 Guardar gasto'}
+        {saved ? '✅ ¡Guardado!' : isIncome ? '💰 Guardar ingreso' : '💾 Guardar gasto'}
       </button>
     </form>
   );

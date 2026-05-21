@@ -1,11 +1,13 @@
-import { User, BarChart3, PlusCircle, Settings } from 'lucide-react';
+import { List, BarChart3, PlusCircle, Settings, LayoutDashboard } from 'lucide-react';
 import type { User as UserType } from '../types/expense';
+
+type Tab = 'add' | 'list' | 'dashboard' | 'report' | 'settings';
 
 interface HeaderProps {
   currentUser: UserType;
   onUserSwitch: (user: UserType) => void;
-  activeTab: 'add' | 'list' | 'report' | 'settings';
-  onTabChange: (tab: 'add' | 'list' | 'report' | 'settings') => void;
+  activeTab: Tab;
+  onTabChange: (tab: Tab) => void;
   userName1: string;
   userName2: string;
 }
@@ -22,14 +24,11 @@ export function Header({ currentUser, onUserSwitch, activeTab, onTabChange, user
               <p className="text-blue-200 text-xs">Control de gastos familiar</p>
             </div>
           </div>
-          {/* User switcher */}
           <div className="flex gap-1 bg-blue-800 rounded-full p-1">
             <button
               onClick={() => onUserSwitch('Ivan')}
               className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                currentUser === 'Ivan'
-                  ? 'bg-white text-blue-800'
-                  : 'text-blue-200 hover:text-white'
+                currentUser === 'Ivan' ? 'bg-white text-blue-800' : 'text-blue-200 hover:text-white'
               }`}
             >
               {userName1}
@@ -37,9 +36,7 @@ export function Header({ currentUser, onUserSwitch, activeTab, onTabChange, user
             <button
               onClick={() => onUserSwitch('Esposa')}
               className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                currentUser === 'Esposa'
-                  ? 'bg-white text-blue-800'
-                  : 'text-blue-200 hover:text-white'
+                currentUser === 'Esposa' ? 'bg-white text-blue-800' : 'text-blue-200 hover:text-white'
               }`}
             >
               {userName2}
@@ -47,25 +44,23 @@ export function Header({ currentUser, onUserSwitch, activeTab, onTabChange, user
           </div>
         </div>
 
-        {/* Tab nav */}
         <nav className="flex gap-1">
-          {[
-            { id: 'add', icon: <PlusCircle size={16} />, label: 'Registrar' },
-            { id: 'list', icon: <User size={16} />, label: 'Gastos' },
-            { id: 'report', icon: <BarChart3 size={16} />, label: 'Reporte' },
-            { id: 'settings', icon: <Settings size={16} />, label: 'Config' },
-          ].map((tab) => (
+          {([
+            { id: 'add',       icon: <PlusCircle size={14} />,      label: 'Registrar' },
+            { id: 'list',      icon: <List size={14} />,            label: 'Gastos' },
+            { id: 'dashboard', icon: <LayoutDashboard size={14} />, label: 'Dashboard' },
+            { id: 'report',    icon: <BarChart3 size={14} />,       label: 'Reporte' },
+            { id: 'settings',  icon: <Settings size={14} />,        label: 'Config' },
+          ] as { id: Tab; icon: React.ReactNode; label: string }[]).map((tab) => (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id as typeof activeTab)}
-              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-medium transition-all ${
-                activeTab === tab.id
-                  ? 'bg-white text-blue-800'
-                  : 'text-blue-200 hover:bg-blue-700'
+              onClick={() => onTabChange(tab.id)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                activeTab === tab.id ? 'bg-white text-blue-800' : 'text-blue-200 hover:bg-blue-700'
               }`}
             >
               {tab.icon}
-              {tab.label}
+              <span style={{ fontSize: '9px' }}>{tab.label}</span>
             </button>
           ))}
         </nav>

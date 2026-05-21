@@ -4,6 +4,8 @@ export type PaymentMethod = 'efectivo' | 'tarjeta_debito' | 'tarjeta_credito' | 
 
 export type ExpenseType = 'variable' | 'fijo';
 
+export type TransactionType = 'gasto' | 'ingreso';
+
 export type Frequency = 'diario' | 'semanal' | 'quincenal' | 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual';
 
 export type Category =
@@ -25,9 +27,21 @@ export type Category =
   | 'deudas'
   | 'otro';
 
+export const INCOME_CATEGORIES: Record<string, string> = {
+  salario: '💼 Salario',
+  freelance: '💻 Freelance',
+  negocio: '🏪 Negocio',
+  inversiones_ingreso: '📈 Inversiones',
+  renta: '🏠 Renta',
+  bono: '🎁 Bono',
+  reembolso: '💰 Reembolso',
+  otro_ingreso: '📦 Otro',
+};
+
 export interface Expense {
   id: string;
   date: string;                    // ISO date YYYY-MM-DD
+  transactionType: TransactionType; // gasto | ingreso
   amount: number;
   currency: string;                // MXN default
   paidBy: User;

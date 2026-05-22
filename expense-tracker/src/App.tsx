@@ -13,6 +13,7 @@ import { PendingFixedTray } from './components/PendingFixedTray';
 import { SpaceOnboarding } from './components/SpaceOnboarding';
 import { UserSwitcher } from './components/UserSwitcher';
 import { SpaceSettings } from './components/SpaceSettings';
+import { SpacePicker } from './components/SpacePicker';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings, loadLegacySettings } from './utils/storage';
@@ -202,16 +203,26 @@ export default function App() {
         pendingFixed={pendingCountCurrentMonth}
       />
 
+      {/* ── Space picker ── */}
+      <div className="bg-white border-b border-gray-100 shadow-sm">
+        <SpacePicker
+          spaces={spaces}
+          session={session}
+          onSwitch={handleSwitchSpace}
+          onUpdateSpaces={handleUpdateSpaces}
+        />
+      </div>
+
       <main className="max-w-2xl mx-auto px-4 py-5 pb-10">
         {/* ── Registrar ── */}
         {activeTab === 'add' && (
           <div className="space-y-4">
             {prefillTemplate && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 flex items-center justify-between">
-                <p className="text-sm text-blue-700 font-medium">
+              <div className="bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5 flex items-center justify-between">
+                <p className="text-sm text-teal-700 font-medium">
                   📋 Registrando: <strong>{prefillTemplate.concept}</strong>
                 </p>
-                <button onClick={() => setPrefillTemplate(null)} className="text-xs text-blue-400 hover:text-blue-600">✕ Limpiar</button>
+                <button onClick={() => setPrefillTemplate(null)} className="text-xs text-teal-400 hover:text-teal-600">✕ Limpiar</button>
               </div>
             )}
             {pendingTemplates.length > 0 && (

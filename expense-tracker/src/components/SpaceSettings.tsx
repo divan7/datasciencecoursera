@@ -268,6 +268,7 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
                   {newMemberPinStep === 'first' ? `PIN para ${newMemberName}` : `Confirmar PIN de ${newMemberName}`}
                 </p>
                 <PinPad
+                  key={newMemberPinStep}
                   onConfirm={handleAddMemberPin}
                   onCancel={() => { setView(null); setNewMemberPinStep('first'); setNewMemberFirstPin(''); }}
                   error={newMemberPinError}
@@ -424,6 +425,7 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
                   {nsPinStep === 'first' ? 'Crea tu PIN' : 'Confirma tu PIN'}
                 </p>
                 <PinPad
+                  key={nsPinStep}
                   onConfirm={handleNewSpacePin}
                   onCancel={() => { setView(null); setNsName(''); setNsOwnerName(''); setNsPinStep('first'); setNsFirstPin(''); }}
                   error={nsPinError}

@@ -99,41 +99,45 @@ export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces }: Props
   return (
     <>
       {/* ── Chip bar ────────────────────────────────────────────── */}
-      <div className="max-w-2xl mx-auto px-4 py-2">
+      <div className="max-w-2xl mx-auto px-4 py-2.5">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
           {spaces.map((sp) => {
             const isActive = sp.id === session.spaceId;
             const member = sp.members[0];
             return (
-              <div key={sp.id} className="flex items-center gap-1 flex-shrink-0">
+              <div key={sp.id} className="flex items-center flex-shrink-0 rounded-full overflow-hidden border transition-all"
+                style={isActive
+                  ? { backgroundColor: 'var(--soi-teal)', borderColor: 'var(--soi-teal)' }
+                  : { backgroundColor: '#fff', borderColor: '#e5e7eb' }}>
+
+                {/* Chip — tap to switch */}
                 <button
                   onClick={() => handleChipSwitch(sp.id)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                    isActive
-                      ? 'text-white shadow-sm'
-                      : 'bg-white border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-700'
+                  className={`flex items-center gap-2 pl-3 pr-3 py-2 text-sm font-semibold transition-all ${
+                    isActive ? 'text-white' : 'text-gray-600 hover:text-teal-700'
                   }`}
-                  style={isActive ? { backgroundColor: 'var(--soi-teal)' } : {}}
+                  disabled={isActive}
                 >
                   {member && (
                     <span
-                      className="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                      className="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 shadow-sm"
                       style={{ backgroundColor: MEMBER_COLORS[member.colorIndex], fontSize: '9px' }}
                     >
                       {member.name.slice(0, 1).toUpperCase()}
                     </span>
                   )}
-                  <span className="max-w-[100px] truncate">{sp.name}</span>
+                  <span className="max-w-[110px] truncate">{sp.name}</span>
+                  {isActive && <span className="text-teal-200 text-xs">✓</span>}
                 </button>
 
-                {/* Delete button — only for non-active spaces */}
+                {/* Delete — only for inactive, full-height tappable strip */}
                 {!isActive && (
                   <button
                     onClick={() => setModal({ type: 'confirmDelete', spaceId: sp.id })}
-                    className="w-5 h-5 rounded-full bg-gray-100 hover:bg-red-100 flex items-center justify-center transition-colors flex-shrink-0"
+                    className="px-2.5 py-2 text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors border-l border-gray-100"
                     title="Eliminar lista"
                   >
-                    <X size={10} className="text-gray-400 hover:text-red-500" />
+                    <X size={14} />
                   </button>
                 )}
               </div>
@@ -143,10 +147,10 @@ export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces }: Props
           {/* Add new space button */}
           <button
             onClick={() => { resetNewForm(); setModal('new'); }}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold bg-white border-2 border-dashed border-gray-300 text-gray-400 hover:border-teal-400 hover:text-teal-600 transition-all flex-shrink-0"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold bg-white border-2 border-dashed border-gray-300 text-gray-400 hover:border-teal-400 hover:text-teal-600 transition-all flex-shrink-0"
           >
             <Plus size={14} />
-            <span>Nueva</span>
+            <span>Nueva lista</span>
           </button>
         </div>
       </div>

@@ -309,7 +309,7 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
                 </div>
               ) : (
                 <div className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
                     style={{ backgroundColor: MEMBER_COLORS[member.colorIndex] }}>
                     {member.name.slice(0, 2).toUpperCase()}
                   </div>
@@ -318,15 +318,24 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
                     <p className="text-xs text-gray-400">{ROLE_LABELS[member.role]}</p>
                   </div>
                   {isPropietario && view === null && (
-                    <div className="flex gap-1">
-                      <button onClick={() => startEditMember(member)} className="p-1.5 text-gray-400 hover:text-teal-600">
-                        <Pencil size={13} />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => startEditMember(member)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-500 bg-white border border-gray-200 hover:border-teal-300 hover:text-teal-600 transition-all"
+                      >
+                        <Pencil size={12} /> Editar
                       </button>
                       {member.id !== session.memberId && (
                         <button
                           onClick={() => handleDeleteMember(member.id)}
-                          className={`p-1.5 transition-colors ${confirmDel === member.id ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}`}>
-                          <Trash2 size={13} />
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                            confirmDel === member.id
+                              ? 'bg-red-500 text-white border-red-500'
+                              : 'text-gray-400 bg-white border-gray-200 hover:border-red-300 hover:text-red-500'
+                          }`}
+                        >
+                          <Trash2 size={12} />
+                          {confirmDel === member.id ? '¿Confirmar?' : 'Eliminar'}
                         </button>
                       )}
                     </div>

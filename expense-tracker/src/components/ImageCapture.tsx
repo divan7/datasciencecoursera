@@ -2,48 +2,43 @@ import { useState, useRef } from 'react';
 import { Camera, Upload, X, AlertCircle, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Expense, User } from '../types/expense';
-import { parseExpenseFromImage } from '../services/claudeService';
-import { QuickForm } from './QuickForm';
-import type { SpaceMember } from '../types/space';
+import { parseReceiptItems } from '../services/claudeService';
+import type { SpaceMember, AppSpace } from '../types/space';
+import { MultiExpenseReview, type ExpenseWithSpace } from './MultiExpenseReview';
 
 interface ImageCaptureProps {
   currentUser: User;
+  currentSpaceId: string;
+  spaces: AppSpace[];
   onSave: (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onSaveMultiple: (items: ExpenseWithSpace[]) => void;
   apiKey?: string;
   members: SpaceMember[];
 }
 
 type MediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
-export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCaptureProps) {
+export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey }: ImageCaptureProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string>('');
   const [mediaType, setMediaType] = useState<MediaType>('image/jpeg');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [parsed, setParsed] = useState<Partial<Expense> | null>(null);
+  const [parsedItems, setParsedItems] = useState<Partial<Expense>[] | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const processFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setError('Por favor selecciona una imagen válida.');
-      return;
-    }
-
-    const mt = file.type as MediaType;
-    setMediaType(mt);
+    if (!file.type.startsWith('image/')) { setError('Por favor selecciona una imagen válida.'); return; }
+    setMediaType(file.type as MediaType);
     setError('');
-    setParsed(null);
-
+    setParsedItems(null);
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
       setImagePreview(result);
-      // Extract base64 without the data URL prefix
-      const base64 = result.split(',')[1];
-      setImageBase64(base64);
+      setImageBase64(result.split(',')[1]);
     };
     reader.readAsDataURL(file);
   };
@@ -55,22 +50,15 @@ export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCapt
 
   const handleAnalyze = async () => {
     if (!imageBase64) return;
-    if (!apiKey) {
-      setError('Configura tu API Key de Anthropic en ajustes para usar esta función.');
-      return;
-    }
-
+    if (!apiKey) { setError('Configura tu API Key de Anthropic en Ajustes para usar esta función.'); return; }
     setLoading(true);
     setError('');
-
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const result = await parseExpenseFromImage(imageBase64, mediaType, apiKey, today);
-      setParsed({
-        ...result,
-        paidBy: result.paidBy ?? currentUser,
-        receiptImageBase64: imageBase64,
-      });
+      const items = await parseReceiptItems(imageBase64, mediaType, apiKey, today);
+      // Attach the receipt image to the first item only (to avoid duplicating large base64)
+      if (items.length > 0) items[0].receiptImageBase64 = imageBase64;
+      setParsedItems(items);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('401') || msg.includes('authentication') || msg.includes('invalid x-api-key')) {
@@ -80,7 +68,7 @@ export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCapt
       } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
         setError('Error de red. Verifica tu conexión a internet.');
       } else {
-        setError(`Error: ${msg}`);
+        setError(`Error al analizar: ${msg}`);
       }
       console.error(err);
     } finally {
@@ -89,37 +77,24 @@ export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCapt
   };
 
   const handleClear = () => {
-    setImagePreview(null);
-    setImageBase64('');
-    setParsed(null);
-    setError('');
+    setImagePreview(null); setImageBase64(''); setParsedItems(null); setError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
 
-  const handleSaveAndReset = (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
-    onSave(data);
+  const handleSaveAll = (items: ExpenseWithSpace[]) => {
+    if (items.length === 1 && items[0].spaceId === currentSpaceId) {
+      onSave(items[0].expense);
+    } else {
+      onSaveMultiple(items);
+    }
     handleClear();
   };
 
   return (
     <div className="space-y-4">
-      {/* Hidden file inputs */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileSelect}
-        id="file-upload"
-      />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFileSelect}
-        id="camera-capture"
-      />
+      <input ref={fileInputRef}   type="file" accept="image/*"              onChange={handleFileSelect} id="file-upload" />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} id="camera-capture" />
 
       {!imagePreview ? (
         <div className="space-y-3">
@@ -129,22 +104,16 @@ export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCapt
               <p className="text-sm font-semibold text-orange-700">Captura tu ticket</p>
             </div>
             <p className="text-xs text-gray-500 mb-4">
-              Toma una foto o sube una imagen de tu ticket de compra. La IA detectará automáticamente los datos del gasto.
+              La IA desglosa automáticamente los artículos del ticket en gastos separados. Puedes asignar cada uno a una lista diferente.
             </p>
-
             <div className="grid grid-cols-2 gap-3">
-              <label
-                htmlFor="camera-capture"
-                className="flex flex-col items-center justify-center gap-2 py-5 border-2 border-dashed border-orange-300 rounded-xl cursor-pointer hover:bg-orange-50 transition-all text-orange-600 bg-white"
-              >
+              <label htmlFor="camera-capture"
+                className="flex flex-col items-center justify-center gap-2 py-5 border-2 border-dashed border-orange-300 rounded-xl cursor-pointer hover:bg-orange-50 transition-all text-orange-600 bg-white">
                 <Camera size={28} />
                 <span className="text-xs font-semibold">Tomar foto</span>
               </label>
-
-              <label
-                htmlFor="file-upload"
-                className="flex flex-col items-center justify-center gap-2 py-5 border-2 border-dashed border-teal-300 rounded-xl cursor-pointer hover:bg-teal-50 transition-all text-teal-700 bg-white"
-              >
+              <label htmlFor="file-upload"
+                className="flex flex-col items-center justify-center gap-2 py-5 border-2 border-dashed border-teal-300 rounded-xl cursor-pointer hover:bg-teal-50 transition-all text-teal-700 bg-white">
                 <Upload size={28} />
                 <span className="text-xs font-semibold">Subir imagen</span>
               </label>
@@ -162,37 +131,22 @@ export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCapt
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Image preview */}
           <div className="relative">
-            <img
-              src={imagePreview}
-              alt="Ticket"
-              className="w-full max-h-64 object-contain rounded-xl border border-gray-200 bg-gray-50"
-            />
-            <button
-              onClick={handleClear}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-all"
-            >
+            <img src={imagePreview} alt="Ticket"
+              className="w-full max-h-56 object-contain rounded-xl border border-gray-200 bg-gray-50" />
+            <button onClick={handleClear}
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-all">
               <X size={14} />
             </button>
           </div>
 
-          {!parsed && (
-            <button
-              onClick={handleAnalyze}
-              disabled={loading}
-              className="w-full py-3 bg-orange-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-60 active:scale-95 transition-all"
-            >
+          {!parsedItems && (
+            <button onClick={handleAnalyze} disabled={loading}
+              className="w-full py-3 bg-orange-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-60 active:scale-95 transition-all">
               {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Analizando ticket...
-                </>
+                <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Desglosando ticket...</>
               ) : (
-                <>
-                  <Sparkles size={18} />
-                  Analizar con IA
-                </>
+                <><Sparkles size={18} /> Desglosar con IA</>
               )}
             </button>
           )}
@@ -206,18 +160,15 @@ export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCapt
         </div>
       )}
 
-      {parsed && (
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-green-600 text-sm font-semibold">✅ Ticket analizado — revisa y guarda:</span>
-          </div>
-          <QuickForm
-            currentUser={currentUser}
-            onSave={handleSaveAndReset}
-            prefill={parsed as Partial<Expense>}
-            members={members}
-          />
-        </div>
+      {parsedItems && (
+        <MultiExpenseReview
+          items={parsedItems}
+          spaces={spaces}
+          defaultSpaceId={currentSpaceId}
+          currentUser={currentUser}
+          onSaveAll={handleSaveAll}
+          onCancel={() => setParsedItems(null)}
+        />
       )}
     </div>
   );

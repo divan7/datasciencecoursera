@@ -16,11 +16,12 @@ import { SpaceSettings } from './components/SpaceSettings';
 import { SpacePicker } from './components/SpacePicker';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
-import { loadSettings, saveSettings, loadLegacySettings } from './utils/storage';
+import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace } from './utils/storage';
 import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy } from './utils/spaceStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
+import type { ExpenseWithSpace } from './components/MultiExpenseReview';
 import type { AppSpace, SessionState } from './types/space';
 import { MEMBER_COLORS } from './types/space';
 import { format } from 'date-fns';
@@ -146,6 +147,19 @@ export default function App() {
     setActiveTab('add');
   }, []);
 
+  const handleSaveMultipleExpenses = useCallback((items: ExpenseWithSpace[]) => {
+    items.forEach(({ expense, spaceId: targetSpaceId }) => {
+      if (targetSpaceId === spaceId) {
+        const saved = addExpense(expense);
+        const month = expense.date.slice(0, 7);
+        tryAutoMatch(saved, month);
+      } else {
+        saveExpenseToAnySpace(expense, targetSpaceId);
+      }
+    });
+    setActiveTab('list');
+  }, [addExpense, tryAutoMatch, spaceId]);
+
   // ── Pending fixed expenses for tray ───────────────────────────
   const currentMonth = format(new Date(), 'yyyy-MM');
   const { pendingTemplates, pendingIds } = useMemo(() => {
@@ -237,8 +251,9 @@ export default function App() {
               {modeButtons.map((btn) => (
                 <button key={btn.id} onClick={() => { setInputMode(btn.id); setPrefillTemplate(null); }}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                    inputMode === btn.id ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}>
+                    inputMode === btn.id ? 'text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                  style={inputMode === btn.id ? { backgroundColor: 'var(--soi-teal)' } : {}}>
                   <span>{btn.emoji}</span>{btn.label}
                 </button>
               ))}
@@ -252,12 +267,26 @@ export default function App() {
                   pendingIds={pendingIds} />
               )}
               {inputMode === 'text' && (
-                <TextParser currentUser={currentUser} onSave={handleSaveExpense}
-                  apiKey={settings.anthropicApiKey} members={currentSpace.members} />
+                <TextParser
+                  currentUser={currentUser}
+                  currentSpaceId={spaceId}
+                  spaces={spaces}
+                  onSave={handleSaveExpense}
+                  onSaveMultiple={handleSaveMultipleExpenses}
+                  apiKey={settings.anthropicApiKey}
+                  members={currentSpace.members}
+                />
               )}
               {inputMode === 'image' && (
-                <ImageCapture currentUser={currentUser} onSave={handleSaveExpense}
-                  apiKey={settings.anthropicApiKey} members={currentSpace.members} />
+                <ImageCapture
+                  currentUser={currentUser}
+                  currentSpaceId={spaceId}
+                  spaces={spaces}
+                  onSave={handleSaveExpense}
+                  onSaveMultiple={handleSaveMultipleExpenses}
+                  apiKey={settings.anthropicApiKey}
+                  members={currentSpace.members}
+                />
               )}
             </div>
           </div>

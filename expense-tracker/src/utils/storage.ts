@@ -45,3 +45,15 @@ export function loadLegacySettings(): AppSettings | null {
 export function generateId(): string {
   return `exp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
+
+/** Save a single expense directly to any space (bypasses React state — use for cross-space saves). */
+export function saveExpenseToAnySpace(
+  data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>,
+  spaceId: string,
+): Expense {
+  const now = new Date().toISOString();
+  const expense: Expense = { ...data, id: generateId(), createdAt: now, updatedAt: now };
+  const existing = loadExpenses(spaceId);
+  saveExpenses([expense, ...existing], spaceId);
+  return expense;
+}

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { QuickForm } from './components/QuickForm';
 import { TextParser } from './components/TextParser';
@@ -9,6 +9,7 @@ import { Dashboard } from './components/Dashboard';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MonthlyChecklist } from './components/MonthlyChecklist';
 import { FixedExpenseManager } from './components/FixedExpenseManager';
+import { PendingFixedTray } from './components/PendingFixedTray';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings } from './utils/storage';
@@ -74,6 +75,20 @@ export default function App() {
     setActiveTab('add');
   }, []);
 
+  // Pending fixed expense templates for tray + autocomplete
+  const currentMonth = format(new Date(), 'yyyy-MM');
+  const { pendingTemplates, pendingIds } = useMemo(() => {
+    const pendingSet = new Set(
+      checks
+        .filter((c) => c.month === currentMonth && c.status === 'pendiente')
+        .map((c) => c.templateId)
+    );
+    return {
+      pendingTemplates: templates.filter((t) => t.active && pendingSet.has(t.id)),
+      pendingIds: pendingSet,
+    };
+  }, [templates, checks, currentMonth]);
+
   const modeButtons: { id: InputMode; label: string; emoji: string }[] = [
     { id: 'form',  label: 'Formulario', emoji: '📋' },
     { id: 'text',  label: 'Texto',      emoji: '✍️' },
@@ -121,6 +136,14 @@ export default function App() {
                 <button onClick={() => setPrefillTemplate(null)} className="text-xs text-blue-400 hover:text-blue-600">✕ Limpiar</button>
               </div>
             )}
+              {pendingTemplates.length > 0 && (
+              <PendingFixedTray
+                templates={templates}
+                checks={checks}
+                onSelect={handleRegisterFromTemplate}
+                onViewAll={() => setActiveTab('checklist')}
+              />
+            )}
             <div className="flex gap-2 bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm">
               {modeButtons.map((btn) => (
                 <button key={btn.id} onClick={() => { setInputMode(btn.id); setPrefillTemplate(null); }}
@@ -135,7 +158,9 @@ export default function App() {
               {inputMode === 'form' && (
                 <QuickForm currentUser={currentUser} onSave={handleSaveExpense}
                   prefill={templatePrefill}
-                  userName1={settings.userName1} userName2={settings.userName2} />
+                  userName1={settings.userName1} userName2={settings.userName2}
+                  fixedSuggestions={templates}
+                  pendingIds={pendingIds} />
               )}
               {inputMode === 'text' && (
                 <TextParser currentUser={currentUser} onSave={handleSaveExpense}

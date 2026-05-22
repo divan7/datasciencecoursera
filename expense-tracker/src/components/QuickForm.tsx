@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
+import type { FixedExpenseTemplate } from '../types/fixedExpense';
 
 interface QuickFormProps {
   currentUser: User;
@@ -9,6 +10,8 @@ interface QuickFormProps {
   prefill?: Partial<Expense>;
   userName1: string;
   userName2: string;
+  fixedSuggestions?: FixedExpenseTemplate[];   // plantillas para autocompletado
+  pendingIds?: Set<string>;                     // IDs de checks pendientes este mes
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -23,8 +26,10 @@ const CATEGORY_ICONS: Record<string, string> = {
 const QUICK_EXPENSE_CATS: Category[] = ['alimentacion', 'restaurantes', 'transporte', 'hogar', 'salud', 'entretenimiento', 'servicios', 'otro'];
 const QUICK_INCOME_CATS = ['salario', 'freelance', 'negocio', 'bono', 'renta', 'reembolso'];
 
-export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }: QuickFormProps) {
+export function QuickForm({ currentUser, onSave, prefill, userName1, userName2, fixedSuggestions = [], pendingIds }: QuickFormProps) {
   const today = format(new Date(), 'yyyy-MM-dd');
+  const conceptRef = useRef<HTMLInputElement>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [transactionType, setTransactionType] = useState<TransactionType>(
     prefill?.transactionType ?? 'gasto'
@@ -58,6 +63,49 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
   const isIncome = transactionType === 'ingreso';
   const quickCats = isIncome ? QUICK_INCOME_CATS : QUICK_EXPENSE_CATS;
   const allCats = isIncome ? INCOME_CATEGORIES : CATEGORIES;
+
+  // ── Autocomplete suggestions ─────────────────────────────────────
+  const filteredSuggestions = useMemo(() => {
+    if (!fixedSuggestions.length) return [];
+    const q = form.concept.toLowerCase().trim();
+    const matched = fixedSuggestions.filter((t) =>
+      q === '' || t.concept.toLowerCase().includes(q)
+    );
+    // Pending first, then rest
+    return [
+      ...matched.filter((t) => pendingIds?.has(t.id)),
+      ...matched.filter((t) => !pendingIds?.has(t.id)),
+    ];
+  }, [fixedSuggestions, form.concept, pendingIds]);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (conceptRef.current && !conceptRef.current.closest('.concept-wrapper')?.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const applySuggestion = (tpl: FixedExpenseTemplate) => {
+    setForm((f) => ({
+      ...f,
+      concept:       tpl.concept,
+      amount:        tpl.expectedAmount > 0 ? String(tpl.expectedAmount) : f.amount,
+      category:      tpl.category,
+      paymentMethod: tpl.paymentMethod,
+      bank:          tpl.bank ?? f.bank,
+      cardLast4:     tpl.cardLast4 ?? f.cardLast4,
+      expenseType:   'fijo',
+      frequency:     tpl.frequency,
+      paidBy:        tpl.paidBy,
+    }));
+    setTransactionType('gasto');
+    setShowSuggestions(false);
+    setTimeout(() => conceptRef.current?.blur(), 0);
+  };
 
   const handleTransactionSwitch = (t: TransactionType) => {
     setTransactionType(t);
@@ -149,19 +197,62 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2 }
         </div>
       </div>
 
-      {/* Concept */}
-      <div>
+      {/* Concept with autocomplete */}
+      <div className="concept-wrapper relative">
         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
           {isIncome ? '¿De dónde proviene?' : 'Concepto *'}
         </label>
         <input
+          ref={conceptRef}
           type="text"
           required
           value={form.concept}
-          onChange={(e) => set('concept', e.target.value)}
+          onChange={(e) => { set('concept', e.target.value); setShowSuggestions(true); }}
+          onFocus={() => setShowSuggestions(true)}
           placeholder={isIncome ? 'Ej. Quincena enero, Pago cliente...' : '¿En qué se gastó?'}
           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          autoComplete="off"
         />
+        {/* Dropdown */}
+        {showSuggestions && !isIncome && filteredSuggestions.length > 0 && (
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden max-h-52 overflow-y-auto">
+            <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+              <p className="text-xs text-gray-400 font-medium">Gastos fijos registrados</p>
+            </div>
+            {filteredSuggestions.map((tpl) => {
+              const isPending = pendingIds?.has(tpl.id);
+              return (
+                <button
+                  key={tpl.id}
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); applySuggestion(tpl); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                >
+                  <span className="text-lg flex-shrink-0">
+                    {CATEGORY_ICONS[tpl.category] ?? '📦'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{tpl.concept}</p>
+                      {isPending && (
+                        <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                          pendiente
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      ${tpl.expectedAmount.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
+                      {' · '}
+                      {(CATEGORIES[tpl.category as keyof typeof CATEGORIES] as string ?? '').replace(/^[^ ]+ /, '')}
+                      {tpl.dayOfMonth ? ` · día ${tpl.dayOfMonth}` : ''}
+                    </p>
+                  </div>
+                  <span className="text-xs text-blue-500 font-medium flex-shrink-0">↵ usar</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Category quick select */}

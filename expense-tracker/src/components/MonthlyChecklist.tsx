@@ -17,7 +17,8 @@ interface Props {
   onSkip: (checkId: string, notes?: string) => void;
   onReset: (checkId: string) => void;
   onRegisterNow: (template: FixedExpenseTemplate) => void;
-  members: SpaceMember[];
+  // members is accepted for API compatibility but not used internally
+  members?: SpaceMember[];
 }
 
 const STATUS_CONFIG: Record<CheckStatus, { icon: React.ReactNode; label: string; color: string; bg: string }> = {

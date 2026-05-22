@@ -135,7 +135,7 @@ export function TextParser({ currentUser, onSave, apiKey, members }: TextParserP
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-4 border border-purple-100">
+      <div className="bg-gradient-to-br from-purple-50 to-teal-50 rounded-2xl p-4 border border-purple-100">
         <div className="flex items-center gap-2 mb-2">
           <Sparkles size={18} className="text-purple-500" />
           <p className="text-sm font-semibold text-purple-700">IA analiza tu texto</p>

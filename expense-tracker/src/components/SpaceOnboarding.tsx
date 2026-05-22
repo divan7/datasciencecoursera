@@ -133,7 +133,7 @@ export function SpaceOnboarding({ onComplete }: Props) {
   const totalMembers = 1 + members.length; // owner + extra members
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl overflow-hidden">
         {/* Header */}
         <div className="bg-teal-700 px-6 py-5 text-white text-center">

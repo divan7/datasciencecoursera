@@ -101,7 +101,7 @@ function CheckItem({
           <div className="flex gap-2 mt-2">
             <button
               onClick={() => onRegisterNow(template)}
-              className="flex-1 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-all"
+              className="flex-1 py-1.5 bg-teal-700 text-white rounded-lg text-xs font-semibold hover:bg-teal-800 transition-all"
             >
               ✏️ Registrar ahora
             </button>
@@ -127,7 +127,7 @@ function CheckItem({
               value={skipNote}
               onChange={(e) => setSkipNote(e.target.value)}
               placeholder="Razón (opcional)..."
-              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-300"
             />
             <div className="flex gap-2">
               <button onClick={() => { onSkip(check.id, skipNote); setShowSkipInput(false); }}
@@ -262,7 +262,7 @@ export function MonthlyChecklist({
       <select
         value={selectedMonth}
         onChange={(e) => setSelectedMonth(e.target.value)}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
       >
         {availableMonths.map((m) => {
           const [y, mo] = m.split('-');

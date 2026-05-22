@@ -183,7 +183,7 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
           <h2 className="text-base font-bold text-gray-800">Espacio actual</h2>
           {isPropietario && view === null && (
             <button onClick={() => { setEditName(currentSpace.name); setView({ type: 'editSpaceName' }); }}
-              className="p-1.5 text-gray-400 hover:text-blue-500">
+              className="p-1.5 text-gray-400 hover:text-teal-600">
               <Pencil size={15} />
             </button>
           )}
@@ -283,26 +283,26 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
           {currentSpace.members.map((member) => (
             <div key={member.id}>
               {view?.type === 'editMember' && view.memberId === member.id ? (
-                <div className="border border-blue-200 rounded-xl p-3 bg-blue-50 space-y-2">
+                <div className="border border-teal-200 rounded-xl p-3 bg-teal-50 space-y-2">
                   <input type="text" value={editMemberName} onChange={(e) => setEditMemberName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" autoFocus />
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" autoFocus />
                   <div className="flex flex-wrap gap-1.5">
                     {MEMBER_COLORS.map((color, i) => (
                       <button key={i} type="button" onClick={() => setEditMemberColorIndex(i)}
-                        className={`w-7 h-7 rounded-full transition-all ${editMemberColorIndex === i ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
+                        className={`w-7 h-7 rounded-full transition-all ${editMemberColorIndex === i ? 'ring-2 ring-offset-1 ring-teal-600' : ''}`}
                         style={{ backgroundColor: color }} />
                     ))}
                   </div>
                   {member.role !== 'propietario' && (
                     <select value={editMemberRole} onChange={(e) => setEditMemberRole(e.target.value as MemberRole)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
                       {(Object.entries(ROLE_LABELS) as [MemberRole, string][]).map(([k, v]) => (
                         <option key={k} value={k}>{v}</option>
                       ))}
                     </select>
                   )}
                   <div className="flex gap-2">
-                    <button onClick={() => handleSaveMember(member.id)} className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold">Guardar</button>
+                    <button onClick={() => handleSaveMember(member.id)} className="flex-1 py-2 bg-teal-700 text-white rounded-xl text-xs font-bold">Guardar</button>
                     <button onClick={() => setView(null)} className="flex-1 py-2 border border-gray-200 text-gray-500 rounded-xl text-xs">Cancelar</button>
                   </div>
                 </div>
@@ -318,7 +318,7 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
                   </div>
                   {isPropietario && view === null && (
                     <div className="flex gap-1">
-                      <button onClick={() => startEditMember(member)} className="p-1.5 text-gray-400 hover:text-blue-500">
+                      <button onClick={() => startEditMember(member)} className="p-1.5 text-gray-400 hover:text-teal-600">
                         <Pencil size={13} />
                       </button>
                       {member.id !== session.memberId && (
@@ -386,7 +386,7 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
                 ) : (
                   <button
                     onClick={() => onSwitchSpace(sp.id, myMember.id)}
-                    className="flex items-center gap-1 text-xs text-blue-600 font-medium hover:underline"
+                    className="flex items-center gap-1 text-xs text-teal-700 font-medium hover:underline"
                   >
                     Cambiar <ChevronRight size={12} />
                   </button>

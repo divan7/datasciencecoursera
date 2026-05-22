@@ -40,7 +40,7 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
         <h3 className="text-sm font-bold text-gray-700 mb-1">🤖 API Key de Anthropic</h3>
         <p className="text-xs text-gray-400 mb-3">
           Necesaria para el análisis de texto con IA y lectura de tickets. Obtén tu clave en{' '}
-          <span className="text-blue-500">console.anthropic.com</span>
+          <span className="text-teal-600">console.anthropic.com</span>
         </p>
         <div className="relative">
           <input
@@ -48,7 +48,7 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
             value={form.anthropicApiKey ?? ''}
             onChange={(e) => set('anthropicApiKey', e.target.value)}
             placeholder="sk-ant-api..."
-            className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 font-mono"
+            className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 font-mono"
           />
           <button
             type="button"
@@ -74,7 +74,7 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
         <select
           value={form.currency}
           onChange={(e) => set('currency', e.target.value)}
-          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
         >
           {['MXN', 'USD', 'EUR', 'COP', 'ARS', 'CLP', 'PEN', 'BRL'].map((c) => (
             <option key={c} value={c}>{c}</option>

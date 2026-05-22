@@ -143,7 +143,7 @@ export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCapt
 
               <label
                 htmlFor="file-upload"
-                className="flex flex-col items-center justify-center gap-2 py-5 border-2 border-dashed border-blue-300 rounded-xl cursor-pointer hover:bg-blue-50 transition-all text-blue-600 bg-white"
+                className="flex flex-col items-center justify-center gap-2 py-5 border-2 border-dashed border-teal-300 rounded-xl cursor-pointer hover:bg-teal-50 transition-all text-teal-700 bg-white"
               >
                 <Upload size={28} />
                 <span className="text-xs font-semibold">Subir imagen</span>

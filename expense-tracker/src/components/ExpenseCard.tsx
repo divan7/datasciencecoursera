@@ -12,7 +12,7 @@ interface ExpenseCardProps {
 
 const CATEGORY_COLORS: Record<string, string> = {
   alimentacion: 'bg-green-100 text-green-700',
-  transporte: 'bg-blue-100 text-blue-700',
+  transporte: 'bg-teal-100 text-teal-800',
   hogar: 'bg-yellow-100 text-yellow-700',
   salud: 'bg-red-100 text-red-700',
   educacion: 'bg-indigo-100 text-indigo-700',
@@ -61,12 +61,12 @@ export function ExpenseCard({ expense: e, onDelete }: ExpenseCardProps) {
                   <span className="text-xs text-gray-400">
                     {format(parseISO(e.date), 'dd MMM', { locale: es })}
                   </span>
-                  <span className="text-xs font-medium text-blue-600">{e.paidBy}</span>
+                  <span className="text-xs font-medium text-teal-700">{e.paidBy}</span>
                   {e.store && (
                     <span className="text-xs text-gray-400 truncate">📍 {e.store}</span>
                   )}
                   {e.expenseType === 'fijo' && (
-                    <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full">fijo</span>
+                    <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full">fijo</span>
                   )}
                   {e.sharedExpense && (
                     <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">compartido</span>
@@ -74,8 +74,14 @@ export function ExpenseCard({ expense: e, onDelete }: ExpenseCardProps) {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-base font-bold text-gray-900">
-                  ${e.amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {e.transactionType === 'ingreso' && (
+                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#f5ede6', color: '#a85a3a' }}>
+                    +ingreso
+                  </span>
+                )}
+                <span className={`text-base font-bold ${e.transactionType === 'ingreso' ? '' : 'text-gray-900'}`}
+                  style={e.transactionType === 'ingreso' ? { color: '#cc7a55' } : {}}>
+                  {e.transactionType === 'ingreso' ? '+' : ''}${e.amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
@@ -124,7 +130,7 @@ export function ExpenseCard({ expense: e, onDelete }: ExpenseCardProps) {
           {e.notes && <p>📝 {e.notes}</p>}
           {e.receiptImageBase64 && (
             <details>
-              <summary className="cursor-pointer text-blue-500 font-medium">Ver ticket</summary>
+              <summary className="cursor-pointer text-teal-600 font-medium">Ver ticket</summary>
               <img
                 src={`data:image/jpeg;base64,${e.receiptImageBase64}`}
                 alt="Ticket"

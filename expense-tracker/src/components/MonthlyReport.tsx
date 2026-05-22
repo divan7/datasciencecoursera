@@ -88,7 +88,7 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
     URL.revokeObjectURL(url);
   };
 
-  const COLORS = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500', 'bg-orange-500', 'bg-teal-500', 'bg-pink-500'];
+  const COLORS = ['bg-teal-600', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500', 'bg-orange-500', 'bg-teal-500', 'bg-pink-500'];
 
   return (
     <div className="space-y-4">
@@ -98,7 +98,7 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 appearance-none bg-white"
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-300 appearance-none bg-white"
           >
             {availableMonths.map((m) => {
               const [y, mo] = m.split('-');
@@ -115,7 +115,7 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
         <button
           onClick={exportCSV}
           disabled={monthExpenses.length === 0}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all disabled:opacity-40"
+          className="px-3 py-2 border border-gray-200 rounded-xl text-gray-500 hover:text-teal-700 hover:border-teal-300 transition-all disabled:opacity-40"
           title="Exportar CSV"
         >
           <Download size={18} />
@@ -130,23 +130,23 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
       ) : (
         <>
           {/* Main totals */}
-          <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-4 text-white">
-            <p className="text-blue-200 text-sm mb-1">{monthLabel}</p>
+          <div className="bg-gradient-to-br from-teal-700 to-teal-800 rounded-2xl p-4 text-white">
+            <p className="text-teal-200 text-sm mb-1">{monthLabel}</p>
             <p className="text-4xl font-bold">
               ${stats.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </p>
-            <p className="text-blue-200 text-sm mt-1">{stats.count} gastos registrados</p>
+            <p className="text-teal-200 text-sm mt-1">{stats.count} gastos registrados</p>
 
             <div className="grid grid-cols-2 gap-3 mt-4">
               {members.map((m) => {
                 const amt = stats.byMember[m.name] ?? 0;
                 return (
                   <div key={m.id} className="bg-white/10 rounded-xl p-3">
-                    <p className="text-blue-200 text-xs truncate">{m.name}</p>
+                    <p className="text-teal-200 text-xs truncate">{m.name}</p>
                     <p className="text-white font-bold text-lg">
                       ${amt.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
                     </p>
-                    <p className="text-blue-300 text-xs">
+                    <p className="text-teal-300 text-xs">
                       {stats.total > 0 ? Math.round((amt / stats.total) * 100) : 0}%
                     </p>
                   </div>
@@ -175,7 +175,7 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
             {stats.total > 0 && (
               <div className="mt-3 h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-blue-500 rounded-full"
+                  className="h-full bg-teal-600 rounded-full"
                   style={{ width: `${(stats.fixed / stats.total) * 100}%` }}
                 />
               </div>

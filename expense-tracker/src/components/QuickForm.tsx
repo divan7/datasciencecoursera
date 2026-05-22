@@ -169,21 +169,21 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
         <button
           type="button"
           onClick={() => handleTransactionSwitch('ingreso')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
-            isIncome ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500'
-          }`}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${isIncome ? 'text-white shadow-sm' : 'text-gray-500'}`}
+          style={isIncome ? { backgroundColor: '#cc7a55' } : {}}
         >
           💰 Ingreso
         </button>
       </div>
 
       {/* Amount */}
-      <div className={`rounded-2xl p-4 border-2 ${isIncome ? 'bg-green-50 border-green-100' : 'bg-blue-50 border-blue-100'}`}>
-        <label className={`block text-xs font-semibold uppercase tracking-wide mb-1 ${isIncome ? 'text-green-600' : 'text-blue-600'}`}>
+      <div className={`rounded-2xl p-4 border-2 ${isIncome ? '' : 'bg-teal-50 border-teal-100'}`}
+        style={isIncome ? { backgroundColor: '#f5ede6', borderColor: '#e8c4a8' } : {}}>
+        <label className={`block text-xs font-semibold uppercase tracking-wide mb-1 ${isIncome ? 'text-[#a85a3a]' : 'text-teal-700'}`}>
           Monto (MXN)
         </label>
         <div className="flex items-center gap-2">
-          <span className={`text-2xl font-bold ${isIncome ? 'text-green-800' : 'text-blue-800'}`}>$</span>
+          <span className={`text-2xl font-bold ${isIncome ? 'text-[#cc7a55]' : 'text-teal-800'}`}>$</span>
           <input
             type="number"
             inputMode="decimal"
@@ -193,7 +193,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
             value={form.amount}
             onChange={(e) => set('amount', e.target.value)}
             placeholder="0.00"
-            className={`flex-1 text-3xl font-bold bg-transparent border-none outline-none ${isIncome ? 'text-green-900 placeholder-green-300' : 'text-blue-900 placeholder-blue-300'}`}
+            className={`flex-1 text-3xl font-bold bg-transparent border-none outline-none ${isIncome ? 'text-[#a85a3a] placeholder-[#e8b89a]' : 'text-teal-900 placeholder-teal-300'}`}
           />
         </div>
       </div>
@@ -211,7 +211,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
           onChange={(e) => { set('concept', e.target.value); setShowSuggestions(true); }}
           onFocus={() => setShowSuggestions(true)}
           placeholder={isIncome ? 'Ej. Quincena enero, Pago cliente...' : '¿En qué se gastó?'}
-          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
           autoComplete="off"
         />
         {/* Dropdown */}
@@ -227,7 +227,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                   key={tpl.id}
                   type="button"
                   onMouseDown={(e) => { e.preventDefault(); applySuggestion(tpl); }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-blue-50 transition-colors text-left border-b border-gray-50 last:border-0"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-teal-50 transition-colors text-left border-b border-gray-50 last:border-0"
                 >
                   <span className="text-lg flex-shrink-0">
                     {CATEGORY_ICONS[tpl.category] ?? '📦'}
@@ -248,7 +248,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                       {tpl.dayOfMonth ? ` · día ${tpl.dayOfMonth}` : ''}
                     </p>
                   </div>
-                  <span className="text-xs text-blue-500 font-medium flex-shrink-0">↵ usar</span>
+                  <span className="text-xs text-teal-600 font-medium flex-shrink-0">↵ usar</span>
                 </button>
               );
             })}
@@ -269,7 +269,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
               onClick={() => set('category', cat)}
               className={`flex flex-col items-center gap-1 p-2 rounded-xl border text-xs transition-all ${
                 form.category === cat
-                  ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                  ? 'border-teal-600 bg-teal-50 text-teal-800 font-semibold'
                   : 'border-gray-200 text-gray-500 hover:border-gray-300'
               }`}
             >
@@ -281,7 +281,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
         <select
           value={form.category}
           onChange={(e) => set('category', e.target.value)}
-          className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-300"
         >
           {Object.entries(allCats).map(([key, label]) => (
             <option key={key} value={key}>{label as string}</option>
@@ -303,8 +303,8 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                 onClick={() => set('paymentMethod', key as PaymentMethod)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                   form.paymentMethod === key
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                    ? 'bg-teal-700 text-white border-teal-700'
+                    : 'border-gray-200 text-gray-500 hover:border-teal-300'
                 }`}
               >
                 {label as string}
@@ -322,7 +322,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
             type="date"
             value={form.date}
             onChange={(e) => set('date', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
           />
         </div>
         <div>
@@ -361,7 +361,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="w-full text-xs text-blue-500 font-medium py-1"
+            className="w-full text-xs text-teal-600 font-medium py-1"
           >
             {showAdvanced ? '▲ Menos opciones' : '▼ Más opciones (establecimiento, tarjeta, MSI...)'}
           </button>
@@ -372,12 +372,12 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Establecimiento</label>
                   <input type="text" value={form.store} onChange={(e) => set('store', e.target.value)}
-                    placeholder="Walmart, OXXO..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    placeholder="Walmart, OXXO..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Banco / Emisor</label>
                   <input type="text" value={form.bank} onChange={(e) => set('bank', e.target.value)}
-                    placeholder="BBVA, Banamex..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    placeholder="BBVA, Banamex..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
                 </div>
               </div>
 
@@ -386,13 +386,13 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Últimos 4 dígitos</label>
                   <input type="text" maxLength={4} value={form.cardLast4}
                     onChange={(e) => set('cardLast4', e.target.value.replace(/\D/g, ''))}
-                    placeholder="1234" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    placeholder="1234" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">MSI (meses)</label>
                   <input type="number" min="0" max="48" value={form.installments}
                     onChange={(e) => set('installments', e.target.value)}
-                    placeholder="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+                    placeholder="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
                 </div>
               </div>
 
@@ -402,7 +402,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                   {(['variable', 'fijo'] as ExpenseType[]).map((t) => (
                     <button key={t} type="button" onClick={() => set('expenseType', t)}
                       className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all capitalize ${
-                        form.expenseType === t ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500'
+                        form.expenseType === t ? 'bg-teal-700 text-white border-teal-700' : 'border-gray-200 text-gray-500'
                       }`}
                     >{t}</button>
                   ))}
@@ -413,7 +413,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Frecuencia</label>
                   <select value={form.frequency} onChange={(e) => set('frequency', e.target.value as Frequency)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
                     {Object.entries(FREQUENCIES).map(([key, label]) => (
                       <option key={key} value={key}>{label as string}</option>
                     ))}
@@ -440,7 +440,7 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Notas</label>
                 <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)}
                   placeholder="Observaciones adicionales..." rows={2}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" />
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 resize-none" />
               </div>
             </div>
           )}
@@ -452,16 +452,16 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
           <label className="block text-xs font-semibold text-gray-500 mb-1">Notas</label>
           <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)}
             placeholder="Detalles adicionales..." rows={2}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none" />
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 resize-none" />
         </div>
       )}
 
       <button
         type="submit"
         className={`w-full py-3 rounded-2xl font-bold text-white text-base transition-all ${
-          saved ? 'bg-green-500' : isIncome
-            ? 'bg-green-600 hover:bg-green-700 active:scale-95'
-            : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
+          saved ? 'bg-[#cc7a55]' : isIncome
+            ? 'bg-[#cc7a55] hover:bg-[#a85a3a] active:scale-95'
+            : 'bg-teal-700 hover:bg-teal-800 active:scale-95'
         }`}
       >
         {saved ? '✅ ¡Guardado!' : isIncome ? '💰 Guardar ingreso' : '💾 Guardar gasto'}

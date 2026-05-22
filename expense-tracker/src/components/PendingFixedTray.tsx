@@ -58,13 +58,13 @@ export function PendingFixedTray({ templates, checks, onSelect, onViewAll }: Pro
           <button
             key={tpl.id}
             onClick={() => onSelect(tpl)}
-            className="flex-shrink-0 bg-white border border-amber-200 rounded-xl p-2.5 text-left hover:border-blue-400 hover:shadow-sm active:scale-95 transition-all min-w-[120px] max-w-[140px]"
+            className="flex-shrink-0 bg-white border border-amber-200 rounded-xl p-2.5 text-left hover:border-teal-500 hover:shadow-sm active:scale-95 transition-all min-w-[120px] max-w-[140px]"
           >
             <div className="text-xl mb-1">{CATEGORY_ICONS[tpl.category] ?? '📦'}</div>
             <p className="text-xs font-semibold text-gray-800 leading-tight line-clamp-2 mb-1">
               {tpl.concept}
             </p>
-            <p className="text-sm font-bold text-blue-700">
+            <p className="text-sm font-bold text-teal-800">
               ${tpl.expectedAmount.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
             </p>
             {tpl.dayOfMonth && (

@@ -208,7 +208,7 @@ export function Dashboard({ expenses, members }: DashboardProps) {
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+          className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
         >
           {availableMonths.map((m) => {
             const [y, mo] = m.split('-');
@@ -226,7 +226,7 @@ export function Dashboard({ expenses, members }: DashboardProps) {
               key={r}
               onClick={() => setRange(r)}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                range === r ? 'bg-blue-600 text-white' : 'text-gray-400'
+                range === r ? 'bg-teal-700 text-white' : 'text-gray-400'
               }`}
             >
               {r}
@@ -251,7 +251,7 @@ export function Dashboard({ expenses, members }: DashboardProps) {
           label="⚖️ Balance mensual"
           value={fmt(Math.abs(monthlySummary.balance))}
           sub={monthlySummary.balance >= 0 ? '▲ superávit' : '▼ déficit'}
-          color={monthlySummary.balance >= 0 ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}
+          color={monthlySummary.balance >= 0 ? 'bg-teal-50 text-teal-800' : 'bg-orange-50 text-orange-700'}
         />
         <SummaryCard
           label="📅 Gastos este año"

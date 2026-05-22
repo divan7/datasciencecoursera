@@ -79,7 +79,7 @@ export function ExpenseList({ expenses, onDelete, members, isLector = false }: E
         <select
           value={selectedMonth}
           onChange={(e) => setSelectedMonth(e.target.value)}
-          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-300 appearance-none bg-white"
+          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-300 appearance-none bg-white"
         >
           {availableMonths.map((m) => {
             const [y, mo] = m.split('-');
@@ -122,7 +122,7 @@ export function ExpenseList({ expenses, onDelete, members, isLector = false }: E
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar gastos..."
-          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+          className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
         />
       </div>
 
@@ -155,7 +155,7 @@ export function ExpenseList({ expenses, onDelete, members, isLector = false }: E
             key={cat}
             onClick={() => setFilterCategory(filterCategory === cat ? 'all' : cat)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium border flex-shrink-0 transition-all ${
-              filterCategory === cat ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500'
+              filterCategory === cat ? 'bg-teal-700 text-white border-teal-700' : 'border-gray-200 text-gray-500'
             }`}
           >
             {CATEGORIES[cat]}

@@ -8,7 +8,11 @@ export interface FixedExpenseTemplate {
   paidBy: User;
   paymentMethod: PaymentMethod;
   frequency: Frequency;
-  dayOfMonth?: number;       // día esperado de pago (1-31)
+  dayOfMonth?: number;       // día esperado de pago (1-31) — mensual, bimestral, trimestral, semestral, anual, quincenal
+  dayOfWeek?: number;        // 1=Lunes…7=Domingo — semanal
+  paymentMonth?: number;     // 1-12 — anual
+  reminderEnabled?: boolean;
+  reminderDaysBefore?: number; // días de anticipación (default 1)
   bank?: string;
   cardLast4?: string;
   active: boolean;

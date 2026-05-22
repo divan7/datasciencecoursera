@@ -17,6 +17,7 @@ import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings, loadLegacySettings } from './utils/storage';
 import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy } from './utils/spaceStorage';
+import { checkAndFireNotifications } from './services/notificationService';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { AppSpace, SessionState } from './types/space';
@@ -83,6 +84,14 @@ export default function App() {
     tryAutoMatch,
     pendingCountCurrentMonth,
   } = useFixedExpenses(expenses, spaceId);
+
+  // ── Notification check on mount and focus ────────────────────
+  useEffect(() => {
+    checkAndFireNotifications(templates);
+    const onVisible = () => { if (!document.hidden) checkAndFireNotifications(templates); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [templates]);
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleOnboardingComplete = useCallback((space: AppSpace, newSession: SessionState) => {

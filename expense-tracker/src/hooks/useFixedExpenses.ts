@@ -6,15 +6,27 @@ import {
   loadTemplates, saveTemplates, loadChecks, saveChecks,
   generateFixedId, isDueInMonth,
 } from '../utils/fixedStorage';
+import { fixedDb } from '../lib/db';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
   const [templates, setTemplates] = useState<FixedExpenseTemplate[]>(() => loadTemplates(spaceId));
   const [checks, setChecks]       = useState<MonthlyCheck[]>(() => loadChecks(spaceId));
 
-  // Reload when spaceId changes
   useEffect(() => {
+    if (!spaceId) return;
     setTemplates(loadTemplates(spaceId));
     setChecks(loadChecks(spaceId));
+    if (isSupabaseConfigured) {
+      fixedDb.listTemplates(spaceId).then((remote) => {
+        setTemplates(remote);
+        saveTemplates(remote, spaceId);
+      }).catch(console.error);
+      fixedDb.listChecks(spaceId).then((remote) => {
+        setChecks(remote);
+        saveChecks(remote, spaceId);
+      }).catch(console.error);
+    }
   }, [spaceId]);
 
   // ── Template CRUD ──────────────────────────────────────────────
@@ -29,6 +41,9 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveTemplates(updated, spaceId);
       return updated;
     });
+    if (isSupabaseConfigured) {
+      fixedDb.createTemplate(spaceId, tpl).catch(console.error);
+    }
     return tpl;
   }, [spaceId]);
 
@@ -36,6 +51,10 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     setTemplates((prev) => {
       const updated = prev.map((t) => t.id === id ? { ...t, ...data } : t);
       saveTemplates(updated, spaceId);
+      if (isSupabaseConfigured) {
+        const tpl = updated.find((t) => t.id === id);
+        if (tpl) fixedDb.updateTemplate(tpl, spaceId).catch(console.error);
+      }
       return updated;
     });
   }, [spaceId]);
@@ -51,6 +70,9 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveChecks(updated, spaceId);
       return updated;
     });
+    if (isSupabaseConfigured) {
+      fixedDb.deleteTemplate(id).catch(console.error);
+    }
   }, [spaceId]);
 
   // ── Check management ───────────────────────────────────────────
@@ -63,7 +85,6 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     const activeTemplates = templates.filter((t) => t.active && isDueInMonth(t, month));
     const existing = checks.filter((c) => c.month === month).map((c) => c.templateId);
     const missing = activeTemplates.filter((t) => !existing.includes(t.id));
-
     if (missing.length === 0) return;
 
     const newChecks: MonthlyCheck[] = missing.map((t) => ({
@@ -76,17 +97,12 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     setChecks((prev) => {
       const updated = [...prev, ...newChecks];
       saveChecks(updated, spaceId);
+      if (isSupabaseConfigured) {
+        fixedDb.upsertChecks(spaceId, newChecks).catch(console.error);
+      }
       return updated;
     });
   }, [templates, checks, spaceId]);
-
-  const updateCheck = useCallback((id: string, data: Partial<MonthlyCheck>) => {
-    setChecks((prev) => {
-      const updated = prev.map((c) => c.id === id ? { ...c, ...data } : c);
-      saveChecks(updated, spaceId);
-      return updated;
-    });
-  }, [spaceId]);
 
   const confirmCheck = useCallback((checkId: string, expenseId: string, actualAmount: number) => {
     setChecks((prev) => {
@@ -96,6 +112,10 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
           : c
       );
       saveChecks(updated, spaceId);
+      const check = updated.find((c) => c.id === checkId);
+      if (isSupabaseConfigured && check) {
+        fixedDb.updateCheck(check, spaceId).catch(console.error);
+      }
       return updated;
     });
   }, [spaceId]);
@@ -106,6 +126,10 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
         c.id === checkId ? { ...c, status: 'omitido' as CheckStatus, notes, confirmedAt: new Date().toISOString() } : c
       );
       saveChecks(updated, spaceId);
+      const check = updated.find((c) => c.id === checkId);
+      if (isSupabaseConfigured && check) {
+        fixedDb.updateCheck(check, spaceId).catch(console.error);
+      }
       return updated;
     });
   }, [spaceId]);
@@ -113,30 +137,33 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
   const resetCheck = useCallback((checkId: string) => {
     setChecks((prev) => {
       const updated = prev.map((c) =>
-        c.id === checkId ? { ...c, status: 'pendiente' as CheckStatus, expenseId: undefined, actualAmount: undefined, confirmedAt: undefined } : c
+        c.id === checkId
+          ? { ...c, status: 'pendiente' as CheckStatus, expenseId: undefined, actualAmount: undefined, confirmedAt: undefined }
+          : c
       );
       saveChecks(updated, spaceId);
+      const check = updated.find((c) => c.id === checkId);
+      if (isSupabaseConfigured && check) {
+        fixedDb.updateCheck(check, spaceId).catch(console.error);
+      }
       return updated;
     });
   }, [spaceId]);
 
-  // ── Auto-match: when an expense is added, try to link it ───────
+  // ── Auto-match ─────────────────────────────────────────────────
   const tryAutoMatch = useCallback((expense: Expense, month: string) => {
     if ((expense.transactionType ?? 'gasto') !== 'gasto') return;
-
     const monthChecks = checks.filter((c) => c.month === month && c.status === 'pendiente');
     if (monthChecks.length === 0) return;
 
     for (const check of monthChecks) {
       const tpl = templates.find((t) => t.id === check.templateId);
       if (!tpl) continue;
-
       const conceptMatch = expense.concept.toLowerCase().includes(tpl.concept.toLowerCase()) ||
                            tpl.concept.toLowerCase().includes(expense.concept.toLowerCase());
       const categoryMatch = expense.category === tpl.category;
       const amountDiff = Math.abs(expense.amount - tpl.expectedAmount) / tpl.expectedAmount;
-      const amountMatch = amountDiff <= 0.25; // ±25% tolerance
-
+      const amountMatch = amountDiff <= 0.25;
       if ((conceptMatch && categoryMatch) || (categoryMatch && amountMatch && tpl.expectedAmount > 0)) {
         confirmCheck(check.id, expense.id, expense.amount);
         return;
@@ -144,7 +171,6 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     }
   }, [checks, templates, confirmCheck]);
 
-  // ── Derived state ──────────────────────────────────────────────
   const pendingCountCurrentMonth = useMemo(() => {
     const month = format(new Date(), 'yyyy-MM');
     return checks.filter((c) => c.month === month && c.status === 'pendiente').length;
@@ -155,7 +181,7 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     checks,
     addTemplate, updateTemplate, deleteTemplate,
     getChecksForMonth, ensureChecksForMonth,
-    updateCheck, confirmCheck, skipCheck, resetCheck,
+    confirmCheck, skipCheck, resetCheck,
     tryAutoMatch,
     pendingCountCurrentMonth,
   };

@@ -1,5 +1,7 @@
 import type { AppSpace, SessionState } from '../types/space';
 import type { AppSettings } from './storage';
+import { spacesDb } from '../lib/db';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 const SPACES_KEY = 'orden_casa_spaces';
 const SESSION_KEY = 'orden_casa_session';
@@ -33,9 +35,29 @@ export function generateMemberId(): string {
   return `mb_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
 }
 
+// Load from Supabase, cache to localStorage
+export async function loadSpacesFromSupabase(): Promise<AppSpace[]> {
+  if (!isSupabaseConfigured) return loadSpaces();
+  const remote = await spacesDb.listMySpaces();
+  if (remote.length > 0) {
+    saveSpaces(remote);
+  }
+  return remote.length > 0 ? remote : loadSpaces();
+}
+
+// Sync a full space (create or update) to Supabase
+export async function syncSpaceToSupabase(space: AppSpace, ownerProfileId?: string): Promise<void> {
+  if (!isSupabaseConfigured) return;
+  if (ownerProfileId) {
+    await spacesDb.createSpace(space, ownerProfileId);
+  } else {
+    await spacesDb.updateSpace(space);
+  }
+}
+
 // Migration: if spaces don't exist yet but old data does, create a default space
 export function migrateFromLegacy(legacySettings: AppSettings | null): AppSpace | null {
-  if (loadSpaces().length > 0) return null; // already migrated
+  if (loadSpaces().length > 0) return null;
 
   const memberId1 = generateMemberId();
   const memberId2 = generateMemberId();
@@ -44,7 +66,6 @@ export function migrateFromLegacy(legacySettings: AppSettings | null): AppSpace 
   const name1 = legacySettings?.userName1 ?? 'Ivan';
   const name2 = legacySettings?.userName2 ?? 'Esposa';
 
-  // Move old expense data to scoped key
   const oldData = localStorage.getItem('expense_tracker_data');
   if (oldData) localStorage.setItem(`expense_tracker_data_${spaceId}`, oldData);
   const oldSettings = localStorage.getItem('expense_tracker_settings');

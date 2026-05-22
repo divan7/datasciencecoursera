@@ -14,11 +14,15 @@ import { SpaceOnboarding } from './components/SpaceOnboarding';
 import { UserSwitcher } from './components/UserSwitcher';
 import { SpaceSettings } from './components/SpaceSettings';
 import { SpacePicker } from './components/SpacePicker';
+import { AuthGate } from './components/AuthGate';
+import { AdminPanel } from './components/AdminPanel';
+import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace } from './utils/storage';
-import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy } from './utils/spaceStorage';
+import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, loadSpacesFromSupabase, syncSpaceToSupabase } from './utils/spaceStorage';
 import { checkAndFireNotifications } from './services/notificationService';
+import { isSupabaseConfigured } from './lib/supabase';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { ExpenseWithSpace } from './components/MultiExpenseReview';
@@ -27,25 +31,25 @@ import { MEMBER_COLORS } from './types/space';
 import { format } from 'date-fns';
 import './index.css';
 
-type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings';
+type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings' | 'admin';
 type InputMode = 'form' | 'text' | 'image';
 
 export default function App() {
+  // ── Auth ──────────────────────────────────────────────────────
+  const { user, profile, loading: authLoading, isAdmin, signInWithMagicLink, signOut } = useAuth();
+
   // ── Space & session state ─────────────────────────────────────
   const [spaces, setSpaces] = useState<AppSpace[]>(() => {
     const existing = loadSpaces();
     if (existing.length > 0) return existing;
-    // Attempt legacy migration on first launch
     const legacy = loadLegacySettings();
     const migrated = migrateFromLegacy(legacy);
     if (migrated) return [migrated];
     return [];
   });
 
-  const [session, setSession] = useState<SessionState | null>(() => {
-    const s = loadSession();
-    return s;
-  });
+  const [session, setSession] = useState<SessionState | null>(() => loadSession());
+  const [spacesLoaded, setSpacesLoaded] = useState(false);
 
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
 
@@ -87,6 +91,27 @@ export default function App() {
     pendingCountCurrentMonth,
   } = useFixedExpenses(expenses, spaceId);
 
+  // ── Load spaces from Supabase when user logs in ───────────────
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured) { setSpacesLoaded(true); return; }
+    loadSpacesFromSupabase().then((remote) => {
+      if (remote.length > 0) {
+        setSpaces(remote);
+        // Restore or pick session
+        const savedSession = loadSession();
+        const stillValid = savedSession && remote.some((s) => s.id === savedSession.spaceId);
+        if (!stillValid) {
+          const firstSpace = remote[0];
+          const firstMember = firstSpace.members[0];
+          const newSession: SessionState = { spaceId: firstSpace.id, memberId: firstMember.id };
+          setSession(newSession);
+          saveSession(newSession);
+        }
+      }
+      setSpacesLoaded(true);
+    }).catch(() => setSpacesLoaded(true));
+  }, [user]);
+
   // ── Notification check on mount and focus ────────────────────
   useEffect(() => {
     checkAndFireNotifications(templates);
@@ -99,11 +124,18 @@ export default function App() {
   const handleOnboardingComplete = useCallback((space: AppSpace, newSession: SessionState) => {
     setSpaces([space]);
     setSession(newSession);
-  }, []);
+    saveSpaces([space]);
+    if (isSupabaseConfigured && user) {
+      syncSpaceToSupabase(space, user.id).catch(console.error);
+    }
+  }, [user]);
 
   const handleUpdateSpaces = useCallback((updated: AppSpace[]) => {
     setSpaces(updated);
     saveSpaces(updated);
+    if (isSupabaseConfigured) {
+      updated.forEach((s) => syncSpaceToSupabase(s).catch(console.error));
+    }
   }, []);
 
   const handleSwitchSpace = useCallback((newSpaceId: string, memberId: string) => {
@@ -197,6 +229,21 @@ export default function App() {
     { id: 'image', label: 'Foto',       emoji: '📷' },
   ];
 
+  // ── Auth gate (when Supabase is configured) ───────────────────
+  if (isSupabaseConfigured) {
+    if (authLoading || !spacesLoaded) {
+      return (
+        <div className="min-h-screen flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+          <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"/>
+        </div>
+      );
+    }
+    if (!user) {
+      return <AuthGate onSignIn={signInWithMagicLink} />;
+    }
+  }
+
   // ── Onboarding gate ───────────────────────────────────────────
   if (spaces.length === 0 || !session || !currentSpace || !currentMember) {
     return <SpaceOnboarding onComplete={handleOnboardingComplete} />;
@@ -215,6 +262,7 @@ export default function App() {
         spaceName={currentSpace.name}
         onAvatarTap={() => setShowUserSwitcher(true)}
         pendingFixed={pendingCountCurrentMonth}
+        isAdmin={isAdmin}
       />
 
       {/* ── Space picker ── */}
@@ -347,7 +395,27 @@ export default function App() {
               <SettingsPanel settings={settings} onSave={handleSaveSettings}
                 expenseCount={expenses.length} onClearAll={handleClearAll} />
             </div>
+            {isSupabaseConfigured && profile && (
+              <div className="border-t border-gray-200 pt-5">
+                <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
+                  <p className="text-xs text-gray-500">
+                    Sesión: <strong>{profile.email}</strong>
+                    <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700 font-semibold capitalize">{profile.plan}</span>
+                  </p>
+                  <button
+                    onClick={signOut}
+                    className="text-sm text-red-500 font-semibold hover:text-red-700 transition-colors">
+                    Cerrar sesión
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+        )}
+
+        {/* ── Admin ── */}
+        {activeTab === 'admin' && isAdmin && (
+          <AdminPanel />
         )}
       </main>
 

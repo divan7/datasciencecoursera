@@ -1,7 +1,7 @@
-import { List, BarChart3, PlusCircle, Settings, LayoutDashboard, ClipboardCheck, ChevronDown } from 'lucide-react';
+import { List, BarChart3, PlusCircle, Settings, LayoutDashboard, ClipboardCheck, ChevronDown, Shield } from 'lucide-react';
 import type { SpacePlan } from '../types/space';
 
-type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings';
+type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings' | 'admin';
 
 interface HeaderProps {
   activeTab: Tab;
@@ -12,6 +12,7 @@ interface HeaderProps {
   onAvatarTap: () => void;
   pendingFixed?: number;
   plan?: SpacePlan;
+  isAdmin?: boolean;
 }
 
 /** Concepto C — "Vínculo": tres círculos superpuestos (marca SOIHogar) */
@@ -37,6 +38,7 @@ export function Header({
   onAvatarTap,
   pendingFixed = 0,
   plan,
+  isAdmin = false,
 }: HeaderProps) {
   const tabs: { id: Tab; icon: React.ReactNode; label: string; badge?: number }[] = [
     { id: 'add',       icon: <PlusCircle size={14} />,      label: 'Registrar' },
@@ -45,6 +47,7 @@ export function Header({
     { id: 'checklist', icon: <ClipboardCheck size={14} />,  label: 'Fijos', badge: pendingFixed },
     { id: 'report',    icon: <BarChart3 size={14} />,       label: 'Reporte' },
     { id: 'settings',  icon: <Settings size={14} />,        label: 'Config' },
+    ...(isAdmin ? [{ id: 'admin' as Tab, icon: <Shield size={14} />, label: 'Admin' }] : []),
   ];
 
   const initials = memberName.slice(0, 2).toUpperCase();

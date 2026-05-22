@@ -72,7 +72,16 @@ export function ImageCapture({ currentUser, onSave, apiKey, userName1, userName2
         receiptImageBase64: imageBase64,
       });
     } catch (err) {
-      setError('No pude leer el ticket. Intenta con mejor iluminación o ingresa el gasto manualmente.');
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('401') || msg.includes('authentication') || msg.includes('invalid x-api-key')) {
+        setError('API Key inválida. Verifica que la copiaste correctamente en Ajustes.');
+      } else if (msg.includes('credit') || msg.includes('billing') || msg.includes('402')) {
+        setError('Sin créditos en tu cuenta Anthropic. Agrega créditos en console.anthropic.com.');
+      } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
+        setError('Error de red. Verifica tu conexión a internet.');
+      } else {
+        setError(`Error: ${msg}`);
+      }
       console.error(err);
     } finally {
       setLoading(false);

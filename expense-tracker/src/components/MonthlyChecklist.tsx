@@ -6,6 +6,7 @@ import type { FixedExpenseTemplate, MonthlyCheck, CheckStatus } from '../types/f
 import type { Expense } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
 import { isDueInMonth } from '../utils/fixedStorage';
+import type { SpaceMember } from '../types/space';
 
 interface Props {
   templates: FixedExpenseTemplate[];
@@ -16,8 +17,7 @@ interface Props {
   onSkip: (checkId: string, notes?: string) => void;
   onReset: (checkId: string) => void;
   onRegisterNow: (template: FixedExpenseTemplate) => void;
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
 }
 
 const STATUS_CONFIG: Record<CheckStatus, { icon: React.ReactNode; label: string; color: string; bg: string }> = {
@@ -27,7 +27,7 @@ const STATUS_CONFIG: Record<CheckStatus, { icon: React.ReactNode; label: string;
 };
 
 function CheckItem({
-  check, template, expense, onConfirmManual, onSkip, onReset, onRegisterNow, userName1, userName2,
+  check, template, expense, onConfirmManual, onSkip, onReset, onRegisterNow,
 }: {
   check: MonthlyCheck;
   template: FixedExpenseTemplate;
@@ -36,8 +36,6 @@ function CheckItem({
   onSkip: (checkId: string, notes?: string) => void;
   onReset: (checkId: string) => void;
   onRegisterNow: (t: FixedExpenseTemplate) => void;
-  userName1: string;
-  userName2: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [skipNote, setSkipNote] = useState('');
@@ -71,7 +69,7 @@ function CheckItem({
                 {(CATEGORIES[template.category] as string).replace(/^[^ ]+ /, '')}
               </span>
               <span className="text-xs text-gray-400">
-                {template.paidBy === 'Ivan' ? userName1 : userName2}
+                {template.paidBy}
               </span>
               {template.dayOfMonth && check.status === 'pendiente' && (
                 <span className="text-xs text-amber-600 font-medium">📅 día {template.dayOfMonth}</span>
@@ -171,7 +169,7 @@ function CheckItem({
 export function MonthlyChecklist({
   templates, checks, expenses, onEnsureChecks,
   onConfirm, onSkip, onReset, onRegisterNow,
-  userName1, userName2,
+  members: _members,
 }: Props) {
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
   const [filter, setFilter] = useState<'all' | CheckStatus>('all');
@@ -361,8 +359,6 @@ export function MonthlyChecklist({
               onSkip={onSkip}
               onReset={onReset}
               onRegisterNow={onRegisterNow}
-              userName1={userName1}
-              userName2={userName2}
             />
           ))}
         </div>

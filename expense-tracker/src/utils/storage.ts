@@ -1,54 +1,45 @@
 import type { Expense } from '../types/expense';
 
-const STORAGE_KEY = 'expense_tracker_data';
-const SETTINGS_KEY = 'expense_tracker_settings';
+const dataKey = (spaceId: string) => `expense_tracker_data_${spaceId}`;
+const settingsKey = (spaceId: string) => `expense_tracker_settings_${spaceId}`;
 
 export interface AppSettings {
-  currentUser: 'Ivan' | 'Esposa';
-  userName1: string;
-  userName2: string;
   currency: string;
   anthropicApiKey?: string;
+  // keep these for migration compatibility:
+  userName1?: string;
+  userName2?: string;
+  currentUser?: string;
 }
 
-export function saveExpenses(expenses: Expense[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+export function saveExpenses(expenses: Expense[], spaceId: string): void {
+  localStorage.setItem(dataKey(spaceId), JSON.stringify(expenses));
 }
 
-export function loadExpenses(): Expense[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
+export function loadExpenses(spaceId: string): Expense[] {
+  const raw = localStorage.getItem(dataKey(spaceId));
   if (!raw) return [];
-  try {
-    return JSON.parse(raw) as Expense[];
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(raw) as Expense[]; }
+  catch { return []; }
 }
 
-export function saveSettings(settings: AppSettings): void {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+export function saveSettings(settings: AppSettings, spaceId: string): void {
+  localStorage.setItem(settingsKey(spaceId), JSON.stringify(settings));
 }
 
-export function loadSettings(): AppSettings {
-  const raw = localStorage.getItem(SETTINGS_KEY);
-  if (!raw) {
-    return {
-      currentUser: 'Ivan',
-      userName1: 'Ivan',
-      userName2: 'Esposa',
-      currency: 'MXN',
-    };
-  }
-  try {
-    return JSON.parse(raw) as AppSettings;
-  } catch {
-    return {
-      currentUser: 'Ivan',
-      userName1: 'Ivan',
-      userName2: 'Esposa',
-      currency: 'MXN',
-    };
-  }
+export function loadSettings(spaceId: string): AppSettings {
+  const raw = localStorage.getItem(settingsKey(spaceId));
+  if (!raw) return { currency: 'MXN' };
+  try { return JSON.parse(raw) as AppSettings; }
+  catch { return { currency: 'MXN' }; }
+}
+
+// Legacy (no spaceId) load for migration
+export function loadLegacySettings(): AppSettings | null {
+  const raw = localStorage.getItem('expense_tracker_settings');
+  if (!raw) return null;
+  try { return JSON.parse(raw) as AppSettings; }
+  catch { return null; }
 }
 
 export function generateId(): string {

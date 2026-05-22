@@ -1,4 +1,4 @@
-export type User = 'Ivan' | 'Esposa';
+export type User = string; // was: 'Ivan' | 'Esposa'
 
 export type PaymentMethod = 'efectivo' | 'tarjeta_debito' | 'tarjeta_credito' | 'transferencia' | 'otro';
 

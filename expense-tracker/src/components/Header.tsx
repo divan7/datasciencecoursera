@@ -1,19 +1,18 @@
 import { List, BarChart3, PlusCircle, Settings, LayoutDashboard, ClipboardCheck } from 'lucide-react';
-import type { User as UserType } from '../types/expense';
 
 type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings';
 
 interface HeaderProps {
-  currentUser: UserType;
-  onUserSwitch: (user: UserType) => void;
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
-  userName1: string;
-  userName2: string;
   pendingFixed?: number;
+  memberName: string;
+  memberColor: string;
+  spaceName: string;
+  onAvatarTap: () => void;
 }
 
-export function Header({ currentUser, onUserSwitch, activeTab, onTabChange, userName1, userName2, pendingFixed = 0 }: HeaderProps) {
+export function Header({ activeTab, onTabChange, pendingFixed = 0, memberName, memberColor, spaceName, onAvatarTap }: HeaderProps) {
   const tabs: { id: Tab; icon: React.ReactNode; label: string; badge?: number }[] = [
     { id: 'add',       icon: <PlusCircle size={14} />,      label: 'Registrar' },
     { id: 'list',      icon: <List size={14} />,            label: 'Gastos' },
@@ -23,31 +22,34 @@ export function Header({ currentUser, onUserSwitch, activeTab, onTabChange, user
     { id: 'settings',  icon: <Settings size={14} />,        label: 'Config' },
   ];
 
+  const initials = memberName.slice(0, 2).toUpperCase();
+
   return (
-    <header style={{ backgroundColor: '#1e40af' }} className="text-white shadow-lg">
+    <header className="text-white shadow-lg" style={{ backgroundColor: '#0f766e' }}>
       <div className="max-w-2xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">💰</span>
+          {/* Logo + title */}
+          <div className="flex items-center gap-2.5">
+            <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
+              <rect width="32" height="32" rx="8" fill="white" fillOpacity="0.15"/>
+              <path d="M16 6L4 16h4v10h8v-7h4v7h8V16h4L16 6z" fill="white"/>
+              <text x="16" y="28" textAnchor="middle" fontSize="7" fontWeight="bold" fill="white" fontFamily="sans-serif" opacity="0.8">SOI</text>
+            </svg>
             <div>
-              <h1 className="text-lg font-bold leading-tight">GastosMes</h1>
-              <p className="text-blue-200 text-xs">Control de gastos familiar</p>
+              <h1 className="text-lg font-bold leading-tight">Orden Casa</h1>
+              <p className="text-teal-200 text-xs leading-tight truncate max-w-[140px]">{spaceName}</p>
             </div>
           </div>
-          <div className="flex gap-1 bg-blue-800 rounded-full p-1">
-            <button onClick={() => onUserSwitch('Ivan')}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                currentUser === 'Ivan' ? 'bg-white text-blue-800' : 'text-blue-200 hover:text-white'
-              }`}>
-              {userName1}
-            </button>
-            <button onClick={() => onUserSwitch('Esposa')}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-                currentUser === 'Esposa' ? 'bg-white text-blue-800' : 'text-blue-200 hover:text-white'
-              }`}>
-              {userName2}
-            </button>
-          </div>
+
+          {/* Member avatar button */}
+          <button
+            onClick={onAvatarTap}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white/30 hover:ring-white/60 active:scale-95 transition-all flex-shrink-0"
+            style={{ backgroundColor: memberColor }}
+            title={memberName}
+          >
+            {initials}
+          </button>
         </div>
 
         <nav className="flex gap-1">
@@ -56,7 +58,7 @@ export function Header({ currentUser, onUserSwitch, activeTab, onTabChange, user
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg transition-all ${
-                activeTab === tab.id ? 'bg-white text-blue-800' : 'text-blue-200 hover:bg-blue-700'
+                activeTab === tab.id ? 'bg-white text-teal-800' : 'text-teal-100 hover:bg-teal-700/50'
               }`}
             >
               {tab.icon}

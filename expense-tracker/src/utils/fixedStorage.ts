@@ -1,24 +1,24 @@
 import type { FixedExpenseTemplate, MonthlyCheck } from '../types/fixedExpense';
 
-const TEMPLATES_KEY = 'fixed_expense_templates';
-const CHECKS_KEY = 'monthly_checks';
+const tplKey = (spaceId: string) => `fixed_expense_templates_${spaceId}`;
+const chkKey = (spaceId: string) => `monthly_checks_${spaceId}`;
 
-export function loadTemplates(): FixedExpenseTemplate[] {
-  try { return JSON.parse(localStorage.getItem(TEMPLATES_KEY) ?? '[]'); }
+export function loadTemplates(spaceId: string): FixedExpenseTemplate[] {
+  try { return JSON.parse(localStorage.getItem(tplKey(spaceId)) ?? '[]'); }
   catch { return []; }
 }
 
-export function saveTemplates(t: FixedExpenseTemplate[]): void {
-  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
+export function saveTemplates(t: FixedExpenseTemplate[], spaceId: string): void {
+  localStorage.setItem(tplKey(spaceId), JSON.stringify(t));
 }
 
-export function loadChecks(): MonthlyCheck[] {
-  try { return JSON.parse(localStorage.getItem(CHECKS_KEY) ?? '[]'); }
+export function loadChecks(spaceId: string): MonthlyCheck[] {
+  try { return JSON.parse(localStorage.getItem(chkKey(spaceId)) ?? '[]'); }
   catch { return []; }
 }
 
-export function saveChecks(c: MonthlyCheck[]): void {
-  localStorage.setItem(CHECKS_KEY, JSON.stringify(c));
+export function saveChecks(c: MonthlyCheck[], spaceId: string): void {
+  localStorage.setItem(chkKey(spaceId), JSON.stringify(c));
 }
 
 export function generateFixedId(): string {

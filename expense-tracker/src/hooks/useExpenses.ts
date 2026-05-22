@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Expense } from '../types/expense';
 import { loadExpenses, saveExpenses, generateId } from '../utils/storage';
 
-export function useExpenses() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+export function useExpenses(spaceId: string) {
+  const [expenses, setExpenses] = useState<Expense[]>(() => loadExpenses(spaceId));
 
+  // Reload when spaceId changes
   useEffect(() => {
-    setExpenses(loadExpenses());
-  }, []);
+    setExpenses(loadExpenses(spaceId));
+  }, [spaceId]);
 
   const addExpense = useCallback((data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = new Date().toISOString();
@@ -19,29 +20,29 @@ export function useExpenses() {
     };
     setExpenses((prev) => {
       const updated = [expense, ...prev];
-      saveExpenses(updated);
+      saveExpenses(updated, spaceId);
       return updated;
     });
     return expense;
-  }, []);
+  }, [spaceId]);
 
   const updateExpense = useCallback((id: string, data: Partial<Expense>) => {
     setExpenses((prev) => {
       const updated = prev.map((e) =>
         e.id === id ? { ...e, ...data, updatedAt: new Date().toISOString() } : e
       );
-      saveExpenses(updated);
+      saveExpenses(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   const deleteExpense = useCallback((id: string) => {
     setExpenses((prev) => {
       const updated = prev.filter((e) => e.id !== id);
-      saveExpenses(updated);
+      saveExpenses(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   const getExpensesByMonth = useCallback(
     (year: number, month: number) => {

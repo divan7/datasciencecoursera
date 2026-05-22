@@ -7,14 +7,15 @@ import {
   generateFixedId, isDueInMonth,
 } from '../utils/fixedStorage';
 
-export function useFixedExpenses(_expenses: Expense[]) {
-  const [templates, setTemplates] = useState<FixedExpenseTemplate[]>([]);
-  const [checks, setChecks]       = useState<MonthlyCheck[]>([]);
+export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
+  const [templates, setTemplates] = useState<FixedExpenseTemplate[]>(() => loadTemplates(spaceId));
+  const [checks, setChecks]       = useState<MonthlyCheck[]>(() => loadChecks(spaceId));
 
+  // Reload when spaceId changes
   useEffect(() => {
-    setTemplates(loadTemplates());
-    setChecks(loadChecks());
-  }, []);
+    setTemplates(loadTemplates(spaceId));
+    setChecks(loadChecks(spaceId));
+  }, [spaceId]);
 
   // ── Template CRUD ──────────────────────────────────────────────
   const addTemplate = useCallback((t: Omit<FixedExpenseTemplate, 'id' | 'createdAt'>) => {
@@ -25,32 +26,32 @@ export function useFixedExpenses(_expenses: Expense[]) {
     };
     setTemplates((prev) => {
       const updated = [tpl, ...prev];
-      saveTemplates(updated);
+      saveTemplates(updated, spaceId);
       return updated;
     });
     return tpl;
-  }, []);
+  }, [spaceId]);
 
   const updateTemplate = useCallback((id: string, data: Partial<FixedExpenseTemplate>) => {
     setTemplates((prev) => {
       const updated = prev.map((t) => t.id === id ? { ...t, ...data } : t);
-      saveTemplates(updated);
+      saveTemplates(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   const deleteTemplate = useCallback((id: string) => {
     setTemplates((prev) => {
       const updated = prev.filter((t) => t.id !== id);
-      saveTemplates(updated);
+      saveTemplates(updated, spaceId);
       return updated;
     });
     setChecks((prev) => {
       const updated = prev.filter((c) => c.templateId !== id);
-      saveChecks(updated);
+      saveChecks(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   // ── Check management ───────────────────────────────────────────
   const getChecksForMonth = useCallback(
@@ -74,18 +75,18 @@ export function useFixedExpenses(_expenses: Expense[]) {
 
     setChecks((prev) => {
       const updated = [...prev, ...newChecks];
-      saveChecks(updated);
+      saveChecks(updated, spaceId);
       return updated;
     });
-  }, [templates, checks]);
+  }, [templates, checks, spaceId]);
 
   const updateCheck = useCallback((id: string, data: Partial<MonthlyCheck>) => {
     setChecks((prev) => {
       const updated = prev.map((c) => c.id === id ? { ...c, ...data } : c);
-      saveChecks(updated);
+      saveChecks(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   const confirmCheck = useCallback((checkId: string, expenseId: string, actualAmount: number) => {
     setChecks((prev) => {
@@ -94,30 +95,30 @@ export function useFixedExpenses(_expenses: Expense[]) {
           ? { ...c, status: 'confirmado' as CheckStatus, expenseId, actualAmount, confirmedAt: new Date().toISOString() }
           : c
       );
-      saveChecks(updated);
+      saveChecks(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   const skipCheck = useCallback((checkId: string, notes?: string) => {
     setChecks((prev) => {
       const updated = prev.map((c) =>
         c.id === checkId ? { ...c, status: 'omitido' as CheckStatus, notes, confirmedAt: new Date().toISOString() } : c
       );
-      saveChecks(updated);
+      saveChecks(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   const resetCheck = useCallback((checkId: string) => {
     setChecks((prev) => {
       const updated = prev.map((c) =>
         c.id === checkId ? { ...c, status: 'pendiente' as CheckStatus, expenseId: undefined, actualAmount: undefined, confirmedAt: undefined } : c
       );
-      saveChecks(updated);
+      saveChecks(updated, spaceId);
       return updated;
     });
-  }, []);
+  }, [spaceId]);
 
   // ── Auto-match: when an expense is added, try to link it ───────
   const tryAutoMatch = useCallback((expense: Expense, month: string) => {

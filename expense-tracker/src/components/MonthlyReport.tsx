@@ -4,14 +4,14 @@ import { es } from 'date-fns/locale';
 import { ChevronDown, Download } from 'lucide-react';
 import type { Expense, Category } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
+import type { SpaceMember } from '../types/space';
 
 interface MonthlyReportProps {
   expenses: Expense[];
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
 }
 
-export function MonthlyReport({ expenses, userName1, userName2 }: MonthlyReportProps) {
+export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
 
   const availableMonths = useMemo(() => {
@@ -28,10 +28,14 @@ export function MonthlyReport({ expenses, userName1, userName2 }: MonthlyReportP
 
   const stats = useMemo(() => {
     const total = monthExpenses.reduce((s, e) => s + e.amount, 0);
-    const ivan = monthExpenses.filter((e) => e.paidBy === 'Ivan').reduce((s, e) => s + e.amount, 0);
-    const esposa = monthExpenses.filter((e) => e.paidBy === 'Esposa').reduce((s, e) => s + e.amount, 0);
     const fixed = monthExpenses.filter((e) => e.expenseType === 'fijo').reduce((s, e) => s + e.amount, 0);
     const variable = monthExpenses.filter((e) => e.expenseType === 'variable').reduce((s, e) => s + e.amount, 0);
+
+    // Per-member totals
+    const byMember = members.reduce((acc, m) => {
+      acc[m.name] = monthExpenses.filter((e) => e.paidBy === m.name).reduce((s, e) => s + e.amount, 0);
+      return acc;
+    }, {} as Record<string, number>);
 
     // By category
     const byCat: Record<string, number> = {};
@@ -48,8 +52,8 @@ export function MonthlyReport({ expenses, userName1, userName2 }: MonthlyReportP
       byMethod[e.paymentMethod] = (byMethod[e.paymentMethod] || 0) + e.amount;
     });
 
-    return { total, ivan, esposa, fixed, variable, categories, byMethod, count: monthExpenses.length };
-  }, [monthExpenses]);
+    return { total, byMember, fixed, variable, categories, byMethod, count: monthExpenses.length };
+  }, [monthExpenses, members]);
 
   const monthLabel = useMemo(() => {
     const [y, m] = selectedMonth.split('-');
@@ -65,7 +69,7 @@ export function MonthlyReport({ expenses, userName1, userName2 }: MonthlyReportP
     ];
     const rows = monthExpenses.map((e) => [
       e.date, e.concept, e.amount, CATEGORIES[e.category],
-      e.paidBy === 'Ivan' ? userName1 : userName2,
+      e.paidBy,
       e.paymentMethod, e.cardLast4 || '', e.bank || '', e.store || '',
       e.expenseType, e.frequency || '', e.installments || '',
       e.isReimbursable ? 'Sí' : 'No',
@@ -134,24 +138,20 @@ export function MonthlyReport({ expenses, userName1, userName2 }: MonthlyReportP
             <p className="text-blue-200 text-sm mt-1">{stats.count} gastos registrados</p>
 
             <div className="grid grid-cols-2 gap-3 mt-4">
-              <div className="bg-white/10 rounded-xl p-3">
-                <p className="text-blue-200 text-xs">{userName1}</p>
-                <p className="text-white font-bold text-lg">
-                  ${stats.ivan.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-                </p>
-                <p className="text-blue-300 text-xs">
-                  {stats.total > 0 ? Math.round((stats.ivan / stats.total) * 100) : 0}%
-                </p>
-              </div>
-              <div className="bg-white/10 rounded-xl p-3">
-                <p className="text-blue-200 text-xs">{userName2}</p>
-                <p className="text-white font-bold text-lg">
-                  ${stats.esposa.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-                </p>
-                <p className="text-blue-300 text-xs">
-                  {stats.total > 0 ? Math.round((stats.esposa / stats.total) * 100) : 0}%
-                </p>
-              </div>
+              {members.map((m) => {
+                const amt = stats.byMember[m.name] ?? 0;
+                return (
+                  <div key={m.id} className="bg-white/10 rounded-xl p-3">
+                    <p className="text-blue-200 text-xs truncate">{m.name}</p>
+                    <p className="text-white font-bold text-lg">
+                      ${amt.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-blue-300 text-xs">
+                      {stats.total > 0 ? Math.round((amt / stats.total) * 100) : 0}%
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -222,7 +222,7 @@ export function MonthlyReport({ expenses, userName1, userName2 }: MonthlyReportP
                       <div className="min-w-0">
                         <p className="text-xs font-medium text-gray-800 truncate">{e.concept}</p>
                         <p className="text-xs text-gray-400">
-                          {e.paidBy === 'Ivan' ? userName1 : userName2} · {e.date.slice(8)}
+                          {e.paidBy} · {e.date.slice(8)}
                         </p>
                       </div>
                     </div>

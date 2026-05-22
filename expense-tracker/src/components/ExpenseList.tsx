@@ -5,17 +5,19 @@ import { es } from 'date-fns/locale';
 import type { Expense, Category } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
 import { ExpenseCard } from './ExpenseCard';
+import type { SpaceMember } from '../types/space';
+import { MEMBER_COLORS } from '../types/space';
 
 interface ExpenseListProps {
   expenses: Expense[];
   onDelete: (id: string) => void;
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
+  isLector?: boolean;
 }
 
-export function ExpenseList({ expenses, onDelete, userName1, userName2 }: ExpenseListProps) {
+export function ExpenseList({ expenses, onDelete, members, isLector = false }: ExpenseListProps) {
   const [search, setSearch] = useState('');
-  const [filterUser, setFilterUser] = useState<'all' | 'Ivan' | 'Esposa'>('all');
+  const [filterUser, setFilterUser] = useState<'all' | string>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | Category>('all');
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
 
@@ -46,8 +48,14 @@ export function ExpenseList({ expenses, onDelete, userName1, userName2 }: Expens
   }, [expenses, selectedMonth, filterUser, filterCategory, search]);
 
   const total = useMemo(() => filtered.reduce((sum, e) => sum + e.amount, 0), [filtered]);
-  const totalIvan = useMemo(() => filtered.filter((e) => e.paidBy === 'Ivan').reduce((s, e) => s + e.amount, 0), [filtered]);
-  const totalEsposa = useMemo(() => filtered.filter((e) => e.paidBy === 'Esposa').reduce((s, e) => s + e.amount, 0), [filtered]);
+
+  // Per-member totals for summary
+  const memberTotals = useMemo(() => {
+    return members.map((m) => ({
+      member: m,
+      total: filtered.filter((e) => e.paidBy === m.name).reduce((s, e) => s + e.amount, 0),
+    }));
+  }, [filtered, members]);
 
   // Group by date
   const grouped = useMemo(() => {
@@ -88,25 +96,21 @@ export function ExpenseList({ expenses, onDelete, userName1, userName2 }: Expens
 
       {/* Summary */}
       <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="grid gap-2 text-center" style={{ gridTemplateColumns: `repeat(${Math.min(members.length + 1, 4)}, 1fr)` }}>
           <div>
             <p className="text-xs text-gray-400">Total</p>
             <p className="font-bold text-gray-900 text-base">
               ${total.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
             </p>
           </div>
-          <div>
-            <p className="text-xs text-blue-400">{userName1}</p>
-            <p className="font-bold text-blue-700 text-base">
-              ${totalIvan.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-purple-400">{userName2}</p>
-            <p className="font-bold text-purple-700 text-base">
-              ${totalEsposa.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-            </p>
-          </div>
+          {memberTotals.slice(0, 3).map(({ member, total: mt }) => (
+            <div key={member.id}>
+              <p className="text-xs truncate" style={{ color: MEMBER_COLORS[member.colorIndex] }}>{member.name}</p>
+              <p className="font-bold text-base" style={{ color: MEMBER_COLORS[member.colorIndex] }}>
+                ${mt.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -133,22 +137,18 @@ export function ExpenseList({ expenses, onDelete, userName1, userName2 }: Expens
         >
           Todos
         </button>
-        <button
-          onClick={() => setFilterUser('Ivan')}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border flex-shrink-0 transition-all ${
-            filterUser === 'Ivan' ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500'
-          }`}
-        >
-          {userName1}
-        </button>
-        <button
-          onClick={() => setFilterUser('Esposa')}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border flex-shrink-0 transition-all ${
-            filterUser === 'Esposa' ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-200 text-gray-500'
-          }`}
-        >
-          {userName2}
-        </button>
+        {members.map((m) => (
+          <button
+            key={m.id}
+            onClick={() => setFilterUser(filterUser === m.name ? 'all' : m.name)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border flex-shrink-0 transition-all ${
+              filterUser === m.name ? 'text-white border-transparent' : 'border-gray-200 text-gray-500'
+            }`}
+            style={filterUser === m.name ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
+          >
+            {m.name}
+          </button>
+        ))}
         <div className="h-6 w-px bg-gray-200 self-center flex-shrink-0" />
         {categoriesUsed.map((cat) => (
           <button
@@ -187,9 +187,7 @@ export function ExpenseList({ expenses, onDelete, userName1, userName2 }: Expens
                   <ExpenseCard
                     key={expense.id}
                     expense={expense}
-                    onDelete={onDelete}
-                    userName1={userName1}
-                    userName2={userName2}
+                    onDelete={isLector ? undefined : onDelete}
                   />
                 ))}
               </div>

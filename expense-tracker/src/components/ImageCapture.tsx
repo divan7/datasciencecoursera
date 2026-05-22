@@ -4,18 +4,18 @@ import { format } from 'date-fns';
 import type { Expense, User } from '../types/expense';
 import { parseExpenseFromImage } from '../services/claudeService';
 import { QuickForm } from './QuickForm';
+import type { SpaceMember } from '../types/space';
 
 interface ImageCaptureProps {
   currentUser: User;
   onSave: (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
   apiKey?: string;
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
 }
 
 type MediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
-export function ImageCapture({ currentUser, onSave, apiKey, userName1, userName2 }: ImageCaptureProps) {
+export function ImageCapture({ currentUser, onSave, apiKey, members }: ImageCaptureProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string>('');
   const [mediaType, setMediaType] = useState<MediaType>('image/jpeg');
@@ -215,8 +215,7 @@ export function ImageCapture({ currentUser, onSave, apiKey, userName1, userName2
             currentUser={currentUser}
             onSave={handleSaveAndReset}
             prefill={parsed as Partial<Expense>}
-            userName1={userName1}
-            userName2={userName2}
+            members={members}
           />
         </div>
       )}

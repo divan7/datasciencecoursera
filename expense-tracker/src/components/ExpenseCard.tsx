@@ -7,9 +7,7 @@ import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 
 interface ExpenseCardProps {
   expense: Expense;
-  onDelete: (id: string) => void;
-  userName1: string;
-  userName2: string;
+  onDelete?: (id: string) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -32,13 +30,12 @@ const CATEGORY_COLORS: Record<string, string> = {
   otro: 'bg-gray-100 text-gray-700',
 };
 
-export function ExpenseCard({ expense: e, onDelete, userName1, userName2 }: ExpenseCardProps) {
+export function ExpenseCard({ expense: e, onDelete }: ExpenseCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const displayName = e.paidBy === 'Ivan' ? userName1 : userName2;
-
   const handleDelete = () => {
+    if (!onDelete) return;
     if (confirmDelete) {
       onDelete(e.id);
     } else {
@@ -64,7 +61,7 @@ export function ExpenseCard({ expense: e, onDelete, userName1, userName2 }: Expe
                   <span className="text-xs text-gray-400">
                     {format(parseISO(e.date), 'dd MMM', { locale: es })}
                   </span>
-                  <span className="text-xs font-medium text-blue-600">{displayName}</span>
+                  <span className="text-xs font-medium text-blue-600">{e.paidBy}</span>
                   {e.store && (
                     <span className="text-xs text-gray-400 truncate">📍 {e.store}</span>
                   )}
@@ -100,13 +97,15 @@ export function ExpenseCard({ expense: e, onDelete, userName1, userName2 }: Expe
                 >
                   {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
-                <button
-                  onClick={handleDelete}
-                  className={`p-1 transition-colors ${confirmDelete ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}`}
-                  title={confirmDelete ? 'Toca de nuevo para confirmar' : 'Eliminar'}
-                >
-                  <Trash2 size={14} />
-                </button>
+                {onDelete && (
+                  <button
+                    onClick={handleDelete}
+                    className={`p-1 transition-colors ${confirmDelete ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}`}
+                    title={confirmDelete ? 'Toca de nuevo para confirmar' : 'Eliminar'}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           </div>

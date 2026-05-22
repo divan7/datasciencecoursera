@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { QuickForm } from './components/QuickForm';
 import { TextParser } from './components/TextParser';
@@ -10,11 +10,17 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { MonthlyChecklist } from './components/MonthlyChecklist';
 import { FixedExpenseManager } from './components/FixedExpenseManager';
 import { PendingFixedTray } from './components/PendingFixedTray';
+import { SpaceOnboarding } from './components/SpaceOnboarding';
+import { UserSwitcher } from './components/UserSwitcher';
+import { SpaceSettings } from './components/SpaceSettings';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
-import { loadSettings, saveSettings } from './utils/storage';
-import type { User, Expense } from './types/expense';
+import { loadSettings, saveSettings, loadLegacySettings } from './utils/storage';
+import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy } from './utils/spaceStorage';
+import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
+import type { AppSpace, SessionState } from './types/space';
+import { MEMBER_COLORS } from './types/space';
 import { format } from 'date-fns';
 import './index.css';
 
@@ -22,13 +28,53 @@ type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings';
 type InputMode = 'form' | 'text' | 'image';
 
 export default function App() {
-  const [settings, setSettings]   = useState(loadSettings);
+  // ── Space & session state ─────────────────────────────────────
+  const [spaces, setSpaces] = useState<AppSpace[]>(() => {
+    const existing = loadSpaces();
+    if (existing.length > 0) return existing;
+    // Attempt legacy migration on first launch
+    const legacy = loadLegacySettings();
+    const migrated = migrateFromLegacy(legacy);
+    if (migrated) return [migrated];
+    return [];
+  });
+
+  const [session, setSession] = useState<SessionState | null>(() => {
+    const s = loadSession();
+    return s;
+  });
+
+  const [showUserSwitcher, setShowUserSwitcher] = useState(false);
+
+  // Derived: current space and member
+  const currentSpace = useMemo(
+    () => spaces.find((s) => s.id === session?.spaceId) ?? null,
+    [spaces, session]
+  );
+  const currentMember = useMemo(
+    () => currentSpace?.members.find((m) => m.id === session?.memberId) ?? null,
+    [currentSpace, session]
+  );
+
+  // ── Settings (API key etc.) ───────────────────────────────────
+  const spaceId = session?.spaceId ?? '';
+  const [settings, setSettings] = useState(() =>
+    spaceId ? loadSettings(spaceId) : { currency: 'MXN' }
+  );
+
+  useEffect(() => {
+    if (spaceId) {
+      setSettings(loadSettings(spaceId));
+    }
+  }, [spaceId]);
+
+  // ── Tab / UI state ────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [inputMode, setInputMode] = useState<InputMode>('form');
-  // When set, QuickForm opens pre-filled from a fixed expense template
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
 
-  const { expenses, addExpense, deleteExpense } = useExpenses();
+  // ── Expense hooks ─────────────────────────────────────────────
+  const { expenses, addExpense, deleteExpense } = useExpenses(spaceId);
   const {
     templates, checks,
     addTemplate, updateTemplate, deleteTemplate,
@@ -36,30 +82,46 @@ export default function App() {
     confirmCheck, skipCheck, resetCheck,
     tryAutoMatch,
     pendingCountCurrentMonth,
-  } = useFixedExpenses(expenses);
+  } = useFixedExpenses(expenses, spaceId);
 
-  const currentUser = settings.currentUser;
+  // ── Handlers ──────────────────────────────────────────────────
+  const handleOnboardingComplete = useCallback((space: AppSpace, newSession: SessionState) => {
+    setSpaces([space]);
+    setSession(newSession);
+  }, []);
 
-  const handleUserSwitch = useCallback((user: User) => {
-    const updated = { ...settings, currentUser: user };
-    setSettings(updated);
-    saveSettings(updated);
-  }, [settings]);
+  const handleUpdateSpaces = useCallback((updated: AppSpace[]) => {
+    setSpaces(updated);
+    saveSpaces(updated);
+  }, []);
+
+  const handleSwitchSpace = useCallback((newSpaceId: string, memberId: string) => {
+    const newSession: SessionState = { spaceId: newSpaceId, memberId };
+    setSession(newSession);
+    saveSession(newSession);
+  }, []);
+
+  const handleMemberSwitch = useCallback((memberId: string) => {
+    if (!session) return;
+    const newSession: SessionState = { ...session, memberId };
+    setSession(newSession);
+    saveSession(newSession);
+    setShowUserSwitcher(false);
+  }, [session]);
 
   const handleSaveSettings = useCallback((newSettings: typeof settings) => {
     setSettings(newSettings);
-    saveSettings(newSettings);
-  }, []);
+    if (spaceId) saveSettings(newSettings, spaceId);
+  }, [spaceId]);
 
   const handleClearAll = useCallback(() => {
-    localStorage.removeItem('expense_tracker_data');
+    localStorage.removeItem(`expense_tracker_data_${spaceId}`);
     window.location.reload();
-  }, []);
+  }, [spaceId]);
 
   const handleSaveExpense = useCallback(
     (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
       const saved = addExpense(data);
-      // Try to auto-match with pending fixed expense checks
       const month = data.date.slice(0, 7);
       tryAutoMatch(saved, month);
       setPrefillTemplate(null);
@@ -68,14 +130,13 @@ export default function App() {
     [addExpense, tryAutoMatch]
   );
 
-  // Called from checklist when user taps "Registrar ahora" on a fixed item
   const handleRegisterFromTemplate = useCallback((tpl: FixedExpenseTemplate) => {
     setPrefillTemplate(tpl);
     setInputMode('form');
     setActiveTab('add');
   }, []);
 
-  // Pending fixed expense templates for tray + autocomplete
+  // ── Pending fixed expenses for tray ───────────────────────────
   const currentMonth = format(new Date(), 'yyyy-MM');
   const { pendingTemplates, pendingIds } = useMemo(() => {
     const pendingSet = new Set(
@@ -89,13 +150,7 @@ export default function App() {
     };
   }, [templates, checks, currentMonth]);
 
-  const modeButtons: { id: InputMode; label: string; emoji: string }[] = [
-    { id: 'form',  label: 'Formulario', emoji: '📋' },
-    { id: 'text',  label: 'Texto',      emoji: '✍️' },
-    { id: 'image', label: 'Foto',       emoji: '📷' },
-  ];
-
-  // Prefill derived from fixed template
+  // ── Prefill from fixed template ───────────────────────────────
   const templatePrefill = prefillTemplate
     ? ({
         concept:       prefillTemplate.concept,
@@ -112,15 +167,29 @@ export default function App() {
       })
     : undefined;
 
+  const modeButtons: { id: InputMode; label: string; emoji: string }[] = [
+    { id: 'form',  label: 'Formulario', emoji: '📋' },
+    { id: 'text',  label: 'Texto',      emoji: '✍️' },
+    { id: 'image', label: 'Foto',       emoji: '📷' },
+  ];
+
+  // ── Onboarding gate ───────────────────────────────────────────
+  if (spaces.length === 0 || !session || !currentSpace || !currentMember) {
+    return <SpaceOnboarding onComplete={handleOnboardingComplete} />;
+  }
+
+  // currentUser is stored as the member's name in paidBy field
+  const currentUser = currentMember.name;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        currentUser={currentUser}
-        onUserSwitch={handleUserSwitch}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        userName1={settings.userName1}
-        userName2={settings.userName2}
+        memberName={currentMember.name}
+        memberColor={MEMBER_COLORS[currentMember.colorIndex] ?? '#3b82f6'}
+        spaceName={currentSpace.name}
+        onAvatarTap={() => setShowUserSwitcher(true)}
         pendingFixed={pendingCountCurrentMonth}
       />
 
@@ -136,7 +205,7 @@ export default function App() {
                 <button onClick={() => setPrefillTemplate(null)} className="text-xs text-blue-400 hover:text-blue-600">✕ Limpiar</button>
               </div>
             )}
-              {pendingTemplates.length > 0 && (
+            {pendingTemplates.length > 0 && (
               <PendingFixedTray
                 templates={templates}
                 checks={checks}
@@ -158,17 +227,17 @@ export default function App() {
               {inputMode === 'form' && (
                 <QuickForm currentUser={currentUser} onSave={handleSaveExpense}
                   prefill={templatePrefill}
-                  userName1={settings.userName1} userName2={settings.userName2}
+                  members={currentSpace.members}
                   fixedSuggestions={templates}
                   pendingIds={pendingIds} />
               )}
               {inputMode === 'text' && (
                 <TextParser currentUser={currentUser} onSave={handleSaveExpense}
-                  apiKey={settings.anthropicApiKey} userName1={settings.userName1} userName2={settings.userName2} />
+                  apiKey={settings.anthropicApiKey} members={currentSpace.members} />
               )}
               {inputMode === 'image' && (
                 <ImageCapture currentUser={currentUser} onSave={handleSaveExpense}
-                  apiKey={settings.anthropicApiKey} userName1={settings.userName1} userName2={settings.userName2} />
+                  apiKey={settings.anthropicApiKey} members={currentSpace.members} />
               )}
             </div>
           </div>
@@ -177,13 +246,13 @@ export default function App() {
         {/* ── Lista ── */}
         {activeTab === 'list' && (
           <ExpenseList expenses={expenses} onDelete={deleteExpense}
-            userName1={settings.userName1} userName2={settings.userName2} />
+            members={currentSpace.members} />
         )}
 
         {/* ── Dashboard ── */}
         {activeTab === 'dashboard' && (
           <Dashboard expenses={expenses}
-            userName1={settings.userName1} userName2={settings.userName2} />
+            members={currentSpace.members} />
         )}
 
         {/* ── Checklist fijos ── */}
@@ -197,15 +266,14 @@ export default function App() {
             onSkip={skipCheck}
             onReset={resetCheck}
             onRegisterNow={handleRegisterFromTemplate}
-            userName1={settings.userName1}
-            userName2={settings.userName2}
+            members={currentSpace.members}
           />
         )}
 
         {/* ── Reporte ── */}
         {activeTab === 'report' && (
           <MonthlyReport expenses={expenses}
-            userName1={settings.userName1} userName2={settings.userName2} />
+            members={currentSpace.members} />
         )}
 
         {/* ── Config ── */}
@@ -216,9 +284,16 @@ export default function App() {
               onAdd={addTemplate}
               onUpdate={updateTemplate}
               onDelete={deleteTemplate}
-              userName1={settings.userName1}
-              userName2={settings.userName2}
+              members={currentSpace.members}
             />
+            <div className="border-t border-gray-200 pt-5">
+              <SpaceSettings
+                spaces={spaces}
+                session={session}
+                onUpdateSpaces={handleUpdateSpaces}
+                onSwitchSpace={handleSwitchSpace}
+              />
+            </div>
             <div className="border-t border-gray-200 pt-5">
               <SettingsPanel settings={settings} onSave={handleSaveSettings}
                 expenseCount={expenses.length} onClearAll={handleClearAll} />
@@ -226,6 +301,16 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* ── User switcher modal ── */}
+      {showUserSwitcher && (
+        <UserSwitcher
+          space={currentSpace}
+          currentMemberId={session.memberId}
+          onSwitch={handleMemberSwitch}
+          onClose={() => setShowUserSwitcher(false)}
+        />
+      )}
     </div>
   );
 }

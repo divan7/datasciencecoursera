@@ -3,13 +3,14 @@ import { format } from 'date-fns';
 import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
 import type { FixedExpenseTemplate } from '../types/fixedExpense';
+import type { SpaceMember } from '../types/space';
+import { MEMBER_COLORS } from '../types/space';
 
 interface QuickFormProps {
   currentUser: User;
   onSave: (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
   prefill?: Partial<Expense>;
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
   fixedSuggestions?: FixedExpenseTemplate[];   // plantillas para autocompletado
   pendingIds?: Set<string>;                     // IDs de checks pendientes este mes
 }
@@ -26,7 +27,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 const QUICK_EXPENSE_CATS: Category[] = ['alimentacion', 'restaurantes', 'transporte', 'hogar', 'salud', 'entretenimiento', 'servicios', 'otro'];
 const QUICK_INCOME_CATS = ['salario', 'freelance', 'negocio', 'bono', 'renta', 'reembolso'];
 
-export function QuickForm({ currentUser, onSave, prefill, userName1, userName2, fixedSuggestions = [], pendingIds }: QuickFormProps) {
+export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggestions = [], pendingIds }: QuickFormProps) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const conceptRef = useRef<HTMLInputElement>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -314,7 +315,7 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2, 
       )}
 
       {/* Date + Who */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fecha</label>
           <input
@@ -328,19 +329,26 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2, 
           <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
             {isIncome ? 'Quién recibió' : 'Quién pagó'}
           </label>
-          <div className="flex gap-2">
-            {(['Ivan', 'Esposa'] as User[]).map((user) => (
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {members.map((member) => (
               <button
-                key={user}
+                key={member.id}
                 type="button"
-                onClick={() => set('paidBy', user)}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                  form.paidBy === user
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-gray-200 text-gray-500'
+                onClick={() => set('paidBy', member.name)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all flex-shrink-0 ${
+                  form.paidBy === member.name
+                    ? 'text-white border-transparent'
+                    : 'border-gray-200 text-gray-500 bg-white'
                 }`}
+                style={form.paidBy === member.name ? { backgroundColor: MEMBER_COLORS[member.colorIndex] } : {}}
               >
-                {user === 'Ivan' ? userName1 : userName2}
+                <span
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                  style={{ backgroundColor: MEMBER_COLORS[member.colorIndex], fontSize: '9px' }}
+                >
+                  {member.name.slice(0, 2).toUpperCase()}
+                </span>
+                {member.name}
               </button>
             ))}
           </div>

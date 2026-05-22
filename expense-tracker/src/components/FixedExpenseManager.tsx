@@ -3,14 +3,15 @@ import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import type { FixedExpenseTemplate } from '../types/fixedExpense';
 import type { Category, User, PaymentMethod, Frequency } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
+import type { SpaceMember } from '../types/space';
+import { MEMBER_COLORS } from '../types/space';
 
 interface Props {
   templates: FixedExpenseTemplate[];
   onAdd: (t: Omit<FixedExpenseTemplate, 'id' | 'createdAt'>) => void;
   onUpdate: (id: string, t: Partial<FixedExpenseTemplate>) => void;
   onDelete: (id: string) => void;
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
 }
 
 const FREQ_LABELS: Record<Frequency, string> = {
@@ -21,19 +22,18 @@ const FREQ_LABELS: Record<Frequency, string> = {
 
 const EMPTY_FORM = {
   concept: '', expectedAmount: '', category: 'servicios' as Category,
-  paidBy: 'Ivan' as User, paymentMethod: 'tarjeta_debito' as PaymentMethod,
+  paidBy: '' as User, paymentMethod: 'tarjeta_debito' as PaymentMethod,
   frequency: 'mensual' as Frequency, dayOfMonth: '', bank: '', cardLast4: '',
   notes: '', active: true,
 };
 
 function TemplateForm({
-  initial, onSave, onCancel, userName1, userName2,
+  initial, onSave, onCancel, members,
 }: {
   initial?: Partial<typeof EMPTY_FORM>;
   onSave: (data: typeof EMPTY_FORM) => void;
   onCancel: () => void;
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
 }) {
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
@@ -91,13 +91,18 @@ function TemplateForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Quién paga</label>
-          <div className="flex gap-2">
-            {(['Ivan', 'Esposa'] as User[]).map((u) => (
-              <button key={u} type="button" onClick={() => set('paidBy', u)}
-                className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                  form.paidBy === u ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-200 text-gray-500'
-                }`}>
-                {u === 'Ivan' ? userName1 : userName2}
+          <div className="flex gap-1.5 flex-wrap">
+            {members.map((m) => (
+              <button key={m.id} type="button" onClick={() => set('paidBy', m.name)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                  form.paidBy === m.name ? 'text-white border-transparent' : 'border-gray-200 text-gray-500 bg-white'
+                }`}
+                style={form.paidBy === m.name ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}>
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                  style={{ backgroundColor: MEMBER_COLORS[m.colorIndex], fontSize: '8px' }}>
+                  {m.name.slice(0, 1).toUpperCase()}
+                </span>
+                {m.name}
               </button>
             ))}
           </div>
@@ -142,7 +147,7 @@ function TemplateForm({
   );
 }
 
-export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, userName1, userName2 }: Props) {
+export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, members }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
@@ -204,7 +209,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, user
       </div>
 
       {showForm && (
-        <TemplateForm onSave={handleAdd} onCancel={() => setShowForm(false)} userName1={userName1} userName2={userName2} />
+        <TemplateForm onSave={handleAdd} onCancel={() => setShowForm(false)} members={members} />
       )}
 
       {templates.length === 0 && !showForm && (
@@ -227,7 +232,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, user
               }}
               onSave={(form) => handleEdit(tpl.id, form)}
               onCancel={() => setEditId(null)}
-              userName1={userName1} userName2={userName2}
+              members={members}
             />
           ) : (
             <div className={`bg-white rounded-xl border p-3 shadow-sm transition-opacity ${!tpl.active ? 'opacity-50' : ''}`}>
@@ -250,7 +255,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, user
                       {(CATEGORIES[tpl.category] as string).replace(/^[^ ]+ /, '')}
                     </span>
                     <span className="text-xs text-gray-400">
-                      {tpl.paidBy === 'Ivan' ? userName1 : userName2}
+                      {tpl.paidBy}
                     </span>
                     {tpl.cardLast4 && <span className="text-xs text-gray-400">···{tpl.cardLast4}</span>}
                   </div>

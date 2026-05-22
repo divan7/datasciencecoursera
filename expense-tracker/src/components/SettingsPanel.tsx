@@ -35,33 +35,6 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
 
   return (
     <div className="space-y-5">
-      {/* User names */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-700 mb-3">👥 Nombres de usuarios</h3>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Usuario 1</label>
-            <input
-              type="text"
-              value={form.userName1}
-              onChange={(e) => set('userName1', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              placeholder="Ivan"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Usuario 2</label>
-            <input
-              type="text"
-              value={form.userName2}
-              onChange={(e) => set('userName2', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              placeholder="Esposa"
-            />
-          </div>
-        </div>
-      </div>
-
       {/* API Key */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
         <h3 className="text-sm font-bold text-gray-700 mb-1">🤖 API Key de Anthropic</h3>
@@ -86,24 +59,38 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
           </button>
         </div>
         {form.anthropicApiKey && (
-          <p className="text-xs text-green-600 mt-1">✅ API Key configurada</p>
+          <p className="text-xs text-green-600 mt-1">API Key configurada</p>
         )}
         {!form.anthropicApiKey && (
           <p className="text-xs text-orange-500 mt-1">
-            ⚠️ Sin API Key — el formulario manual funcionará, pero no la IA
+            Sin API Key — el formulario manual funcionará, pero no la IA
           </p>
         )}
+      </div>
+
+      {/* Currency */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+        <h3 className="text-sm font-bold text-gray-700 mb-3">💱 Moneda</h3>
+        <select
+          value={form.currency}
+          onChange={(e) => set('currency', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          {['MXN', 'USD', 'EUR', 'COP', 'ARS', 'CLP', 'PEN', 'BRL'].map((c) => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
       </div>
 
       {/* Save */}
       <button
         onClick={handleSave}
         className={`w-full py-3 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all ${
-          saved ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700 active:scale-95'
+          saved ? 'bg-green-500' : 'bg-teal-600 hover:bg-teal-700 active:scale-95'
         }`}
       >
         <Save size={18} />
-        {saved ? '✅ ¡Guardado!' : 'Guardar ajustes'}
+        {saved ? 'Guardado!' : 'Guardar ajustes'}
       </button>
 
       {/* Stats */}
@@ -113,7 +100,7 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
 
       {/* Danger zone */}
       <div className="border border-red-100 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-red-600 mb-2">⚠️ Zona de peligro</h3>
+        <h3 className="text-sm font-bold text-red-600 mb-2">Zona de peligro</h3>
         <p className="text-xs text-gray-500 mb-3">
           Eliminar todos los gastos es irreversible.
         </p>
@@ -126,7 +113,7 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
               : 'border-red-200 text-red-500 hover:bg-red-50'
           }`}
         >
-          {confirmClear ? '⚠️ Confirmar: Borrar todo' : 'Borrar todos los gastos'}
+          {confirmClear ? 'Confirmar: Borrar todo' : 'Borrar todos los gastos'}
         </button>
       </div>
     </div>

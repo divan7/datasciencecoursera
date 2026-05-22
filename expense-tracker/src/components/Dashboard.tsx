@@ -7,11 +7,12 @@ import { format, subMonths, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Expense } from '../types/expense';
 import { CATEGORIES, INCOME_CATEGORIES } from '../types/expense';
+import type { SpaceMember } from '../types/space';
+import { MEMBER_COLORS } from '../types/space';
 
 interface DashboardProps {
   expenses: Expense[];
-  userName1: string;
-  userName2: string;
+  members: SpaceMember[];
 }
 
 const PIE_COLORS = [
@@ -62,7 +63,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: { name: s
   );
 }
 
-export function Dashboard({ expenses, userName1, userName2 }: DashboardProps) {
+export function Dashboard({ expenses, members }: DashboardProps) {
   const [range, setRange] = useState<Range>('6m');
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
 
@@ -105,10 +106,13 @@ export function Dashboard({ expenses, userName1, userName2 }: DashboardProps) {
   const monthlySummary = useMemo(() => {
     const gastos = monthExpenses.filter((e) => (e.transactionType ?? 'gasto') === 'gasto').reduce((s, e) => s + e.amount, 0);
     const ingresos = monthExpenses.filter((e) => e.transactionType === 'ingreso').reduce((s, e) => s + e.amount, 0);
-    const ivan = monthExpenses.filter((e) => (e.transactionType ?? 'gasto') === 'gasto' && e.paidBy === 'Ivan').reduce((s, e) => s + e.amount, 0);
-    const esposa = monthExpenses.filter((e) => (e.transactionType ?? 'gasto') === 'gasto' && e.paidBy === 'Esposa').reduce((s, e) => s + e.amount, 0);
-    return { gastos, ingresos, balance: ingresos - gastos, ivan, esposa };
-  }, [monthExpenses]);
+    // Per-member amounts
+    const byMember = members.reduce((acc, m) => {
+      acc[m.name] = monthExpenses.filter((e) => (e.transactionType ?? 'gasto') === 'gasto' && e.paidBy === m.name).reduce((s, e) => s + e.amount, 0);
+      return acc;
+    }, {} as Record<string, number>);
+    return { gastos, ingresos, balance: ingresos - gastos, byMember };
+  }, [monthExpenses, members]);
 
   // Category breakdown (expenses only)
   const categoryData = useMemo(() => {
@@ -143,13 +147,15 @@ export function Dashboard({ expenses, userName1, userName2 }: DashboardProps) {
   const userTrendData = useMemo(() => {
     return months.map((m) => {
       const mes = expenses.filter((e) => e.date.startsWith(m) && (e.transactionType ?? 'gasto') === 'gasto');
-      const ivan = mes.filter((e) => e.paidBy === 'Ivan').reduce((s, e) => s + e.amount, 0);
-      const esposa = mes.filter((e) => e.paidBy === 'Esposa').reduce((s, e) => s + e.amount, 0);
       const [y, mo] = m.split('-');
       const label = format(new Date(parseInt(y), parseInt(mo) - 1, 1), 'MMM yy', { locale: es });
-      return { mes: label, [userName1]: Math.round(ivan), [userName2]: Math.round(esposa) };
+      const entry: Record<string, string | number> = { mes: label };
+      members.forEach((member) => {
+        entry[member.name] = Math.round(mes.filter((e) => e.paidBy === member.name).reduce((s, e) => s + e.amount, 0));
+      });
+      return entry;
     });
-  }, [expenses, months, userName1, userName2]);
+  }, [expenses, months, members]);
 
   // Top concepts (expense)
   const topConcepts = useMemo(() => {
@@ -362,25 +368,30 @@ export function Dashboard({ expenses, userName1, userName2 }: DashboardProps) {
             <YAxis tickFormatter={fmt} tick={{ fontSize: 10 }} />
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey={userName1} stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-            <Bar dataKey={userName2} stackId="a" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+            {members.map((m, i) => (
+              <Bar
+                key={m.id}
+                dataKey={m.name}
+                stackId="a"
+                fill={MEMBER_COLORS[m.colorIndex]}
+                radius={i === members.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
-        <div className="grid grid-cols-2 gap-2 mt-3">
-          <div className="bg-blue-50 rounded-xl p-2 text-center">
-            <p className="text-xs text-blue-400">{userName1}</p>
-            <p className="font-bold text-blue-700">{fmt(monthlySummary.ivan)}</p>
-            <p className="text-xs text-blue-400">
-              {monthlySummary.gastos > 0 ? Math.round((monthlySummary.ivan / monthlySummary.gastos) * 100) : 0}%
-            </p>
-          </div>
-          <div className="bg-purple-50 rounded-xl p-2 text-center">
-            <p className="text-xs text-purple-400">{userName2}</p>
-            <p className="font-bold text-purple-700">{fmt(monthlySummary.esposa)}</p>
-            <p className="text-xs text-purple-400">
-              {monthlySummary.gastos > 0 ? Math.round((monthlySummary.esposa / monthlySummary.gastos) * 100) : 0}%
-            </p>
-          </div>
+        <div className={`grid gap-2 mt-3`} style={{ gridTemplateColumns: `repeat(${Math.min(members.length, 4)}, 1fr)` }}>
+          {members.map((m) => {
+            const amount = monthlySummary.byMember[m.name] ?? 0;
+            return (
+              <div key={m.id} className="rounded-xl p-2 text-center" style={{ backgroundColor: MEMBER_COLORS[m.colorIndex] + '20' }}>
+                <p className="text-xs truncate" style={{ color: MEMBER_COLORS[m.colorIndex] }}>{m.name}</p>
+                <p className="font-bold text-sm" style={{ color: MEMBER_COLORS[m.colorIndex] }}>{fmt(amount)}</p>
+                <p className="text-xs" style={{ color: MEMBER_COLORS[m.colorIndex] }}>
+                  {monthlySummary.gastos > 0 ? Math.round((amount / monthlySummary.gastos) * 100) : 0}%
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

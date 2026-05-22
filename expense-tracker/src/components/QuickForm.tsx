@@ -66,7 +66,7 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2, 
 
   // ── Autocomplete suggestions ─────────────────────────────────────
   const filteredSuggestions = useMemo(() => {
-    if (!fixedSuggestions.length) return [];
+    if (prefill !== undefined || !fixedSuggestions.length) return [];
     const q = form.concept.toLowerCase().trim();
     const matched = fixedSuggestions.filter((t) =>
       q === '' || t.concept.toLowerCase().includes(q)
@@ -76,7 +76,7 @@ export function QuickForm({ currentUser, onSave, prefill, userName1, userName2, 
       ...matched.filter((t) => pendingIds?.has(t.id)),
       ...matched.filter((t) => !pendingIds?.has(t.id)),
     ];
-  }, [fixedSuggestions, form.concept, pendingIds]);
+  }, [fixedSuggestions, form.concept, pendingIds, prefill]);
 
   // Close suggestions when clicking outside
   useEffect(() => {

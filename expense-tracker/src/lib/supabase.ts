@@ -7,4 +7,12 @@ export const isSupabaseConfigured =
   Boolean(url && key && !url.includes('tu-proyecto'));
 
 export const supabase =
-  url && key ? createClient(url, key) : null;
+  url && key
+    ? createClient(url, key, {
+        auth: {
+          flowType: 'implicit',
+          persistSession: true,
+          detectSessionInUrl: true,
+        },
+      })
+    : null;

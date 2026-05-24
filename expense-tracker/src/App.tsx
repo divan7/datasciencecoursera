@@ -16,6 +16,8 @@ import { SpaceSettings } from './components/SpaceSettings';
 import { SpacePicker } from './components/SpacePicker';
 import { AuthGate } from './components/AuthGate';
 import { AdminPanel } from './components/AdminPanel';
+import { WelcomeChoice } from './components/WelcomeChoice';
+import { JoinSpace } from './components/JoinSpace';
 import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
@@ -52,6 +54,8 @@ export default function App() {
   const [spacesLoaded, setSpacesLoaded] = useState(false);
 
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
+  // 'choosing' = show create/join screen; 'joining' = entering code; 'creating' = onboarding
+  const [welcomeMode, setWelcomeMode] = useState<'choosing' | 'joining' | 'creating'>('choosing');
 
   // Derived: current space and member
   const currentSpace = useMemo(
@@ -179,6 +183,17 @@ export default function App() {
     setActiveTab('add');
   }, []);
 
+  const handleJoined = useCallback(async (spaceId: string, memberId: string) => {
+    const updated = await loadSpacesFromSupabase();
+    if (updated.length > 0) {
+      setSpaces(updated);
+      const newSession: SessionState = { spaceId, memberId };
+      setSession(newSession);
+      saveSession(newSession);
+    }
+    setWelcomeMode('choosing');
+  }, []);
+
   const handleSaveMultipleExpenses = useCallback((items: ExpenseWithSpace[]) => {
     items.forEach(({ expense, spaceId: targetSpaceId }) => {
       if (targetSpaceId === spaceId) {
@@ -241,6 +256,16 @@ export default function App() {
     }
     if (!user) {
       return <AuthGate onSignIn={signInWithMagicLink} />;
+    }
+  }
+
+  // ── Welcome gate (when Supabase is on and no spaces yet) ─────
+  if (isSupabaseConfigured && spaces.length === 0) {
+    if (welcomeMode === 'joining') {
+      return <JoinSpace profile={profile} onJoined={handleJoined} onBack={() => setWelcomeMode('choosing')} />;
+    }
+    if (welcomeMode === 'choosing') {
+      return <WelcomeChoice onCreateOwn={() => setWelcomeMode('creating')} onJoin={() => setWelcomeMode('joining')} />;
     }
   }
 

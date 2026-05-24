@@ -4,6 +4,7 @@ import type { AppSpace, SessionState, MemberRole, SpaceMember } from '../types/s
 import { MEMBER_COLORS, ROLE_LABELS } from '../types/space';
 import { saveSpaces, saveSession, generateMemberId, generateSpaceId } from '../utils/spaceStorage';
 import { PinPad } from './PinPad';
+import { InviteCodePanel } from './InviteCodePanel';
 
 interface Props {
   spaces: AppSpace[];
@@ -345,6 +346,13 @@ export function SpaceSettings({ spaces, session, onUpdateSpaces, onSwitchSpace }
             </div>
           ))}
         </div>
+
+        {/* Invite code */}
+        {isPropietario && view === null && (
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <InviteCodePanel space={currentSpace} currentMemberId={session.memberId} />
+          </div>
+        )}
 
         {/* Transfer ownership */}
         {isPropietario && view === null && currentSpace.members.length > 1 && (

@@ -383,6 +383,76 @@ export const settingsDb = {
   },
 };
 
+// ─── Invites ──────────────────────────────────────────────────────────────────
+
+export interface SpaceInvite {
+  id: string;
+  code: string;
+  spaceName: string;
+  expiresAt: string;
+  maxUses: number;
+  useCount: number;
+  createdAt: string;
+}
+
+export const invitesDb = {
+  generateCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  },
+
+  async create(spaceId: string, spaceName: string, createdBy: string): Promise<string> {
+    if (!supabase) throw new Error('Supabase no configurado');
+    const code = this.generateCode();
+    const id = `inv_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const { error } = await supabase.from('space_invites').insert({
+      id, space_id: spaceId, space_name: spaceName, code, created_by: createdBy,
+    });
+    if (error) throw error;
+    return code;
+  },
+
+  async preview(code: string): Promise<{ spaceId: string; spaceName: string } | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('preview_invite', { p_code: code.toUpperCase() });
+    if (error || !data) return null;
+    return data as { spaceId: string; spaceName: string };
+  },
+
+  async join(code: string, displayName: string, colorIndex: number): Promise<{ spaceId: string; memberId: string }> {
+    if (!supabase) throw new Error('Supabase no configurado');
+    const { data, error } = await supabase.rpc('join_space_with_code', {
+      p_code: code.toUpperCase(),
+      p_display_name: displayName,
+      p_color_index: colorIndex,
+    });
+    if (error) throw new Error(error.message);
+    return data as { spaceId: string; memberId: string };
+  },
+
+  async listForSpace(spaceId: string): Promise<SpaceInvite[]> {
+    if (!supabase) return [];
+    const { data } = await supabase
+      .from('space_invites').select('*')
+      .eq('space_id', spaceId)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+    return (data ?? [])
+      .filter((r: { use_count: number; max_uses: number }) => r.use_count < r.max_uses)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => ({
+        id: r.id, code: r.code, spaceName: r.space_name,
+        expiresAt: r.expires_at, maxUses: r.max_uses,
+        useCount: r.use_count, createdAt: r.created_at,
+      }));
+  },
+
+  async revoke(inviteId: string): Promise<void> {
+    if (!supabase) return;
+    await supabase.from('space_invites').delete().eq('id', inviteId);
+  },
+};
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export { generateId };

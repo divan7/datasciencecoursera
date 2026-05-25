@@ -6,6 +6,7 @@ import { PinPad } from './PinPad';
 
 interface Props {
   onComplete: (space: AppSpace, session: SessionState) => void;
+  isSupabaseMode?: boolean;
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -16,7 +17,7 @@ interface AddedMember {
   pin: string;
 }
 
-export function SpaceOnboarding({ onComplete }: Props) {
+export function SpaceOnboarding({ onComplete, isSupabaseMode = false }: Props) {
   const [step, setStep] = useState<Step>(1);
 
   // Step 1
@@ -64,8 +65,11 @@ export function SpaceOnboarding({ onComplete }: Props) {
       setFirstPin('');
       return;
     }
-    // PIN confirmed, go to step 4 with owner already added
-    setStep(4);
+    if (isSupabaseMode) {
+      handleFinish();
+    } else {
+      setStep(4);
+    }
   };
 
   const handleAddMemberPin = (pin: string) => {
@@ -146,7 +150,7 @@ export function SpaceOnboarding({ onComplete }: Props) {
           <p className="text-teal-200 text-sm">by SOI</p>
           {/* Step indicator */}
           <div className="flex justify-center gap-1.5 mt-3">
-            {[1,2,3,4].map((s) => (
+            {(isSupabaseMode ? [1,2,3] : [1,2,3,4]).map((s) => (
               <div key={s} className={`h-1.5 w-6 rounded-full transition-all ${s <= step ? 'bg-white' : 'bg-teal-600'}`} />
             ))}
           </div>

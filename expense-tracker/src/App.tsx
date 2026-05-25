@@ -271,7 +271,7 @@ export default function App() {
 
   // ── Onboarding gate ───────────────────────────────────────────
   if (spaces.length === 0 || !session || !currentSpace || !currentMember) {
-    return <SpaceOnboarding onComplete={handleOnboardingComplete} />;
+    return <SpaceOnboarding onComplete={handleOnboardingComplete} isSupabaseMode={isSupabaseConfigured} />;
   }
 
   // currentUser is stored as the member's name in paidBy field

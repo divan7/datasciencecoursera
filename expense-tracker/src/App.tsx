@@ -54,8 +54,9 @@ export default function App() {
   const [spacesLoaded, setSpacesLoaded] = useState(false);
 
   const [showUserSwitcher, setShowUserSwitcher] = useState(false);
-  // 'choosing' = show create/join screen; 'joining' = entering code; 'creating' = onboarding
-  const [welcomeMode, setWelcomeMode] = useState<'choosing' | 'joining' | 'creating'>('choosing');
+  // 'choosing' | 'joining' | 'creating' | 'joined' (post-join confirmation)
+  const [welcomeMode, setWelcomeMode] = useState<'choosing' | 'joining' | 'creating' | 'joined'>('choosing');
+  const [joinedSpaceName, setJoinedSpaceName] = useState('');
 
   // Derived: current space and member
   const currentSpace = useMemo(
@@ -190,8 +191,10 @@ export default function App() {
       const newSession: SessionState = { spaceId, memberId };
       setSession(newSession);
       saveSession(newSession);
+      const joined = updated.find((s) => s.id === spaceId);
+      setJoinedSpaceName(joined?.name ?? '');
     }
-    setWelcomeMode('choosing');
+    setWelcomeMode('joined');
   }, []);
 
   const handleSaveMultipleExpenses = useCallback((items: ExpenseWithSpace[]) => {
@@ -267,6 +270,46 @@ export default function App() {
     if (welcomeMode === 'choosing') {
       return <WelcomeChoice onCreateOwn={() => setWelcomeMode('creating')} onJoin={() => setWelcomeMode('joining')} />;
     }
+  }
+
+  // ── Post-join screen: user joined a shared list, offer to also create their own ──
+  if (isSupabaseConfigured && welcomeMode === 'joined') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10"
+        style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-7 space-y-5">
+          <div className="text-center space-y-2">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ backgroundColor: '#e6f7f9' }}>
+              <span className="text-3xl">🏠</span>
+            </div>
+            <h2 className="text-xl font-extrabold text-gray-800">¡Ya estás dentro!</h2>
+            <p className="text-sm text-gray-500">
+              Te uniste a <strong className="text-gray-800">{joinedSpaceName}</strong>.
+              En esta lista verás los gastos de todos los miembros del hogar.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => setWelcomeMode('choosing')}
+              className="w-full py-3 rounded-2xl text-white text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
+              style={{ backgroundColor: '#0c6878' }}>
+              Ir a {joinedSpaceName} →
+            </button>
+            <button
+              onClick={() => setWelcomeMode('creating')}
+              className="w-full py-3 rounded-2xl text-sm font-bold border-2 text-gray-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+              style={{ borderColor: '#0c6878' }}>
+              También crear mi propia lista
+            </button>
+          </div>
+
+          <p className="text-xs text-center text-gray-400">
+            Puedes tener varias listas a la vez. Cámbiate entre ellas desde el menú superior.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   // ── Onboarding gate ───────────────────────────────────────────

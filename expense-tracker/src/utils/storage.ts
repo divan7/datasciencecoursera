@@ -2,6 +2,7 @@ import type { Expense } from '../types/expense';
 
 const dataKey = (spaceId: string) => `expense_tracker_data_${spaceId}`;
 const settingsKey = (spaceId: string) => `expense_tracker_settings_${spaceId}`;
+const GLOBAL_API_KEY = 'expense_tracker_api_key';
 
 export interface AppSettings {
   currency: string;
@@ -24,14 +25,28 @@ export function loadExpenses(spaceId: string): Expense[] {
 }
 
 export function saveSettings(settings: AppSettings, spaceId: string): void {
+  // Persist API key globally so it survives space switches and new spaces
+  if (settings.anthropicApiKey) {
+    localStorage.setItem(GLOBAL_API_KEY, settings.anthropicApiKey);
+  } else {
+    localStorage.removeItem(GLOBAL_API_KEY);
+  }
   localStorage.setItem(settingsKey(spaceId), JSON.stringify(settings));
 }
 
 export function loadSettings(spaceId: string): AppSettings {
   const raw = localStorage.getItem(settingsKey(spaceId));
-  if (!raw) return { currency: 'MXN' };
-  try { return JSON.parse(raw) as AppSettings; }
-  catch { return { currency: 'MXN' }; }
+  const base: AppSettings = { currency: 'MXN' };
+  let saved: AppSettings = base;
+  if (raw) {
+    try { saved = JSON.parse(raw) as AppSettings; } catch { /* ignore */ }
+  }
+  // Fall back to global API key if this space doesn't have one yet
+  if (!saved.anthropicApiKey) {
+    const globalKey = localStorage.getItem(GLOBAL_API_KEY);
+    if (globalKey) saved = { ...saved, anthropicApiKey: globalKey };
+  }
+  return saved;
 }
 
 // Legacy (no spaceId) load for migration

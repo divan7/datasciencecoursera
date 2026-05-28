@@ -6,7 +6,8 @@ import type { FixedExpenseTemplate } from '../types/fixedExpense';
 import {
   requestNotificationPermission,
   buildGoogleCalendarUrl,
-  getNextDueDate,
+  downloadICS,
+  getEffectiveDueDate,
 } from '../services/notificationService';
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
   onClose: () => void;
 }
 
-type ReminderType = 'push' | 'calendar' | 'both';
+type ReminderType = 'push' | 'google' | 'ics' | 'both';
 type Step = 'choose' | 'days' | 'done';
 
 export function ReminderDialog({ template, onUpdate, onClose }: Props) {
@@ -23,7 +24,7 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
   const [chosenType, setChosenType] = useState<ReminderType | null>(null);
   const [daysBefore, setDaysBefore] = useState(1);
 
-  const dueDate = getNextDueDate(template);
+  const dueDate = getEffectiveDueDate(template);
 
   const selectType = (type: ReminderType) => {
     setChosenType(type);
@@ -35,16 +36,16 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
 
     if (chosenType === 'push' || chosenType === 'both') {
       const granted = await requestNotificationPermission();
-      if (granted) {
-        onUpdate(template.id, { reminderEnabled: true, reminderDaysBefore: daysBefore });
-      } else {
-        onUpdate(template.id, { reminderEnabled: false });
-      }
+      onUpdate(template.id, { reminderEnabled: granted, reminderDaysBefore: daysBefore });
     }
 
-    if (chosenType === 'calendar' || chosenType === 'both') {
+    if (chosenType === 'google' || chosenType === 'both') {
       const url = buildGoogleCalendarUrl(template);
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    if (chosenType === 'ics') {
+      downloadICS(template, daysBefore);
     }
 
     setStep('done');
@@ -78,6 +79,31 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
             </div>
 
             <div className="space-y-2">
+              {/* Google Calendar */}
+              <button
+                onClick={() => selectType('google')}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 active:scale-98 transition-all text-left"
+              >
+                <Calendar size={18} className="text-blue-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-800">Google Calendar</p>
+                  <p className="text-xs text-blue-600">Abre Google Calendar con el evento listo para guardar</p>
+                </div>
+              </button>
+
+              {/* ICS — Apple Calendar, Outlook, etc. */}
+              <button
+                onClick={() => selectType('ics')}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl hover:bg-gray-100 active:scale-98 transition-all text-left"
+              >
+                <span className="text-lg flex-shrink-0">🗓️</span>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Apple Calendar / Outlook</p>
+                  <p className="text-xs text-gray-500">Descarga un archivo .ics compatible con cualquier app de calendario</p>
+                </div>
+              </button>
+
+              {/* In-app push */}
               <button
                 onClick={() => selectType('push')}
                 className="w-full flex items-center gap-3 px-4 py-3 bg-teal-50 border border-teal-200 rounded-2xl hover:bg-teal-100 active:scale-98 transition-all text-left"
@@ -85,35 +111,25 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
                 <Bell size={18} className="text-teal-600 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-semibold text-teal-800">Notificación en la app</p>
-                  <p className="text-xs text-teal-600">Aviso cuando abras Orden Casa</p>
+                  <p className="text-xs text-teal-600">Aviso cuando abras Orden Casa (requiere permiso)</p>
                 </div>
               </button>
 
-              <button
-                onClick={() => selectType('calendar')}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 active:scale-98 transition-all text-left"
-              >
-                <Calendar size={18} className="text-blue-600 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold text-blue-800">Guardar en Google Calendar</p>
-                  <p className="text-xs text-blue-600">Abre Google Calendar con el evento listo</p>
-                </div>
-              </button>
-
+              {/* Both calendar options */}
               <button
                 onClick={() => selectType('both')}
                 className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 border border-purple-200 rounded-2xl hover:bg-purple-100 active:scale-98 transition-all text-left"
               >
                 <span className="text-lg flex-shrink-0">✨</span>
                 <div>
-                  <p className="text-sm font-semibold text-purple-800">Ambos</p>
-                  <p className="text-xs text-purple-600">Notificación en app + evento en calendario</p>
+                  <p className="text-sm font-semibold text-purple-800">Google Calendar + notificación en app</p>
+                  <p className="text-xs text-purple-600">Las dos opciones al mismo tiempo</p>
                 </div>
               </button>
 
               <button
                 onClick={onClose}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl hover:bg-gray-100 transition-all text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-100 rounded-2xl hover:bg-gray-50 transition-all text-left"
               >
                 <BellOff size={18} className="text-gray-400 flex-shrink-0" />
                 <p className="text-sm text-gray-500">No, gracias</p>
@@ -173,7 +189,8 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
             <div className="text-5xl mb-3">✅</div>
             <p className="text-sm font-bold text-gray-800">¡Recordatorio configurado!</p>
             <p className="text-xs text-gray-500 mt-1">
-              {chosenType === 'calendar' && 'Revisa Google Calendar para confirmar el evento.'}
+              {chosenType === 'google' && 'Revisa Google Calendar para confirmar el evento recurrente.'}
+              {chosenType === 'ics' && 'Abre el archivo .ics descargado para importarlo a tu calendario.'}
               {chosenType === 'push' && 'Recibirás un aviso cuando abras la app.'}
               {chosenType === 'both' && 'Revisa Google Calendar para confirmar el evento.'}
             </p>

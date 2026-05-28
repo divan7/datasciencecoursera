@@ -90,29 +90,117 @@ export function getNextDueDate(tpl: FixedExpenseTemplate): Date | null {
   }
 }
 
+/** For credit cards, the due date = cutDay + paymentDueDaysAfterCut days */
+export function getCreditCardPaymentDate(tpl: FixedExpenseTemplate): Date | null {
+  if (!tpl.isCreditCard || !tpl.cutDay) return null;
+  const today = startOfDay(new Date());
+  const dueDays = tpl.paymentDueDaysAfterCut ?? 20;
+  const y = today.getFullYear();
+  const mo = today.getMonth();
+  const candidate = addDays(new Date(y, mo, tpl.cutDay), dueDays);
+  return candidate >= today ? candidate : addDays(new Date(y, mo + 1, tpl.cutDay), dueDays);
+}
+
+/** Returns next payment due date, honouring credit card cut+pay cycle */
+export function getEffectiveDueDate(tpl: FixedExpenseTemplate): Date | null {
+  if (tpl.isCreditCard) return getCreditCardPaymentDate(tpl);
+  return getNextDueDate(tpl);
+}
+
+// ── ICS generation ────────────────────────────────────────────────────────────
+
+const RRULE_MAP: Record<string, string> = {
+  diario:     'FREQ=DAILY',
+  semanal:    'FREQ=WEEKLY',
+  mensual:    'FREQ=MONTHLY',
+  bimestral:  'FREQ=MONTHLY;INTERVAL=2',
+  trimestral: 'FREQ=MONTHLY;INTERVAL=3',
+  semestral:  'FREQ=MONTHLY;INTERVAL=6',
+  anual:      'FREQ=YEARLY',
+};
+
+function icsDate(d: Date): string {
+  return format(d, 'yyyyMMdd');
+}
+
+export function buildICSContent(tpl: FixedExpenseTemplate, daysBefore = 1): string {
+  const dueDate = getEffectiveDueDate(tpl);
+  if (!dueDate) return '';
+
+  const dtStart = icsDate(dueDate);
+  const dtEnd   = icsDate(addDays(dueDate, 1));
+  const rrule   = tpl.isCreditCard ? `FREQ=MONTHLY` : RRULE_MAP[tpl.frequency] ?? '';
+
+  const amountLine = `Monto esperado: $${tpl.expectedAmount.toLocaleString('es-MX')}`;
+  const minLine    = tpl.minimumPayment ? `\\nPago mínimo: $${tpl.minimumPayment.toLocaleString('es-MX')}` : '';
+  const cutLine    = tpl.isCreditCard && tpl.cutDay
+    ? `\\nCorte: día ${tpl.cutDay} · Límite pago: ${tpl.paymentDueDaysAfterCut ?? 20} días después`
+    : '';
+  const bankLine   = tpl.bank ? `\\n${tpl.bank}${tpl.cardLast4 ? ` ···${tpl.cardLast4}` : ''}` : '';
+  const description = `${amountLine}${minLine}${cutLine}${bankLine}\\nRegistrado con Orden Casa`;
+
+  const prefix = tpl.isCreditCard ? '💳' : '📋';
+  const uid    = `${tpl.id}-${Date.now()}@ordencasa.app`;
+
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Orden Casa//SOIHogar//ES',
+    'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTART;VALUE=DATE:${dtStart}`,
+    `DTEND;VALUE=DATE:${dtEnd}`,
+    ...(rrule ? [`RRULE:${rrule}`] : []),
+    `SUMMARY:${prefix} Pago: ${tpl.concept}`,
+    `DESCRIPTION:${description}`,
+    'BEGIN:VALARM',
+    `TRIGGER:-P${daysBefore}D`,
+    'ACTION:DISPLAY',
+    `DESCRIPTION:Recordatorio: ${tpl.concept} vence pronto`,
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ];
+
+  return lines.join('\r\n');
+}
+
+export function downloadICS(tpl: FixedExpenseTemplate, daysBefore = 1): void {
+  const content = buildICSContent(tpl, daysBefore);
+  if (!content) return;
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `${tpl.concept.replace(/[^a-zA-Z0-9]/g, '_')}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function buildGoogleCalendarUrl(tpl: FixedExpenseTemplate): string {
-  const dueDate = getNextDueDate(tpl);
+  const dueDate = getEffectiveDueDate(tpl);
   if (!dueDate) return '';
 
   const dateStr = format(dueDate, 'yyyyMMdd');
-  const endStr = format(addDays(dueDate, 1), 'yyyyMMdd');
+  const endStr  = format(addDays(dueDate, 1), 'yyyyMMdd');
 
-  const rruleMap: Record<string, string> = {
-    diario: 'RRULE:FREQ=DAILY',
-    semanal: 'RRULE:FREQ=WEEKLY',
-    quincenal: '',
-    mensual: 'RRULE:FREQ=MONTHLY',
-    bimestral: 'RRULE:FREQ=MONTHLY;INTERVAL=2',
-    trimestral: 'RRULE:FREQ=MONTHLY;INTERVAL=3',
-    semestral: 'RRULE:FREQ=MONTHLY;INTERVAL=6',
+  const rruleGcal: Record<string, string> = {
+    diario: 'RRULE:FREQ=DAILY', semanal: 'RRULE:FREQ=WEEKLY',
+    mensual: 'RRULE:FREQ=MONTHLY', bimestral: 'RRULE:FREQ=MONTHLY;INTERVAL=2',
+    trimestral: 'RRULE:FREQ=MONTHLY;INTERVAL=3', semestral: 'RRULE:FREQ=MONTHLY;INTERVAL=6',
     anual: 'RRULE:FREQ=YEARLY',
   };
+  const recur = tpl.isCreditCard ? 'RRULE:FREQ=MONTHLY' : (rruleGcal[tpl.frequency] ?? '');
 
-  const recur = rruleMap[tpl.frequency] ?? '';
+  const details = tpl.isCreditCard && tpl.cutDay
+    ? `Monto: $${tpl.expectedAmount.toLocaleString('es-MX')}\nCorte: día ${tpl.cutDay}\nLímite: ${tpl.paymentDueDaysAfterCut ?? 20} días después del corte`
+    : `Monto: $${tpl.expectedAmount.toLocaleString('es-MX')}\nPagado por: ${tpl.paidBy}`;
+
   const params: Record<string, string> = {
-    text: `Pago: ${tpl.concept}`,
+    text: `💳 Pago: ${tpl.concept}`,
     dates: `${dateStr}/${endStr}`,
-    details: `Monto esperado: $${tpl.expectedAmount.toLocaleString('es-MX')}\nPagado por: ${tpl.paidBy}`,
+    details,
   };
   if (recur) params.recur = recur;
 

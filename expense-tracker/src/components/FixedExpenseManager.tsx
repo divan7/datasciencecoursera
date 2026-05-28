@@ -26,10 +26,11 @@ const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto
 
 const EMPTY_FORM = {
   concept: '', expectedAmount: '', category: 'servicios' as Category,
-  paidBy: '' as User, paymentMethod: 'tarjeta_debito' as PaymentMethod,
+  paidBy: '' as User, paymentMethod: 'tarjeta_credito' as PaymentMethod,
   frequency: 'mensual' as Frequency,
   dayOfMonth: '', dayOfWeek: '1', paymentMonth: '1',
   bank: '', cardLast4: '', notes: '', active: true,
+  isCreditCard: false, cutDay: '', paymentDueDaysAfterCut: '20', minimumPayment: '',
 };
 
 function PaymentDayField({
@@ -198,6 +199,50 @@ function TemplateForm({
         </div>
       </div>
 
+      {/* Credit card toggle */}
+      <div className="flex items-center justify-between px-3 py-2.5 bg-orange-50 border border-orange-200 rounded-xl">
+        <div>
+          <p className="text-xs font-semibold text-orange-800">¿Es pago de tarjeta de crédito?</p>
+          <p className="text-xs text-orange-500 mt-0.5">Activa campos de corte y fecha límite</p>
+        </div>
+        <button type="button" onClick={() => set('isCreditCard', !form.isCreditCard)}
+          className={`w-11 h-6 rounded-full transition-all relative ${form.isCreditCard ? 'bg-orange-500' : 'bg-gray-200'}`}>
+          <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${form.isCreditCard ? 'left-5' : 'left-0.5'}`} />
+        </button>
+      </div>
+
+      {/* Credit card specific fields */}
+      {form.isCreditCard && (
+        <div className="space-y-3 bg-orange-50 border border-orange-200 rounded-xl p-3">
+          <p className="text-xs font-semibold text-orange-800">💳 Datos de la tarjeta</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Día de corte</label>
+              <input type="number" min="1" max="31" value={form.cutDay}
+                onChange={(e) => set('cutDay', e.target.value)} placeholder="Ej: 15"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Días límite de pago</label>
+              <input type="number" min="1" max="30" value={form.paymentDueDaysAfterCut}
+                onChange={(e) => set('paymentDueDaysAfterCut', e.target.value)} placeholder="20"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Pago mínimo (opcional)</label>
+            <input type="number" min="0" step="0.01" value={form.minimumPayment}
+              onChange={(e) => set('minimumPayment', e.target.value)} placeholder="0.00"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          {form.cutDay && (
+            <p className="text-xs text-orange-600">
+              📅 Fecha límite de pago: día {Math.min(parseInt(form.cutDay) + parseInt(form.paymentDueDaysAfterCut || '20'), 31)} del mes siguiente al corte
+            </p>
+          )}
+        </div>
+      )}
+
       <div>
         <label className="block text-xs text-gray-500 mb-1">Notas</label>
         <input type="text" value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Observaciones..."
@@ -224,41 +269,33 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [pendingReminder, setPendingReminder] = useState<FixedExpenseTemplate | null>(null);
 
+  const formToTemplate = (form: typeof EMPTY_FORM) => ({
+    concept: form.concept,
+    expectedAmount: parseFloat(form.expectedAmount as string) || 0,
+    category: form.category,
+    paidBy: form.paidBy,
+    paymentMethod: form.paymentMethod,
+    frequency: form.frequency,
+    dayOfMonth: !form.isCreditCard && form.dayOfMonth ? parseInt(form.dayOfMonth as string) : undefined,
+    dayOfWeek: form.frequency === 'semanal' && form.dayOfWeek ? parseInt(form.dayOfWeek) : undefined,
+    paymentMonth: form.frequency === 'anual' && form.paymentMonth ? parseInt(form.paymentMonth) : undefined,
+    bank: form.bank || undefined,
+    cardLast4: form.cardLast4 || undefined,
+    notes: form.notes || undefined,
+    isCreditCard: form.isCreditCard || undefined,
+    cutDay: form.isCreditCard && form.cutDay ? parseInt(form.cutDay as string) : undefined,
+    paymentDueDaysAfterCut: form.isCreditCard && form.paymentDueDaysAfterCut ? parseInt(form.paymentDueDaysAfterCut as string) : undefined,
+    minimumPayment: form.isCreditCard && form.minimumPayment ? parseFloat(form.minimumPayment as string) : undefined,
+  });
+
   const handleAdd = (form: typeof EMPTY_FORM) => {
-    const tpl = onAdd({
-      concept: form.concept,
-      expectedAmount: parseFloat(form.expectedAmount as string) || 0,
-      category: form.category,
-      paidBy: form.paidBy,
-      paymentMethod: form.paymentMethod,
-      frequency: form.frequency,
-      dayOfMonth: form.dayOfMonth ? parseInt(form.dayOfMonth as string) : undefined,
-      dayOfWeek: form.frequency === 'semanal' && form.dayOfWeek ? parseInt(form.dayOfWeek) : undefined,
-      paymentMonth: form.frequency === 'anual' && form.paymentMonth ? parseInt(form.paymentMonth) : undefined,
-      bank: form.bank || undefined,
-      cardLast4: form.cardLast4 || undefined,
-      notes: form.notes || undefined,
-      active: true,
-    });
+    const tpl = onAdd({ ...formToTemplate(form), active: true });
     setShowForm(false);
     setPendingReminder(tpl);
   };
 
   const handleEdit = (id: string, form: typeof EMPTY_FORM) => {
-    onUpdate(id, {
-      concept: form.concept,
-      expectedAmount: parseFloat(form.expectedAmount as string) || 0,
-      category: form.category,
-      paidBy: form.paidBy,
-      paymentMethod: form.paymentMethod,
-      frequency: form.frequency,
-      dayOfMonth: form.dayOfMonth ? parseInt(form.dayOfMonth as string) : undefined,
-      dayOfWeek: form.frequency === 'semanal' && form.dayOfWeek ? parseInt(form.dayOfWeek) : undefined,
-      paymentMonth: form.frequency === 'anual' && form.paymentMonth ? parseInt(form.paymentMonth) : undefined,
-      bank: form.bank || undefined,
-      cardLast4: form.cardLast4 || undefined,
-      notes: form.notes || undefined,
-    });
+    onUpdate(id, formToTemplate(form));
     setEditId(null);
   };
 
@@ -310,6 +347,10 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
                   dayOfWeek: tpl.dayOfWeek ? String(tpl.dayOfWeek) : '1',
                   paymentMonth: tpl.paymentMonth ? String(tpl.paymentMonth) : '1',
                   bank: tpl.bank ?? '', cardLast4: tpl.cardLast4 ?? '', notes: tpl.notes ?? '',
+                  isCreditCard: tpl.isCreditCard ?? false,
+                  cutDay: tpl.cutDay ? String(tpl.cutDay) : '',
+                  paymentDueDaysAfterCut: tpl.paymentDueDaysAfterCut ? String(tpl.paymentDueDaysAfterCut) : '20',
+                  minimumPayment: tpl.minimumPayment ? String(tpl.minimumPayment) : '',
                 }}
                 onSave={(form) => handleEdit(tpl.id, form)}
                 onCancel={() => setEditId(null)}
@@ -344,12 +385,21 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
                       <span className="text-base font-bold text-gray-800">
                         ${tpl.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
                       </span>
+                      {tpl.minimumPayment && (
+                        <span className="text-xs text-orange-500">mín ${tpl.minimumPayment.toLocaleString('es-MX')}</span>
+                      )}
                       <span className="text-xs text-gray-400">
                         {(CATEGORIES[tpl.category] as string).replace(/^[^ ]+ /, '')}
                       </span>
                       <span className="text-xs text-gray-400">{tpl.paidBy}</span>
                       {tpl.cardLast4 && <span className="text-xs text-gray-400">···{tpl.cardLast4}</span>}
                     </div>
+                    {tpl.isCreditCard && tpl.cutDay && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-orange-600">✂️ Corte día {tpl.cutDay}</span>
+                        <span className="text-xs text-orange-500">· Límite día ~{Math.min(tpl.cutDay + (tpl.paymentDueDaysAfterCut ?? 20), 31)}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button

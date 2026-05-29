@@ -37,6 +37,12 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Activate new service worker immediately so deploys take effect on next load
+        clientsClaim: true,
+        skipWaiting: true,
+        // Never cache Supabase auth/data API responses — stale or empty cached
+        // results could overwrite real data. Always go to network.
+        navigateFallbackDenylist: [/^https:\/\/[a-z0-9]+\.supabase\.co\//i],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -44,9 +50,9 @@ export default defineConfig({
             options: { cacheName: 'google-fonts-cache', expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 } },
           },
           {
-            urlPattern: /^https:\/\/irmszqqknncwsfwhmhku\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: { cacheName: 'supabase-cache', expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 } },
+            // Supabase API: network-only, never serve from cache
+            urlPattern: /^https:\/\/[a-z0-9]+\.supabase\.co\/.*/i,
+            handler: 'NetworkOnly',
           },
         ],
       },

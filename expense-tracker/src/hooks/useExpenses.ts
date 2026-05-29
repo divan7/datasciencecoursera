@@ -12,13 +12,32 @@ export function useExpenses(spaceId: string) {
   useEffect(() => {
     if (!spaceId) return;
     // Fast: local cache
-    setExpenses(loadExpenses(spaceId));
-    // Slow: sync from Supabase
+    const local = loadExpenses(spaceId);
+    setExpenses(local);
+
+    // Slow: sync from Supabase — NON-DESTRUCTIVE merge.
+    // Never overwrite local data with an empty/partial remote result, and
+    // re-upload any local-only expenses that never reached the cloud.
     if (isSupabaseConfigured) {
       expensesDb.list(spaceId).then((remote) => {
-        setExpenses(remote);
-        saveExpenses(remote, spaceId);
-      }).catch(console.error);
+        const remoteIds = new Set(remote.map((e) => e.id));
+        const localOnly = local.filter((e) => !remoteIds.has(e.id));
+
+        // Recover/back up local-only expenses to Supabase
+        if (localOnly.length > 0) {
+          expensesDb.bulkCreate(spaceId, localOnly)
+            .catch((err) => console.error('No se pudieron re-sincronizar gastos locales:', err));
+        }
+
+        // Union by id: keep everything (remote + local-only)
+        const merged = [...remote, ...localOnly]
+          .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+        setExpenses(merged);
+        saveExpenses(merged, spaceId);
+      }).catch((err) => {
+        // On any failure, keep the local data we already showed
+        console.error('No se pudo leer gastos remotos, se mantienen los locales:', err);
+      });
     }
   }, [spaceId]);
 

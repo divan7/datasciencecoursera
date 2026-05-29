@@ -304,7 +304,7 @@ export const expensesDb = {
   async create(spaceId: string, expense: Expense): Promise<void> {
     if (!supabase) return;
     const { error } = await supabase.from('expenses').insert(expenseToRow(spaceId, expense));
-    if (error) console.error('expense insert:', error);
+    if (error) throw new Error(error.message);
   },
 
   async delete(id: string): Promise<void> {
@@ -314,7 +314,10 @@ export const expensesDb = {
 
   async bulkCreate(spaceId: string, expenses: Expense[]): Promise<void> {
     if (!supabase || !expenses.length) return;
-    await supabase.from('expenses').insert(expenses.map((e) => expenseToRow(spaceId, e)));
+    // Upsert so re-syncing local-only expenses tolerates partial prior inserts
+    const { error } = await supabase.from('expenses')
+      .upsert(expenses.map((e) => expenseToRow(spaceId, e)), { onConflict: 'id' });
+    if (error) throw new Error(error.message);
   },
 };
 

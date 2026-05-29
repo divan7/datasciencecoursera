@@ -4,15 +4,19 @@ import { es } from 'date-fns/locale';
 import { ChevronDown, Download } from 'lucide-react';
 import type { Expense, Category } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
-import type { SpaceMember } from '../types/space';
+import type { SpaceMember, AppSpace } from '../types/space';
+import { ExportDialog } from './ExportDialog';
 
 interface MonthlyReportProps {
   expenses: Expense[];
   members: SpaceMember[];
+  spaces: AppSpace[];
+  currentSpaceId: string;
 }
 
-export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
+export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: MonthlyReportProps) {
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
+  const [showExport, setShowExport] = useState(false);
 
   const availableMonths = useMemo(() => {
     const months = new Set(expenses.map((e) => e.date.slice(0, 7)));
@@ -61,32 +65,6 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
     return format(date, 'MMMM yyyy', { locale: es }).replace(/^\w/, (c) => c.toUpperCase());
   }, [selectedMonth]);
 
-  const exportCSV = () => {
-    const headers = [
-      'Fecha', 'Concepto', 'Monto', 'Categoría', 'Quién pagó', 'Forma de pago',
-      'Tarjeta', 'Banco', 'Establecimiento', 'Tipo', 'Frecuencia', 'MSI',
-      'Reembolsable', 'Deducible', 'Factura', 'Compartido', 'Notas'
-    ];
-    const rows = monthExpenses.map((e) => [
-      e.date, e.concept, e.amount, CATEGORIES[e.category],
-      e.paidBy,
-      e.paymentMethod, e.cardLast4 || '', e.bank || '', e.store || '',
-      e.expenseType, e.frequency || '', e.installments || '',
-      e.isReimbursable ? 'Sí' : 'No',
-      e.isTaxDeductible ? 'Sí' : 'No',
-      e.invoiceRequested ? 'Sí' : 'No',
-      e.sharedExpense ? 'Sí' : 'No',
-      e.notes || ''
-    ]);
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `gastos_${selectedMonth}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const COLORS = ['bg-teal-600', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500', 'bg-orange-500', 'bg-teal-500', 'bg-pink-500'];
 
@@ -113,10 +91,9 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
           <ChevronDown size={16} className="absolute right-3 top-3 text-gray-400 pointer-events-none" />
         </div>
         <button
-          onClick={exportCSV}
-          disabled={monthExpenses.length === 0}
-          className="px-3 py-2 border border-gray-200 rounded-xl text-gray-500 hover:text-teal-700 hover:border-teal-300 transition-all disabled:opacity-40"
-          title="Exportar CSV"
+          onClick={() => setShowExport(true)}
+          className="px-3 py-2 border border-gray-200 rounded-xl text-gray-500 hover:text-teal-700 hover:border-teal-300 transition-all"
+          title="Exportar CSV personalizado"
         >
           <Download size={18} />
         </button>
@@ -236,5 +213,14 @@ export function MonthlyReport({ expenses, members }: MonthlyReportProps) {
         </>
       )}
     </div>
+
+    {showExport && (
+      <ExportDialog
+        spaces={spaces}
+        currentSpaceId={currentSpaceId}
+        currentExpenses={expenses}
+        onClose={() => setShowExport(false)}
+      />
+    )}
   );
 }

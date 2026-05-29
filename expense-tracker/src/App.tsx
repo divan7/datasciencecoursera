@@ -87,7 +87,7 @@ export default function App() {
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
 
   // ── Expense hooks ─────────────────────────────────────────────
-  const { expenses, addExpense, deleteExpense } = useExpenses(spaceId);
+  const { expenses, addExpense, updateExpense, deleteExpense } = useExpenses(spaceId);
   const {
     templates, checks,
     addTemplate, updateTemplate, deleteTemplate,
@@ -429,7 +429,7 @@ export default function App() {
 
         {/* ── Lista ── */}
         {activeTab === 'list' && (
-          <ExpenseList expenses={expenses} onDelete={deleteExpense}
+          <ExpenseList expenses={expenses} onDelete={deleteExpense} onEdit={updateExpense}
             members={currentSpace.members} />
         )}
 
@@ -457,7 +457,9 @@ export default function App() {
         {/* ── Reporte ── */}
         {activeTab === 'report' && (
           <MonthlyReport expenses={expenses}
-            members={currentSpace.members} />
+            members={currentSpace.members}
+            spaces={spaces}
+            currentSpaceId={spaceId} />
         )}
 
         {/* ── Config ── */}

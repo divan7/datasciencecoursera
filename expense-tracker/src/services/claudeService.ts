@@ -48,25 +48,36 @@ const RECEIPT_SYSTEM = `Eres un asistente de finanzas personales especializado e
 
 PASO 1 — Identifica el establecimiento:
 Busca el nombre del negocio/tienda en el encabezado, logo o pie del ticket (ej: Walmart, OXXO, Costco, Farmacias Guadalajara, etc.).
-Ese valor es OBLIGATORIO. Inclúyelo como "store" en TODOS los registros del array.
+Ese valor es OBLIGATORIO. Inclúyelo como "store" en TODOS los registros.
 Si no logras leerlo claramente, usa el tipo de negocio que puedas inferir (ej: "Supermercado", "Farmacia", "Restaurante").
 
-PASO 2 — Desglosa los artículos:
+PASO 2 — Localiza el TOTAL del ticket:
+Busca el monto total cobrado (puede llamarse "TOTAL", "TOTAL A PAGAR", "IMPORTE TOTAL", "GRAND TOTAL", etc.).
+Si no puedes leerlo con claridad, usa null.
+
+PASO 3 — Desglosa los artículos:
 - Si el ticket tiene ≤6 artículos, crea uno por artículo relevante
 - Si tiene muchos artículos, agrúpalos por categoría (ej: "Alimentos", "Bebidas", "Higiene", "Snacks")
-- Los montos de los grupos deben sumar el total del ticket
+- Los montos de los grupos DEBEN sumar exactamente el total del ticket
 - Incluye la fecha del ticket si aparece; si no, usa hoy
 
-PASO 3 — Devuelve ÚNICAMENTE un JSON array válido. Sin texto adicional, sin comentarios, sin markdown.
+PASO 4 — Devuelve ÚNICAMENTE este objeto JSON. Sin texto adicional, sin comentarios, sin markdown:
+{
+  "detectedTotal": <número o null>,
+  "items": [...]
+}
 
 ${FIELDS}
 
-Ejemplo para ticket de supermercado:
-[
-  {"amount":320,"concept":"Alimentos y despensa","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
-  {"amount":85,"concept":"Bebidas","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
-  {"amount":95,"concept":"Productos de higiene","category":"hogar","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"}
-]`;
+Ejemplo:
+{
+  "detectedTotal": 500.00,
+  "items": [
+    {"amount":320,"concept":"Alimentos y despensa","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
+    {"amount":85,"concept":"Bebidas","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
+    {"amount":95,"concept":"Productos de higiene","category":"hogar","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"}
+  ]
+}`;
 
 function stripJson(raw: string): string {
   let s = raw.trim().replace(/^```json?\n?/, '').replace(/\n?```$/, '').trim();
@@ -146,7 +157,7 @@ export async function parseReceiptItems(
   mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
   apiKey: string,
   today: string,
-): Promise<Partial<Expense>[]> {
+): Promise<{ items: Partial<Expense>[]; detectedTotal: number | null }> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -156,14 +167,21 @@ export async function parseReceiptItems(
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
-        { type: 'text', text: `Hoy es ${today}. Desglosa todos los gastos de este ticket como JSON array.` },
+        { type: 'text', text: `Hoy es ${today}. Desglosa todos los gastos de este ticket como JSON.` },
       ],
     }],
   });
   const content = response.content[0];
   if (content.type !== 'text') throw new Error('Respuesta inesperada del modelo');
   const parsed = JSON.parse(stripJson(content.text));
-  return Array.isArray(parsed) ? parsed : [parsed];
+  // Handle both old array format and new { detectedTotal, items } format
+  if (Array.isArray(parsed)) {
+    return { items: parsed, detectedTotal: null };
+  }
+  return {
+    items: Array.isArray(parsed.items) ? parsed.items : [],
+    detectedTotal: typeof parsed.detectedTotal === 'number' ? parsed.detectedTotal : null,
+  };
 }
 
 export function validatePartialExpense(data: Partial<Expense>): { valid: boolean; missing: string[] } {

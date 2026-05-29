@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Expense } from '../types/expense';
@@ -8,6 +8,7 @@ import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 interface ExpenseCardProps {
   expense: Expense;
   onDelete?: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -30,7 +31,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   otro: 'bg-gray-100 text-gray-700',
 };
 
-export function ExpenseCard({ expense: e, onDelete }: ExpenseCardProps) {
+export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -103,6 +104,15 @@ export function ExpenseCard({ expense: e, onDelete }: ExpenseCardProps) {
                 >
                   {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
+                {onEdit && (
+                  <button
+                    onClick={() => onEdit(e.id)}
+                    className="p-1 text-gray-300 hover:text-teal-500 transition-colors"
+                    title="Editar"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
                 {onDelete && (
                   <button
                     onClick={handleDelete}

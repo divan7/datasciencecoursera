@@ -7,17 +7,20 @@ import type { Expense, Category } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
 import { ExpenseCard } from './ExpenseCard';
 import { TicketGroup } from './TicketGroup';
+import { ExpenseEditModal } from './ExpenseEditModal';
 import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
 
 interface ExpenseListProps {
   expenses: Expense[];
   onDelete: (id: string) => void;
+  onEdit?: (id: string, data: Partial<Expense>) => void;
   members: SpaceMember[];
   isLector?: boolean;
 }
 
-export function ExpenseList({ expenses, onDelete, members, isLector = false }: ExpenseListProps) {
+export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = false }: ExpenseListProps) {
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [search, setSearch] = useState('');
   const [filterUser, setFilterUser] = useState<'all' | string>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | Category>('all');
@@ -202,20 +205,28 @@ export function ExpenseList({ expenses, onDelete, members, isLector = false }: E
                   const elements: ReactNode[] = [];
 
                   // Ticket groups first (multi-item), then singles with same ticketId, then ungrouped
+                  const handleEdit = isLector || !onEdit ? undefined : (id: string) => {
+                    const exp = expenses.find((e) => e.id === id);
+                    if (exp) setEditingExpense(exp);
+                  };
+
                   ticketMap.forEach((items, tid) => {
                     if (items.length >= 2) {
                       elements.push(
-                        <TicketGroup key={tid} expenses={items} onDelete={isLector ? undefined : onDelete} />
+                        <TicketGroup key={tid} expenses={items}
+                          onDelete={isLector ? undefined : onDelete}
+                          onEdit={handleEdit} />
                       );
                     } else {
-                      // single-item "group" — render as normal card
                       individual.push(...items);
                     }
                   });
 
                   individual.forEach((expense) => {
                     elements.push(
-                      <ExpenseCard key={expense.id} expense={expense} onDelete={isLector ? undefined : onDelete} />
+                      <ExpenseCard key={expense.id} expense={expense}
+                        onDelete={isLector ? undefined : onDelete}
+                        onEdit={handleEdit} />
                     );
                   });
 
@@ -225,6 +236,15 @@ export function ExpenseList({ expenses, onDelete, members, isLector = false }: E
             </div>
           ))}
         </div>
+      )}
+
+      {editingExpense && onEdit && (
+        <ExpenseEditModal
+          expense={editingExpense}
+          members={members}
+          onSave={(id, data) => { onEdit(id, data); setEditingExpense(null); }}
+          onClose={() => setEditingExpense(null)}
+        />
       )}
     </div>
   );

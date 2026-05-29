@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Camera, Upload, X, AlertCircle, Sparkles } from 'lucide-react';
+import { Camera, Upload, X, AlertCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Expense, User } from '../types/expense';
 import { parseReceiptItems } from '../services/claudeService';
@@ -25,6 +25,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [parsedItems, setParsedItems] = useState<Partial<Expense>[] | null>(null);
+  const [totalWarning, setTotalWarning] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -53,11 +54,32 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     if (!apiKey) { setError('Configura tu API Key de Anthropic en Ajustes para usar esta función.'); return; }
     setLoading(true);
     setError('');
+    setTotalWarning(null);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const items = await parseReceiptItems(imageBase64, mediaType, apiKey, today);
+      const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today);
       // Attach the receipt image to the first item only (to avoid duplicating large base64)
       if (items.length > 0) items[0].receiptImageBase64 = imageBase64;
+
+      // Validate sum of items vs ticket total
+      if (detectedTotal !== null && items.length > 0) {
+        const sum = items.reduce((s, it) => s + (it.amount ?? 0), 0);
+        const diff = detectedTotal - sum;
+        const absDiff = Math.abs(diff);
+        if (absDiff > 0.01 && absDiff < 1) {
+          // Tiny rounding error — silently adjust last item
+          const last = items[items.length - 1];
+          if (last.amount !== undefined) {
+            last.amount = Math.round((last.amount + diff) * 100) / 100;
+          }
+        } else if (absDiff >= 1) {
+          const sign = diff > 0 ? '+' : '';
+          setTotalWarning(
+            `Total del ticket: $${detectedTotal.toFixed(2)} · Suma de artículos: $${sum.toFixed(2)} · Diferencia: $${sign}${diff.toFixed(2)}. Revisa y ajusta los montos antes de guardar.`
+          );
+        }
+      }
+
       setParsedItems(items);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -77,7 +99,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
   };
 
   const handleClear = () => {
-    setImagePreview(null); setImageBase64(''); setParsedItems(null); setError('');
+    setImagePreview(null); setImageBase64(''); setParsedItems(null); setError(''); setTotalWarning(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
@@ -157,6 +179,13 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
         <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
           <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
           <p className="text-sm text-red-600">{error}</p>
+        </div>
+      )}
+
+      {totalWarning && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-amber-700">{totalWarning}</p>
         </div>
       )}
 

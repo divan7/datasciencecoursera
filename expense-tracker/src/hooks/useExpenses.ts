@@ -61,6 +61,10 @@ export function useExpenses(spaceId: string) {
         e.id === id ? { ...e, ...data, updatedAt: new Date().toISOString() } : e
       );
       saveExpenses(updated, spaceId);
+      if (isSupabaseConfigured) {
+        const updatedExpense = updated.find((e) => e.id === id);
+        if (updatedExpense) expensesDb.update(spaceId, updatedExpense).catch(console.error);
+      }
       return updated;
     });
   }, [spaceId]);

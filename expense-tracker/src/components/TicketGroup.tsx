@@ -8,9 +8,10 @@ import { ExpenseCard } from './ExpenseCard';
 interface TicketGroupProps {
   expenses: Expense[];
   onDelete?: (id: string) => void;
+  onEdit?: (id: string) => void;
 }
 
-export function TicketGroup({ expenses, onDelete }: TicketGroupProps) {
+export function TicketGroup({ expenses, onDelete, onEdit }: TicketGroupProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (expenses.length === 0) return null;
@@ -66,7 +67,7 @@ export function TicketGroup({ expenses, onDelete }: TicketGroupProps) {
         <div className="border-t border-teal-50 divide-y divide-gray-50">
           {expenses.map((exp) => (
             <div key={exp.id} className="px-2 py-1">
-              <ExpenseCard expense={exp} onDelete={onDelete} />
+              <ExpenseCard expense={exp} onDelete={onDelete} onEdit={onEdit} />
             </div>
           ))}
         </div>

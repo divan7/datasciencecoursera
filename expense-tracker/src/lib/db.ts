@@ -333,6 +333,13 @@ export const expensesDb = {
       .upsert(expenses.map((e) => expenseToRow(spaceId, e)), { onConflict: 'id' });
     if (error) throw new Error(error.message);
   },
+
+  async update(spaceId: string, expense: Expense): Promise<void> {
+    if (!supabase) return;
+    const { id, ...row } = expenseToRow(spaceId, expense);
+    const { error } = await supabase.from('expenses').update(row).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
 };
 
 // ─── Fixed Expense Templates ──────────────────────────────────────────────────

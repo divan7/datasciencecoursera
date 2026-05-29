@@ -165,6 +165,24 @@ export const profilesDb = {
     return rowToProfile(data);
   },
 
+  async getApiKey(): Promise<string | null> {
+    if (!supabase) return null;
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) return null;
+    const { data } = await supabase
+      .from('profiles').select('anthropic_api_key').eq('id', uid).single();
+    return data?.anthropic_api_key ?? null;
+  },
+
+  async setApiKey(key: string | null): Promise<void> {
+    if (!supabase) return;
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) return;
+    await supabase.from('profiles')
+      .update({ anthropic_api_key: key ?? null })
+      .eq('id', uid);
+  },
+
   async updateLastSeen(): Promise<void> {
     if (!supabase) return;
     await supabase.from('profiles')

@@ -25,7 +25,7 @@ import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace }
 import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, loadSpacesFromSupabase, syncSpaceToSupabase } from './utils/spaceStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
-import { settingsDb } from './lib/db';
+import { profilesDb } from './lib/db';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { ExpenseWithSpace } from './components/MultiExpenseReview';
@@ -116,12 +116,15 @@ export default function App() {
         } else {
           activeSpaceId = savedSession!.spaceId;
         }
-        // Load settings from Supabase and merge with local (Supabase wins for API key)
-        const remoteSettings = await settingsDb.get(activeSpaceId).catch(() => null);
-        if (remoteSettings) {
-          const merged = { ...loadSettings(activeSpaceId), ...remoteSettings };
-          saveSettings(merged, activeSpaceId);
-          setSettings(merged);
+        // Load API key from user profile (stored per-user, not per-space)
+        const remoteApiKey = await profilesDb.getApiKey().catch(() => null);
+        if (remoteApiKey) {
+          const local = loadSettings(activeSpaceId);
+          if (local.anthropicApiKey !== remoteApiKey) {
+            const merged = { ...local, anthropicApiKey: remoteApiKey };
+            saveSettings(merged, activeSpaceId);
+            setSettings(merged);
+          }
         }
       }
       setSpacesLoaded(true);
@@ -172,7 +175,9 @@ export default function App() {
     setSettings(newSettings);
     if (spaceId) {
       saveSettings(newSettings, spaceId);
-      if (isSupabaseConfigured) settingsDb.upsert(spaceId, newSettings).catch(console.error);
+      if (isSupabaseConfigured) {
+        profilesDb.setApiKey(newSettings.anthropicApiKey ?? null).catch(console.error);
+      }
     }
   }, [spaceId]);
 

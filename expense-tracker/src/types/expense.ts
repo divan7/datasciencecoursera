@@ -64,6 +64,7 @@ export interface Expense {
   notes?: string;
   tags?: string[];
   receiptImageBase64?: string;
+  ticketId?: string;             // links all items from the same receipt
   createdAt: string;
   updatedAt: string;
 }

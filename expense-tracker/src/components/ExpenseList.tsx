@@ -1,10 +1,12 @@
 import { useState, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Expense, Category } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
 import { ExpenseCard } from './ExpenseCard';
+import { TicketGroup } from './TicketGroup';
 import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
 
@@ -183,13 +185,42 @@ export function ExpenseList({ expenses, onDelete, members, isLector = false }: E
                 </p>
               </div>
               <div className="space-y-2">
-                {dayExpenses.map((expense) => (
-                  <ExpenseCard
-                    key={expense.id}
-                    expense={expense}
-                    onDelete={isLector ? undefined : onDelete}
-                  />
-                ))}
+                {(() => {
+                  // Group by ticketId; items without ticketId render individually
+                  const ticketMap = new Map<string, Expense[]>();
+                  const individual: Expense[] = [];
+                  dayExpenses.forEach((e) => {
+                    if (e.ticketId) {
+                      const g = ticketMap.get(e.ticketId) ?? [];
+                      g.push(e);
+                      ticketMap.set(e.ticketId, g);
+                    } else {
+                      individual.push(e);
+                    }
+                  });
+
+                  const elements: ReactNode[] = [];
+
+                  // Ticket groups first (multi-item), then singles with same ticketId, then ungrouped
+                  ticketMap.forEach((items, tid) => {
+                    if (items.length >= 2) {
+                      elements.push(
+                        <TicketGroup key={tid} expenses={items} onDelete={isLector ? undefined : onDelete} />
+                      );
+                    } else {
+                      // single-item "group" — render as normal card
+                      individual.push(...items);
+                    }
+                  });
+
+                  individual.forEach((expense) => {
+                    elements.push(
+                      <ExpenseCard key={expense.id} expense={expense} onDelete={isLector ? undefined : onDelete} />
+                    );
+                  });
+
+                  return elements;
+                })()}
               </div>
             </div>
           ))}

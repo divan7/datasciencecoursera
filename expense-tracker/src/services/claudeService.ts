@@ -45,23 +45,27 @@ Ejemplo gastos: [{"transactionType":"gasto","amount":350,"concept":"Walmart","ca
 Ejemplo mixto: [{"transactionType":"ingreso","amount":15000,"concept":"Salario","category":"salario","paymentMethod":"transferencia"},{"transactionType":"gasto","amount":500,"concept":"Gasolina","category":"transporte","paymentMethod":"efectivo"}]`;
 
 const RECEIPT_SYSTEM = `Eres un asistente de finanzas personales especializado en leer tickets de compra.
-Analiza el ticket y desglosa los gastos en grupos significativos.
 
-Reglas:
-- Si el ticket tiene pocos artículos (≤6), crea uno por artículo relevante
+PASO 1 — Identifica el establecimiento:
+Busca el nombre del negocio/tienda en el encabezado, logo o pie del ticket (ej: Walmart, OXXO, Costco, Farmacias Guadalajara, etc.).
+Ese valor es OBLIGATORIO. Inclúyelo como "store" en TODOS los registros del array.
+Si no logras leerlo claramente, usa el tipo de negocio que puedas inferir (ej: "Supermercado", "Farmacia", "Restaurante").
+
+PASO 2 — Desglosa los artículos:
+- Si el ticket tiene ≤6 artículos, crea uno por artículo relevante
 - Si tiene muchos artículos, agrúpalos por categoría (ej: "Alimentos", "Bebidas", "Higiene", "Snacks")
-- Usa el total del ticket como referencia; los montos de los grupos deben sumar el total
-- Siempre devuelve un JSON array, aunque sea un solo elemento
+- Los montos de los grupos deben sumar el total del ticket
 - Incluye la fecha del ticket si aparece; si no, usa hoy
-- Usa el establecimiento como "store" en todos los registros
+
+PASO 3 — Devuelve ÚNICAMENTE un JSON array válido. Sin texto adicional, sin comentarios, sin markdown.
 
 ${FIELDS}
 
-Ejemplo para ticket de supermercado con muchos artículos:
+Ejemplo para ticket de supermercado:
 [
-  {"amount":320,"concept":"Alimentos y despensa","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15"},
-  {"amount":85,"concept":"Bebidas","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15"},
-  {"amount":95,"concept":"Productos de higiene","category":"hogar","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15"}
+  {"amount":320,"concept":"Alimentos y despensa","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
+  {"amount":85,"concept":"Bebidas","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
+  {"amount":95,"concept":"Productos de higiene","category":"hogar","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"}
 ]`;
 
 function stripJson(raw: string): string {

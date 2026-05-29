@@ -56,23 +56,27 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
   const canSave = activeRows.length > 0 && activeRows.every((r) => r.concept.trim() && parseFloat(r.amount) > 0);
 
   const handleSave = () => {
-    const result: ExpenseWithSpace[] = rows
-      .filter((r) => !r.removed)
-      .map((r) => ({
-        spaceId: r.spaceId,
-        expense: {
-          concept:       r.concept.trim(),
-          amount:        parseFloat(r.amount),
-          category:      r.category,
-          paymentMethod: r.paymentMethod,
-          paidBy:        r.paidBy,
-          date:          r.date,
-          store:         r.store.trim() || undefined,
-          transactionType: 'gasto' as const,
-          expenseType:   'variable' as const,
-          currency:      'MXN',
-        },
-      }));
+    const active = rows.filter((r) => !r.removed);
+    const ticketId = active.length > 1
+      ? `tkt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+      : undefined;
+
+    const result: ExpenseWithSpace[] = active.map((r) => ({
+      spaceId: r.spaceId,
+      expense: {
+        concept:         r.concept.trim(),
+        amount:          parseFloat(r.amount),
+        category:        r.category,
+        paymentMethod:   r.paymentMethod,
+        paidBy:          r.paidBy,
+        date:            r.date,
+        store:           r.store.trim() || undefined,
+        ticketId,
+        transactionType: 'gasto' as const,
+        expenseType:     'variable' as const,
+        currency:        'MXN',
+      },
+    }));
     onSaveAll(result);
   };
 

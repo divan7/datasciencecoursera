@@ -27,6 +27,7 @@ interface RowState {
   paymentMethod: PaymentMethod;
   paidBy: string;
   date: string;
+  store: string;
   spaceId: string;
   removed: boolean;
 }
@@ -42,6 +43,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
       paymentMethod: (item.paymentMethod as PaymentMethod) ?? 'tarjeta_debito',
       paidBy:        item.paidBy ?? currentUser,
       date:          item.date ?? today,
+      store:         item.store ?? '',
       spaceId:       defaultSpaceId,
       removed:       false,
     }))
@@ -65,6 +67,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           paymentMethod: r.paymentMethod,
           paidBy:        r.paidBy,
           date:          r.date,
+          store:         r.store.trim() || undefined,
           transactionType: 'gasto' as const,
           expenseType:   'variable' as const,
           currency:      'MXN',
@@ -95,7 +98,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           return (
             <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               {/* Header row */}
-              <div className="flex items-center gap-2 px-3 pt-3 pb-2">
+              <div className="flex items-center gap-2 px-3 pt-3 pb-1">
                 <input
                   type="text"
                   value={row.concept}
@@ -119,6 +122,17 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                 >
                   <Trash2 size={14} />
                 </button>
+              </div>
+              {/* Store sub-row */}
+              <div className="flex items-center gap-1 px-3 pb-2">
+                <span className="text-xs text-gray-300">📍</span>
+                <input
+                  type="text"
+                  value={row.store}
+                  onChange={(e) => setRow(i, { store: e.target.value })}
+                  placeholder="Establecimiento (opcional)"
+                  className="flex-1 text-xs text-gray-500 bg-transparent border-none focus:outline-none placeholder-gray-300"
+                />
               </div>
 
               {/* Detail row */}

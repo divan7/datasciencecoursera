@@ -256,6 +256,22 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
         )}
       </div>
 
+      {/* Store — shown in main form for gastos only */}
+      {!isIncome && (
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+            📍 Establecimiento <span className="text-gray-300 font-normal normal-case">(opcional)</span>
+          </label>
+          <input
+            type="text"
+            value={form.store}
+            onChange={(e) => set('store', e.target.value)}
+            placeholder="Walmart, OXXO, Amazon..."
+            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+          />
+        </div>
+      )}
+
       {/* Category quick select */}
       <div>
         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -363,37 +379,29 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
             onClick={() => setShowAdvanced((v) => !v)}
             className="w-full text-xs text-teal-600 font-medium py-1"
           >
-            {showAdvanced ? '▲ Menos opciones' : '▼ Más opciones (establecimiento, tarjeta, MSI...)'}
+            {showAdvanced ? '▲ Menos opciones' : '▼ Más opciones (banco, tarjeta, MSI...)'}
           </button>
 
           {showAdvanced && (
             <div className="space-y-3 border border-gray-100 rounded-xl p-3 bg-gray-50">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Establecimiento</label>
-                  <input type="text" value={form.store} onChange={(e) => set('store', e.target.value)}
-                    placeholder="Walmart, OXXO..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
-                </div>
-                <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Banco / Emisor</label>
                   <input type="text" value={form.bank} onChange={(e) => set('bank', e.target.value)}
                     placeholder="BBVA, Banamex..." className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">Últimos 4 dígitos</label>
                   <input type="text" maxLength={4} value={form.cardLast4}
                     onChange={(e) => set('cardLast4', e.target.value.replace(/\D/g, ''))}
                     placeholder="1234" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">MSI (meses)</label>
-                  <input type="number" min="0" max="48" value={form.installments}
-                    onChange={(e) => set('installments', e.target.value)}
-                    placeholder="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
-                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">MSI (meses)</label>
+                <input type="number" min="0" max="48" value={form.installments}
+                  onChange={(e) => set('installments', e.target.value)}
+                  placeholder="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
               </div>
 
               <div>

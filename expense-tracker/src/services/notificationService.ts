@@ -197,16 +197,19 @@ export function buildGoogleCalendarUrl(tpl: FixedExpenseTemplate): string {
     ? `Monto: $${tpl.expectedAmount.toLocaleString('es-MX')}\nCorte: día ${tpl.cutDay}\nLímite: ${tpl.paymentDueDaysAfterCut ?? 20} días después del corte`
     : `Monto: $${tpl.expectedAmount.toLocaleString('es-MX')}\nPagado por: ${tpl.paidBy}`;
 
-  // Build URL manually — URLSearchParams would percent-encode the RRULE colons/semicolons
-  // which Google Calendar cannot parse (it requires raw "RRULE:FREQ=MONTHLY" syntax).
+  // Use the classic /render?action=TEMPLATE format — widely supported on desktop,
+  // mobile browsers, and the Google Calendar app. The newer /r/eventedit path
+  // does not reliably populate the event form on mobile devices.
+  // recur must NOT be percent-encoded: Google Calendar requires raw RRULE syntax.
   const prefix = tpl.isCreditCard ? '💳' : '📋';
   const parts = [
+    'action=TEMPLATE',
     `text=${encodeURIComponent(`${prefix} Pago: ${tpl.concept}`)}`,
     `dates=${dateStr}/${endStr}`,
     `details=${encodeURIComponent(details)}`,
   ];
   if (recur) parts.push(`recur=${recur}`);
-  return `https://calendar.google.com/calendar/r/eventedit?${parts.join('&')}`;
+  return `https://www.google.com/calendar/render?${parts.join('&')}`;
 }
 
 export function checkAndFireNotifications(templates: FixedExpenseTemplate[]) {

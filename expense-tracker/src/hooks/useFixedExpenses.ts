@@ -15,18 +15,42 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
 
   useEffect(() => {
     if (!spaceId) return;
-    setTemplates(loadTemplates(spaceId));
-    setChecks(loadChecks(spaceId));
-    if (isSupabaseConfigured) {
-      fixedDb.listTemplates(spaceId).then((remote) => {
-        setTemplates(remote);
-        saveTemplates(remote, spaceId);
-      }).catch(console.error);
-      fixedDb.listChecks(spaceId).then((remote) => {
-        setChecks(remote);
-        saveChecks(remote, spaceId);
-      }).catch(console.error);
-    }
+
+    // Fast path: load local cache immediately
+    const localTemplates = loadTemplates(spaceId);
+    const localChecks    = loadChecks(spaceId);
+    setTemplates(localTemplates);
+    setChecks(localChecks);
+
+    if (!isSupabaseConfigured) return;
+
+    // Templates — non-destructive merge (same pattern as expenses)
+    fixedDb.listTemplates(spaceId).then((remote) => {
+      const remoteIds = new Set(remote.map((t) => t.id));
+      const localOnly = localTemplates.filter((t) => !remoteIds.has(t.id));
+      // Re-upload templates that only exist locally
+      if (localOnly.length > 0) {
+        Promise.all(localOnly.map((t) => fixedDb.createTemplate(spaceId, t)))
+          .catch((err) => console.error('Re-sync plantillas locales fallido:', err));
+      }
+      const merged = [...remote, ...localOnly];
+      setTemplates(merged);
+      saveTemplates(merged, spaceId);
+    }).catch((err) => console.error('No se leyeron plantillas remotas, se mantienen las locales:', err));
+
+    // Checks — non-destructive merge
+    fixedDb.listChecks(spaceId).then((remote) => {
+      const remoteIds = new Set(remote.map((c) => c.id));
+      const localOnly = localChecks.filter((c) => !remoteIds.has(c.id));
+      if (localOnly.length > 0) {
+        fixedDb.upsertChecks(spaceId, localOnly)
+          .catch((err) => console.error('Re-sync checks locales fallido:', err));
+      }
+      const merged = [...remote, ...localOnly];
+      setChecks(merged);
+      saveChecks(merged, spaceId);
+    }).catch((err) => console.error('No se leyeron checks remotos, se mantienen los locales:', err));
+
   }, [spaceId]);
 
   // ── Template CRUD ──────────────────────────────────────────────

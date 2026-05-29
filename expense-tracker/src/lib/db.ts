@@ -93,23 +93,28 @@ function expenseToRow(spaceId: string, e: Expense) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToTemplate(r: any): FixedExpenseTemplate {
   return {
-    id:                  r.id,
-    concept:             r.concept,
-    expectedAmount:      Number(r.expected_amount),
-    category:            r.category,
-    paidBy:              r.paid_by,
-    paymentMethod:       r.payment_method,
-    frequency:           r.frequency,
-    dayOfMonth:          r.day_of_month ?? undefined,
-    dayOfWeek:           r.day_of_week ?? undefined,
-    paymentMonth:        r.payment_month ?? undefined,
-    reminderEnabled:     r.reminder_enabled ?? false,
-    reminderDaysBefore:  r.reminder_days_before ?? 3,
-    bank:                r.bank ?? undefined,
-    cardLast4:           r.card_last4 ?? undefined,
-    active:              r.active ?? true,
-    notes:               r.notes ?? undefined,
-    createdAt:           r.created_at,
+    id:                       r.id,
+    concept:                  r.concept,
+    expectedAmount:           Number(r.expected_amount),
+    category:                 r.category,
+    paidBy:                   r.paid_by,
+    paymentMethod:            r.payment_method,
+    frequency:                r.frequency,
+    dayOfMonth:               r.day_of_month ?? undefined,
+    dayOfWeek:                r.day_of_week ?? undefined,
+    paymentMonth:             r.payment_month ?? undefined,
+    reminderEnabled:          r.reminder_enabled ?? false,
+    reminderDaysBefore:       r.reminder_days_before ?? 3,
+    bank:                     r.bank ?? undefined,
+    cardLast4:                r.card_last4 ?? undefined,
+    active:                   r.active ?? true,
+    notes:                    r.notes ?? undefined,
+    createdAt:                r.created_at,
+    // Credit card fields
+    isCreditCard:             r.is_credit_card ?? undefined,
+    cutDay:                   r.cut_day ?? undefined,
+    paymentDueDaysAfterCut:   r.payment_due_days_after_cut ?? undefined,
+    minimumPayment:           r.minimum_payment ? Number(r.minimum_payment) : undefined,
   };
 }
 
@@ -125,6 +130,11 @@ function templateToRow(spaceId: string, t: FixedExpenseTemplate) {
     reminder_enabled: t.reminderEnabled ?? false,
     reminder_days_before: t.reminderDaysBefore ?? 3,
     notes: t.notes ?? null, created_at: t.createdAt,
+    // Credit card fields
+    is_credit_card:             t.isCreditCard ?? null,
+    cut_day:                    t.cutDay ?? null,
+    payment_due_days_after_cut: t.paymentDueDaysAfterCut ?? null,
+    minimum_payment:            t.minimumPayment ?? null,
   };
 }
 
@@ -334,13 +344,15 @@ export const fixedDb = {
 
   async createTemplate(spaceId: string, t: FixedExpenseTemplate): Promise<void> {
     if (!supabase) return;
-    await supabase.from('fixed_expense_templates').insert(templateToRow(spaceId, t));
+    const { error } = await supabase.from('fixed_expense_templates').insert(templateToRow(spaceId, t));
+    if (error) throw new Error(error.message);
   },
 
   async updateTemplate(t: FixedExpenseTemplate, spaceId: string): Promise<void> {
     if (!supabase) return;
     const { id, ...row } = templateToRow(spaceId, t);
-    await supabase.from('fixed_expense_templates').update(row).eq('id', id);
+    const { error } = await supabase.from('fixed_expense_templates').update(row).eq('id', id);
+    if (error) throw new Error(error.message);
   },
 
   async deleteTemplate(id: string): Promise<void> {

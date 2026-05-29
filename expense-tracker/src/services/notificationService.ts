@@ -197,14 +197,16 @@ export function buildGoogleCalendarUrl(tpl: FixedExpenseTemplate): string {
     ? `Monto: $${tpl.expectedAmount.toLocaleString('es-MX')}\nCorte: día ${tpl.cutDay}\nLímite: ${tpl.paymentDueDaysAfterCut ?? 20} días después del corte`
     : `Monto: $${tpl.expectedAmount.toLocaleString('es-MX')}\nPagado por: ${tpl.paidBy}`;
 
-  const params: Record<string, string> = {
-    text: `💳 Pago: ${tpl.concept}`,
-    dates: `${dateStr}/${endStr}`,
-    details,
-  };
-  if (recur) params.recur = recur;
-
-  return `https://calendar.google.com/calendar/r/eventedit?${new URLSearchParams(params).toString()}`;
+  // Build URL manually — URLSearchParams would percent-encode the RRULE colons/semicolons
+  // which Google Calendar cannot parse (it requires raw "RRULE:FREQ=MONTHLY" syntax).
+  const prefix = tpl.isCreditCard ? '💳' : '📋';
+  const parts = [
+    `text=${encodeURIComponent(`${prefix} Pago: ${tpl.concept}`)}`,
+    `dates=${dateStr}/${endStr}`,
+    `details=${encodeURIComponent(details)}`,
+  ];
+  if (recur) parts.push(`recur=${recur}`);
+  return `https://calendar.google.com/calendar/r/eventedit?${parts.join('&')}`;
 }
 
 export function checkAndFireNotifications(templates: FixedExpenseTemplate[]) {

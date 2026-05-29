@@ -171,12 +171,12 @@ export default function App() {
     setShowUserSwitcher(false);
   }, [session]);
 
-  const handleSaveSettings = useCallback((newSettings: typeof settings) => {
+  const handleSaveSettings = useCallback(async (newSettings: typeof settings) => {
     setSettings(newSettings);
     if (spaceId) {
       saveSettings(newSettings, spaceId);
       if (isSupabaseConfigured) {
-        profilesDb.setApiKey(newSettings.anthropicApiKey ?? null).catch(console.error);
+        await profilesDb.setApiKey(newSettings.anthropicApiKey ?? null);
       }
     }
   }, [spaceId]);
@@ -480,7 +480,8 @@ export default function App() {
             </div>
             <div className="border-t border-gray-200 pt-5">
               <SettingsPanel settings={settings} onSave={handleSaveSettings}
-                expenseCount={expenses.length} onClearAll={handleClearAll} />
+                expenseCount={expenses.length} onClearAll={handleClearAll}
+                isSupabaseConnected={isSupabaseConfigured && !!profile} />
             </div>
             {isSupabaseConfigured && profile && (
               <div className="border-t border-gray-200 pt-5">

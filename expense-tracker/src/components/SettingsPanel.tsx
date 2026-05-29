@@ -1,26 +1,36 @@
 import { useState } from 'react';
-import { Eye, EyeOff, Save } from 'lucide-react';
+import { Eye, EyeOff, Save, Cloud, CloudOff, Loader } from 'lucide-react';
 import type { AppSettings } from '../utils/storage';
 
 interface SettingsPanelProps {
   settings: AppSettings;
-  onSave: (settings: AppSettings) => void;
+  onSave: (settings: AppSettings) => Promise<void>;
   expenseCount: number;
   onClearAll: () => void;
+  isSupabaseConnected?: boolean;
 }
 
-export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSupabaseConnected }: SettingsPanelProps) {
   const [form, setForm] = useState({ ...settings });
   const [showKey, setShowKey] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
+  const [syncError, setSyncError] = useState('');
   const [confirmClear, setConfirmClear] = useState(false);
 
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
 
-  const handleSave = () => {
-    onSave(form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSyncStatus('saving');
+    setSyncError('');
+    try {
+      await onSave(form);
+      setSyncStatus('ok');
+      setTimeout(() => setSyncStatus('idle'), 4000);
+    } catch (err) {
+      setSyncStatus('error');
+      setSyncError(err instanceof Error ? err.message : 'Error al guardar en la nube');
+      setTimeout(() => setSyncStatus('idle'), 6000);
+    }
   };
 
   const handleClear = () => {
@@ -66,6 +76,11 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
             Sin API Key — el formulario manual funcionará, pero no la IA
           </p>
         )}
+        {isSupabaseConnected && (
+          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+            <Cloud size={12} /> Se sincronizará con tu cuenta en todos los dispositivos
+          </p>
+        )}
       </div>
 
       {/* Currency */}
@@ -85,13 +100,30 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll }: Se
       {/* Save */}
       <button
         onClick={handleSave}
-        className={`w-full py-3 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all ${
-          saved ? 'bg-green-500' : 'bg-teal-600 hover:bg-teal-700 active:scale-95'
+        disabled={syncStatus === 'saving'}
+        className={`w-full py-3 rounded-2xl font-bold text-white flex items-center justify-center gap-2 transition-all disabled:opacity-70 ${
+          syncStatus === 'ok' ? 'bg-green-500' :
+          syncStatus === 'error' ? 'bg-red-500' :
+          'bg-teal-600 hover:bg-teal-700 active:scale-95'
         }`}
       >
-        <Save size={18} />
-        {saved ? 'Guardado!' : 'Guardar ajustes'}
+        {syncStatus === 'saving' ? <Loader size={18} className="animate-spin" /> :
+         syncStatus === 'ok' ? <Cloud size={18} /> :
+         syncStatus === 'error' ? <CloudOff size={18} /> :
+         <Save size={18} />}
+        {syncStatus === 'saving' ? 'Guardando...' :
+         syncStatus === 'ok' ? 'Guardado y sincronizado' :
+         syncStatus === 'error' ? 'Error al sincronizar' :
+         'Guardar ajustes'}
       </button>
+      {syncStatus === 'error' && syncError && (
+        <p className="text-xs text-red-500 text-center -mt-2">{syncError}</p>
+      )}
+      {syncStatus === 'error' && (
+        <p className="text-xs text-orange-500 text-center -mt-1">
+          Verifica que ejecutaste la migración SQL en Supabase (supabase/add_api_key_to_profile.sql)
+        </p>
+      )}
 
       {/* Stats */}
       <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 text-center">

@@ -177,10 +177,11 @@ export const profilesDb = {
   async setApiKey(key: string | null): Promise<void> {
     if (!supabase) return;
     const uid = (await supabase.auth.getUser()).data.user?.id;
-    if (!uid) return;
-    await supabase.from('profiles')
+    if (!uid) throw new Error('No hay sesión activa');
+    const { error } = await supabase.from('profiles')
       .update({ anthropic_api_key: key ?? null })
       .eq('id', uid);
+    if (error) throw new Error(error.message);
   },
 
   async updateLastSeen(): Promise<void> {

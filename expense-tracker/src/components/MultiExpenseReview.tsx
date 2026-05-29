@@ -175,6 +175,35 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                 />
               </div>
 
+              {/* Space assignment — always visible */}
+              <div className="flex items-center gap-1.5 px-3 pb-2 flex-wrap">
+                <span className="text-xs text-gray-400 flex-shrink-0">📂 Lista:</span>
+                {spaces.length === 1 ? (
+                  <span className="text-xs font-semibold" style={{ color: 'var(--soi-teal)' }}>
+                    {currentSpaceName(row.spaceId)}
+                  </span>
+                ) : (
+                  spaces.map((sp) => (
+                    <button
+                      key={sp.id}
+                      type="button"
+                      onClick={() => {
+                        const newMembers = spaces.find((s) => s.id === sp.id)?.members ?? [];
+                        setRow(i, { spaceId: sp.id, paidBy: newMembers[0]?.name ?? currentUser });
+                      }}
+                      className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all ${
+                        row.spaceId === sp.id
+                          ? 'text-white border-transparent'
+                          : 'border-gray-200 text-gray-500 bg-white hover:border-teal-300'
+                      }`}
+                      style={row.spaceId === sp.id ? { backgroundColor: 'var(--soi-teal)' } : {}}
+                    >
+                      {sp.id === defaultSpaceId ? `★ ${sp.name}` : sp.name}
+                    </button>
+                  ))
+                )}
+              </div>
+
               {/* Per-item notes row */}
               {(row.showNotes || row.notes) && (
                 <div className="px-3 pb-2">
@@ -212,60 +241,28 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                   </select>
                 </div>
 
-                {/* Paid by + space selector */}
-                <div className="flex items-center gap-2">
-                  {/* Member pills */}
-                  <div className="flex gap-1 flex-wrap flex-1">
-                    {members.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setRow(i, { paidBy: m.name })}
-                        className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border transition-all ${
-                          row.paidBy === m.name ? 'text-white border-transparent' : 'border-gray-200 text-gray-500 bg-white'
-                        }`}
-                        style={row.paidBy === m.name ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
-                      >
-                        <span
-                          className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                          style={{ backgroundColor: MEMBER_COLORS[m.colorIndex], fontSize: '7px' }}
-                        >
-                          {m.name.slice(0, 1).toUpperCase()}
-                        </span>
-                        {m.name}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Space selector */}
-                  {spaces.length > 1 && (
-                    <select
-                      value={row.spaceId}
-                      onChange={(e) => {
-                        const newSpaceId = e.target.value;
-                        const newMembers = spaces.find((s) => s.id === newSpaceId)?.members ?? [];
-                        setRow(i, {
-                          spaceId: newSpaceId,
-                          paidBy: newMembers[0]?.name ?? currentUser,
-                        });
-                      }}
-                      className="text-xs px-2 py-1.5 border-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-300 font-semibold flex-shrink-0"
-                      style={{ borderColor: 'var(--soi-teal)', color: 'var(--soi-teal)', backgroundColor: '#f0fafa' }}
-                      title="Lista de destino"
+                {/* Paid by */}
+                <div className="flex gap-1 flex-wrap">
+                  {members.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setRow(i, { paidBy: m.name })}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold border transition-all ${
+                        row.paidBy === m.name ? 'text-white border-transparent' : 'border-gray-200 text-gray-500 bg-white'
+                      }`}
+                      style={row.paidBy === m.name ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
                     >
-                      {spaces.map((sp) => (
-                        <option key={sp.id} value={sp.id}>
-                          {sp.id === defaultSpaceId ? `★ ${sp.name}` : sp.name}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                      <span
+                        className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
+                        style={{ backgroundColor: MEMBER_COLORS[m.colorIndex], fontSize: '7px' }}
+                      >
+                        {m.name.slice(0, 1).toUpperCase()}
+                      </span>
+                      {m.name}
+                    </button>
+                  ))}
                 </div>
-
-                {/* Space label when only one space */}
-                {spaces.length === 1 && (
-                  <p className="text-xs text-gray-400">📂 {currentSpaceName(row.spaceId)}</p>
-                )}
               </div>
             </div>
           );

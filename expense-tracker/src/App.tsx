@@ -25,6 +25,7 @@ import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace }
 import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, loadSpacesFromSupabase, syncSpaceToSupabase } from './utils/spaceStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
+import { settingsDb } from './lib/db';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { ExpenseWithSpace } from './components/MultiExpenseReview';
@@ -96,13 +97,13 @@ export default function App() {
     pendingCountCurrentMonth,
   } = useFixedExpenses(expenses, spaceId);
 
-  // ── Load spaces from Supabase when user logs in ───────────────
+  // ── Load spaces + settings from Supabase when user logs in ─────
   useEffect(() => {
     if (!user || !isSupabaseConfigured) { setSpacesLoaded(true); return; }
-    loadSpacesFromSupabase().then((remote) => {
+    loadSpacesFromSupabase().then(async (remote) => {
+      let activeSpaceId = spaceId;
       if (remote.length > 0) {
         setSpaces(remote);
-        // Restore or pick session
         const savedSession = loadSession();
         const stillValid = savedSession && remote.some((s) => s.id === savedSession.spaceId);
         if (!stillValid) {
@@ -111,6 +112,16 @@ export default function App() {
           const newSession: SessionState = { spaceId: firstSpace.id, memberId: firstMember.id };
           setSession(newSession);
           saveSession(newSession);
+          activeSpaceId = firstSpace.id;
+        } else {
+          activeSpaceId = savedSession!.spaceId;
+        }
+        // Load settings from Supabase and merge with local (Supabase wins for API key)
+        const remoteSettings = await settingsDb.get(activeSpaceId).catch(() => null);
+        if (remoteSettings) {
+          const merged = { ...loadSettings(activeSpaceId), ...remoteSettings };
+          saveSettings(merged, activeSpaceId);
+          setSettings(merged);
         }
       }
       setSpacesLoaded(true);
@@ -159,7 +170,10 @@ export default function App() {
 
   const handleSaveSettings = useCallback((newSettings: typeof settings) => {
     setSettings(newSettings);
-    if (spaceId) saveSettings(newSettings, spaceId);
+    if (spaceId) {
+      saveSettings(newSettings, spaceId);
+      if (isSupabaseConfigured) settingsDb.upsert(spaceId, newSettings).catch(console.error);
+    }
   }, [spaceId]);
 
   const handleClearAll = useCallback(() => {

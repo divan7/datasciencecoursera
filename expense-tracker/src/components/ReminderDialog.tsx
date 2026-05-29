@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, Calendar, BellOff, X } from 'lucide-react';
+import { Bell, Calendar, BellOff, X, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { FixedExpenseTemplate } from '../types/fixedExpense';
@@ -19,12 +19,29 @@ interface Props {
 type ReminderType = 'push' | 'google' | 'ics' | 'both';
 type Step = 'choose' | 'days' | 'done';
 
+function isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as unknown as Record<string, unknown>).MSStream;
+}
+
+// Opens a URL without being blocked by mobile popup blockers.
+// Must be called synchronously (not after an await) to avoid being treated as a popup.
+function openUrl(url: string) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export function ReminderDialog({ template, onUpdate, onClose }: Props) {
-  const [step, setStep] = useState<Step>('choose');
+  const [step, setStep]         = useState<Step>('choose');
   const [chosenType, setChosenType] = useState<ReminderType | null>(null);
   const [daysBefore, setDaysBefore] = useState(1);
 
-  const dueDate = getEffectiveDueDate(template);
+  const dueDate  = getEffectiveDueDate(template);
+  const onIPhone = isIOS();
 
   const selectType = (type: ReminderType) => {
     setChosenType(type);
@@ -34,22 +51,23 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
   const handleConfirm = async () => {
     if (!chosenType) return;
 
-    if (chosenType === 'push' || chosenType === 'both') {
-      const granted = await requestNotificationPermission();
-      onUpdate(template.id, { reminderEnabled: granted, reminderDaysBefore: daysBefore });
-    }
-
+    // Open Google Calendar URL *before* any await to avoid popup blockers on mobile
     if (chosenType === 'google' || chosenType === 'both') {
       const url = buildGoogleCalendarUrl(template);
-      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      if (url) openUrl(url);
     }
 
     if (chosenType === 'ics') {
       downloadICS(template, daysBefore);
     }
 
+    if (chosenType === 'push' || chosenType === 'both') {
+      const granted = await requestNotificationPermission();
+      onUpdate(template.id, { reminderEnabled: granted, reminderDaysBefore: daysBefore });
+    }
+
     setStep('done');
-    setTimeout(onClose, 1400);
+    setTimeout(onClose, 2200);
   };
 
   return (
@@ -79,51 +97,63 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
             </div>
 
             <div className="space-y-2">
+              {/* ICS — recommended on iPhone */}
+              <button
+                onClick={() => selectType('ics')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all text-left ${
+                  onIPhone
+                    ? 'bg-teal-50 border-teal-300 hover:bg-teal-100'
+                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                <Download size={18} className={onIPhone ? 'text-teal-600 flex-shrink-0' : 'text-gray-500 flex-shrink-0'} />
+                <div>
+                  <p className={`text-sm font-semibold ${onIPhone ? 'text-teal-800' : 'text-gray-800'}`}>
+                    {onIPhone ? '📅 Apple Calendar (recomendado)' : '🗓️ Apple Calendar / Outlook'}
+                  </p>
+                  <p className={`text-xs ${onIPhone ? 'text-teal-600' : 'text-gray-500'}`}>
+                    {onIPhone
+                      ? 'Descarga el evento y se agrega directo a tu iPhone'
+                      : 'Archivo .ics compatible con cualquier app de calendario'}
+                  </p>
+                </div>
+              </button>
+
               {/* Google Calendar */}
               <button
                 onClick={() => selectType('google')}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 active:scale-98 transition-all text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 rounded-2xl hover:bg-blue-100 transition-all text-left"
               >
                 <Calendar size={18} className="text-blue-600 flex-shrink-0" />
                 <div>
                   <p className="text-sm font-semibold text-blue-800">Google Calendar</p>
-                  <p className="text-xs text-blue-600">Abre Google Calendar con el evento listo para guardar</p>
-                </div>
-              </button>
-
-              {/* ICS — Apple Calendar, Outlook, etc. */}
-              <button
-                onClick={() => selectType('ics')}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl hover:bg-gray-100 active:scale-98 transition-all text-left"
-              >
-                <span className="text-lg flex-shrink-0">🗓️</span>
-                <div>
-                  <p className="text-sm font-semibold text-gray-800">Apple Calendar / Outlook</p>
-                  <p className="text-xs text-gray-500">Descarga un archivo .ics compatible con cualquier app de calendario</p>
+                  <p className="text-xs text-blue-600">
+                    Abre el formulario del evento — deberás tocar <strong>Guardar</strong> en Google Calendar
+                  </p>
                 </div>
               </button>
 
               {/* In-app push */}
               <button
                 onClick={() => selectType('push')}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-teal-50 border border-teal-200 rounded-2xl hover:bg-teal-100 active:scale-98 transition-all text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-2xl hover:bg-orange-100 transition-all text-left"
               >
-                <Bell size={18} className="text-teal-600 flex-shrink-0" />
+                <Bell size={18} className="text-orange-500 flex-shrink-0" />
                 <div>
-                  <p className="text-sm font-semibold text-teal-800">Notificación en la app</p>
-                  <p className="text-xs text-teal-600">Aviso cuando abras Orden Casa (requiere permiso)</p>
+                  <p className="text-sm font-semibold text-orange-800">Notificación en la app</p>
+                  <p className="text-xs text-orange-600">Aviso cuando abras Orden Casa (requiere permiso)</p>
                 </div>
               </button>
 
-              {/* Both calendar options */}
+              {/* Google + push */}
               <button
                 onClick={() => selectType('both')}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 border border-purple-200 rounded-2xl hover:bg-purple-100 active:scale-98 transition-all text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 border border-purple-200 rounded-2xl hover:bg-purple-100 transition-all text-left"
               >
                 <span className="text-lg flex-shrink-0">✨</span>
                 <div>
                   <p className="text-sm font-semibold text-purple-800">Google Calendar + notificación en app</p>
-                  <p className="text-xs text-purple-600">Las dos opciones al mismo tiempo</p>
+                  <p className="text-xs text-purple-600">Las dos opciones (recuerda guardar en Google Calendar)</p>
                 </div>
               </button>
 
@@ -187,12 +217,20 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
         {step === 'done' && (
           <div className="text-center py-6">
             <div className="text-5xl mb-3">✅</div>
-            <p className="text-sm font-bold text-gray-800">¡Recordatorio configurado!</p>
-            <p className="text-xs text-gray-500 mt-1">
-              {chosenType === 'google' && 'Revisa Google Calendar para confirmar el evento recurrente.'}
-              {chosenType === 'ics' && 'Abre el archivo .ics descargado para importarlo a tu calendario.'}
-              {chosenType === 'push' && 'Recibirás un aviso cuando abras la app.'}
-              {chosenType === 'both' && 'Revisa Google Calendar para confirmar el evento.'}
+            <p className="text-sm font-bold text-gray-800">¡Listo!</p>
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+              {chosenType === 'google' && (
+                <>Busca la pestaña de Google Calendar que se abrió y toca <strong>Guardar</strong> para que el evento quede en tu calendario.</>
+              )}
+              {chosenType === 'ics' && (
+                onIPhone
+                  ? 'Abre el archivo descargado — iOS te preguntará si deseas agregar el evento a tu calendario.'
+                  : 'Abre el archivo .ics descargado para importarlo a tu app de calendario.'
+              )}
+              {chosenType === 'push' && 'Recibirás un aviso cuando abras Orden Casa cerca de la fecha.'}
+              {chosenType === 'both' && (
+                <>Busca la pestaña de Google Calendar y toca <strong>Guardar</strong>. También recibirás notificación en la app.</>
+              )}
             </p>
           </div>
         )}

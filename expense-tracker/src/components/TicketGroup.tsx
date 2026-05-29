@@ -47,6 +47,9 @@ export function TicketGroup({ expenses, onDelete }: TicketGroupProps) {
                   {expenses.length} artículos
                 </span>
               </div>
+              {first.ticketNotes && (
+                <p className="text-xs text-gray-400 mt-1 italic truncate">{first.ticketNotes}</p>
+              )}
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <span className="text-base font-bold text-gray-900">

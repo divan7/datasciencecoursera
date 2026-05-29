@@ -65,6 +65,7 @@ export interface Expense {
   tags?: string[];
   receiptImageBase64?: string;
   ticketId?: string;             // links all items from the same receipt
+  ticketNotes?: string;          // general comment for the whole ticket
   createdAt: string;
   updatedAt: string;
 }

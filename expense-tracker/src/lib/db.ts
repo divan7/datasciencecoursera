@@ -63,6 +63,7 @@ function rowToExpense(r: any): Expense {
     tags:                 r.tags ?? undefined,
     receiptImageBase64:   r.receipt_image_base64 ?? undefined,
     ticketId:             r.ticket_id ?? undefined,
+    ticketNotes:          r.ticket_notes ?? undefined,
     createdAt:            r.created_at,
     updatedAt:            r.updated_at,
   };
@@ -88,6 +89,7 @@ function expenseToRow(spaceId: string, e: Expense) {
     notes: e.notes ?? null, tags: e.tags ?? null,
     receipt_image_base64: e.receiptImageBase64 ?? null,
     ticket_id: e.ticketId ?? null,
+    ticket_notes: e.ticketNotes ?? null,
     created_at: e.createdAt, updated_at: e.updatedAt,
   };
 }

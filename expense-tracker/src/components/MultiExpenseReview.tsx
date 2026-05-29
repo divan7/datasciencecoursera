@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Trash2, CheckCircle2, Save } from 'lucide-react';
+import { Trash2, CheckCircle2, Save, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Expense, Category, PaymentMethod } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
@@ -29,6 +29,8 @@ interface RowState {
   date: string;
   store: string;
   spaceId: string;
+  notes: string;
+  showNotes: boolean;
   removed: boolean;
 }
 
@@ -45,15 +47,20 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
       date:          item.date ?? today,
       store:         item.store ?? '',
       spaceId:       defaultSpaceId,
+      notes:         item.notes ?? '',
+      showNotes:     false,
       removed:       false,
     }))
   );
+
+  const [ticketNotes, setTicketNotes] = useState('');
 
   const setRow = (i: number, patch: Partial<RowState>) =>
     setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
 
   const activeRows = rows.filter((r) => !r.removed);
   const canSave = activeRows.length > 0 && activeRows.every((r) => r.concept.trim() && parseFloat(r.amount) > 0);
+  const isTicket = activeRows.length > 1;
 
   const handleSave = () => {
     const active = rows.filter((r) => !r.removed);
@@ -71,7 +78,9 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         paidBy:          r.paidBy,
         date:            r.date,
         store:           r.store.trim() || undefined,
+        notes:           r.notes.trim() || undefined,
         ticketId,
+        ticketNotes:     ticketId && ticketNotes.trim() ? ticketNotes.trim() : undefined,
         transactionType: 'gasto' as const,
         expenseType:     'variable' as const,
         currency:        'MXN',
@@ -94,6 +103,23 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         </div>
         <p className="text-xs text-gray-400">Revisa y asigna a la lista correcta</p>
       </div>
+
+      {/* Ticket-level comment — only shown when 2+ items */}
+      {isTicket && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
+          <label className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 mb-1.5">
+            <MessageSquare size={12} />
+            Comentario general del ticket (opcional)
+          </label>
+          <textarea
+            value={ticketNotes}
+            onChange={(e) => setTicketNotes(e.target.value)}
+            placeholder="Ej: Compra semanal de súper, incluye productos para la semana..."
+            rows={2}
+            className="w-full text-xs text-gray-700 bg-white border border-amber-200 rounded-lg px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400 placeholder-gray-300"
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         {rows.map((row, i) => {
@@ -120,6 +146,15 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                     className="w-20 text-sm font-bold text-right border-b border-dashed border-gray-300 focus:outline-none focus:border-teal-400 bg-transparent pb-0.5"
                   />
                 </div>
+                {/* Per-item notes toggle */}
+                <button
+                  type="button"
+                  onClick={() => setRow(i, { showNotes: !row.showNotes })}
+                  title="Agregar nota al artículo"
+                  className={`p-1 transition-colors flex-shrink-0 ${row.showNotes || row.notes ? 'text-teal-500' : 'text-gray-300 hover:text-teal-400'}`}
+                >
+                  <MessageSquare size={14} />
+                </button>
                 <button
                   onClick={() => setRow(i, { removed: true })}
                   className="p-1 text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
@@ -127,8 +162,9 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                   <Trash2 size={14} />
                 </button>
               </div>
+
               {/* Store sub-row */}
-              <div className="flex items-center gap-1 px-3 pb-2">
+              <div className="flex items-center gap-1 px-3 pb-1">
                 <span className="text-xs text-gray-300">📍</span>
                 <input
                   type="text"
@@ -138,6 +174,19 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                   className="flex-1 text-xs text-gray-500 bg-transparent border-none focus:outline-none placeholder-gray-300"
                 />
               </div>
+
+              {/* Per-item notes row */}
+              {(row.showNotes || row.notes) && (
+                <div className="px-3 pb-2">
+                  <textarea
+                    value={row.notes}
+                    onChange={(e) => setRow(i, { notes: e.target.value })}
+                    placeholder="Nota para este artículo (opcional)"
+                    rows={1}
+                    className="w-full text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-teal-300 placeholder-gray-300"
+                  />
+                </div>
+              )}
 
               {/* Detail row */}
               <div className="px-3 pb-3 space-y-2">

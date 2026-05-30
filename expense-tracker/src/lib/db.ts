@@ -255,6 +255,26 @@ export const spacesDb = {
 
   async createSpace(space: AppSpace, ownerProfileId: string): Promise<void> {
     if (!supabase) return;
+
+    // Diagnostic: verify the client actually has a live session whose access
+    // token carries a user id. If auth.uid() is NULL server-side, the INSERT
+    // fails RLS (42501). Force a fresh session read so the token is attached.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    const tokenSub = session?.access_token
+      ? (JSON.parse(atob(session.access_token.split('.')[1])).sub as string | undefined)
+      : undefined;
+    if (!session || !tokenSub) {
+      throw new Error(
+        `Sesión no establecida (sin token). session=${!!session}, ownerProfileId=${ownerProfileId.slice(0, 8)}…`
+      );
+    }
+    if (tokenSub !== ownerProfileId) {
+      throw new Error(
+        `Token sub (${tokenSub.slice(0, 8)}…) ≠ ownerProfileId (${ownerProfileId.slice(0, 8)}…)`
+      );
+    }
+
     // owner_id must be the Supabase auth UID (a UUID), not the local member ID.
     const { error: spaceErr } = await supabase.from('spaces').upsert({
       id: space.id, name: space.name, owner_id: ownerProfileId,

@@ -26,10 +26,10 @@ import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace } from './utils/storage';
-import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, loadSpacesFromSupabase, syncSpaceToSupabase } from './utils/spaceStorage';
+import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, loadSpacesFromSupabase, syncSpaceToSupabase, getCacheOwner, setCacheOwner, clearLocalSpaceData } from './utils/spaceStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
-import { profilesDb } from './lib/db';
+import { profilesDb, spacesDb } from './lib/db';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { ExpenseWithSpace } from './components/MultiExpenseReview';
@@ -106,10 +106,24 @@ export default function App() {
   // ── Load spaces + settings from Supabase when user logs in ─────
   useEffect(() => {
     if (!user || !isSupabaseConfigured) { setSpacesLoaded(true); return; }
-    loadSpacesFromSupabase().then(async (remote) => {
-      let activeSpaceId = spaceId;
+
+    // Isolation guard: if the local cache on this device belongs to a different
+    // user (or someone who was never signed in), wipe it before we render so we
+    // never leak another person's spaces/expenses into this session.
+    const cachedUid = getCacheOwner();
+    if (cachedUid !== user.id) {
+      clearLocalSpaceData();
+      setSpaces([]);
+      setSession(null);
+    }
+
+    // The cloud is the source of truth for an authenticated user. Fetch directly
+    // (not loadSpacesFromSupabase, which falls back to stale local cache on empty).
+    spacesDb.listMySpaces().then(async (remote) => {
       if (remote.length > 0) {
         setSpaces(remote);
+        saveSpaces(remote);
+        let activeSpaceId = spaceId;
         const savedSession = loadSession();
         const stillValid = savedSession && remote.some((s) => s.id === savedSession.spaceId);
         if (!stillValid) {
@@ -132,7 +146,14 @@ export default function App() {
             setSettings(merged);
           }
         }
+      } else {
+        // This user has no spaces in the cloud → start clean so the welcome /
+        // join flow appears. Never inherit a previous user's local cache.
+        clearLocalSpaceData();
+        setSpaces([]);
+        setSession(null);
       }
+      setCacheOwner(user.id);
       setSpacesLoaded(true);
     }).catch(() => setSpacesLoaded(true));
   }, [user]);
@@ -221,6 +242,16 @@ export default function App() {
     setActiveTab('add');
   }, []);
 
+  const handleSignOut = useCallback(async () => {
+    // Clear the device cache so the next person to sign in here starts clean
+    // and never inherits this user's spaces/expenses.
+    clearLocalSpaceData();
+    setSpaces([]);
+    setSession(null);
+    setWelcomeMode('choosing');
+    await signOut();
+  }, [signOut]);
+
   const handleJoined = useCallback(async (spaceId: string, memberId: string) => {
     const updated = await loadSpacesFromSupabase();
     if (updated.length > 0) {
@@ -228,11 +259,12 @@ export default function App() {
       const newSession: SessionState = { spaceId, memberId };
       setSession(newSession);
       saveSession(newSession);
+      if (user) setCacheOwner(user.id);
       const joined = updated.find((s) => s.id === spaceId);
       setJoinedSpaceName(joined?.name ?? '');
     }
     setWelcomeMode('joined');
-  }, []);
+  }, [user]);
 
   const handleSaveMultipleExpenses = useCallback((items: ExpenseWithSpace[]) => {
     let firstUnmatchedFijo: Expense | null = null;
@@ -524,7 +556,7 @@ export default function App() {
                   </p>
                   <ChangePassword onSetPassword={setPassword} />
                   <button
-                    onClick={signOut}
+                    onClick={handleSignOut}
                     className="block text-sm text-red-500 font-semibold hover:text-red-700 transition-colors">
                     Cerrar sesión
                   </button>

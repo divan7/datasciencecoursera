@@ -5,6 +5,37 @@ import { isSupabaseConfigured } from '../lib/supabase';
 
 const SPACES_KEY = 'orden_casa_spaces';
 const SESSION_KEY = 'orden_casa_session';
+// Tracks which authenticated user the local cache belongs to, so we never
+// show one user's cached spaces/expenses to a different user on the same device.
+const CACHE_UID_KEY = 'orden_casa_cache_uid';
+
+export function getCacheOwner(): string | null {
+  return localStorage.getItem(CACHE_UID_KEY);
+}
+
+export function setCacheOwner(uid: string): void {
+  localStorage.setItem(CACHE_UID_KEY, uid);
+}
+
+// Wipe every locally cached space, session and per-space dataset. Used when a
+// different user logs in on this device, or when the signed-in user genuinely
+// has no spaces in the cloud (so stale cache must not leak).
+export function clearLocalSpaceData(): void {
+  const prefixes = [
+    'expense_tracker_data_',
+    'expense_tracker_settings_',
+    'fixed_expense_templates_',
+    'monthly_checks_',
+  ];
+  for (let i = localStorage.length - 1; i >= 0; i--) {
+    const key = localStorage.key(i);
+    if (key && prefixes.some((p) => key.startsWith(p))) {
+      localStorage.removeItem(key);
+    }
+  }
+  localStorage.removeItem(SPACES_KEY);
+  localStorage.removeItem(SESSION_KEY);
+}
 
 export function loadSpaces(): AppSpace[] {
   try { return JSON.parse(localStorage.getItem(SPACES_KEY) ?? '[]'); }

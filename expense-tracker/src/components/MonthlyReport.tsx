@@ -69,6 +69,7 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
   const COLORS = ['bg-teal-600', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-red-500', 'bg-orange-500', 'bg-teal-500', 'bg-pink-500'];
 
   return (
+    <>
     <div className="space-y-4">
       {/* Month selector */}
       <div className="flex gap-2">
@@ -222,5 +223,6 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
         onClose={() => setShowExport(false)}
       />
     )}
+    </>
   );
 }

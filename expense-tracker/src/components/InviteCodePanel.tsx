@@ -13,11 +13,23 @@ function daysLeft(isoDate: string): number {
   return Math.max(0, Math.ceil((new Date(isoDate).getTime() - Date.now()) / 86400000));
 }
 
+// Rejects if a promise takes longer than `ms`, so a stalled network/auth call
+// can never leave the UI spinning forever.
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Tiempo de espera agotado (${label}). Revisa tu conexión e inténtalo de nuevo.`)), ms)
+    ),
+  ]);
+}
+
 export function InviteCodePanel({ space, currentMemberId }: Props) {
   const [invites, setInvites]     = useState<SpaceInvite[]>([]);
   const [loading, setLoading]     = useState(false);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied]       = useState(false);
+  const [error, setError]         = useState('');
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -26,20 +38,26 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
 
   const load = async () => {
     setLoading(true);
-    const list = await invitesDb.listForSpace(space.id);
-    setInvites(list);
-    setLoading(false);
+    try {
+      const list = await withTimeout(invitesDb.listForSpace(space.id), 15000, 'cargar');
+      setInvites(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron cargar los códigos.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const activeInvite: SpaceInvite | undefined = invites[0];
 
   const handleGenerate = async () => {
     setGenerating(true);
+    setError('');
     try {
-      await invitesDb.create(space.id, space.name, currentMemberId);
+      await withTimeout(invitesDb.create(space.id, space.name, currentMemberId), 15000, 'generar código');
       await load();
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo generar el código. Inténtalo de nuevo.');
     } finally {
       setGenerating(false);
     }
@@ -75,6 +93,12 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
         <Link2 size={15} style={{ color: '#0c6878' }} />
         <p className="text-sm font-bold text-gray-700">Código de invitación</p>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+          <p className="text-xs text-red-600">{error}</p>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-4">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Pencil, Check } from 'lucide-react';
 import type { AppSpace, SessionState } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
 import { PinPad } from './PinPad';
@@ -12,11 +12,28 @@ interface Props {
   onUpdateSpaces: (spaces: AppSpace[]) => void;
 }
 
-type Modal = 'new' | { type: 'confirmDelete'; spaceId: string } | null;
+type Modal = 'new' | 'rename' | { type: 'confirmDelete'; spaceId: string } | null;
 type PinStep = 'first' | 'confirm';
 
 export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces }: Props) {
   const [modal, setModal] = useState<Modal>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+
+  const openRename = () => {
+    const active = spaces.find((s) => s.id === session.spaceId);
+    setRenameDraft(active?.name ?? '');
+    setModal('rename');
+  };
+
+  const handleRename = () => {
+    if (!renameDraft.trim()) return;
+    const updated = spaces.map((s) =>
+      s.id === session.spaceId ? { ...s, name: renameDraft.trim() } : s
+    );
+    onUpdateSpaces(updated);
+    saveSpaces(updated);
+    setModal(null);
+  };
 
   // ── New space form state ──────────────────────────────────────
   const [nsName, setNsName]               = useState('');
@@ -130,7 +147,18 @@ export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces }: Props
                   {isActive && <span className="text-teal-200 text-xs">✓</span>}
                 </button>
 
-                {/* Delete — only for inactive, full-height tappable strip */}
+                {/* Rename — only for active chip */}
+                {isActive && (
+                  <button
+                    onClick={openRename}
+                    className="px-2.5 py-2 text-teal-200 hover:text-white transition-colors border-l border-teal-600"
+                    title="Renombrar lista"
+                  >
+                    <Pencil size={13} />
+                  </button>
+                )}
+
+                {/* Delete — only for inactive chips */}
                 {!isActive && (
                   <button
                     onClick={() => setModal({ type: 'confirmDelete', spaceId: sp.id })}
@@ -244,8 +272,57 @@ export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces }: Props
         </div>
       )}
 
+      {/* ── Rename modal ────────────────────────────────────────── */}
+      {modal === 'rename' && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={() => setModal(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-sm bg-white rounded-t-3xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <h2 className="text-base font-bold text-gray-800">Renombrar lista</h2>
+              <button onClick={() => setModal(null)} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <input
+                type="text"
+                value={renameDraft}
+                onChange={(e) => setRenameDraft(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleRename()}
+                placeholder="Nombre de la lista"
+                autoFocus
+                className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setModal(null)}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-500 rounded-xl text-sm font-medium hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleRename}
+                  disabled={!renameDraft.trim()}
+                  className="flex-1 py-2.5 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40 active:scale-95 transition-all"
+                  style={{ backgroundColor: 'var(--soi-teal)' }}
+                >
+                  <Check size={15} /> Guardar
+                </button>
+              </div>
+            </div>
+            <div className="h-safe-bottom" />
+          </div>
+        </div>
+      )}
+
       {/* ── Confirm delete modal ─────────────────────────────────── */}
-      {modal !== null && modal !== 'new' && modal.type === 'confirmDelete' && (
+      {modal !== null && modal !== 'new' && modal !== 'rename' && modal.type === 'confirmDelete' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6" onClick={() => setModal(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative w-full max-w-xs bg-white rounded-3xl shadow-2xl p-6 text-center" onClick={(e) => e.stopPropagation()}>

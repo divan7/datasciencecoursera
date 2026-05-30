@@ -149,7 +149,15 @@ export default function App() {
     setSession(newSession);
     saveSpaces([space]);
     if (isSupabaseConfigured && user) {
-      syncSpaceToSupabase(space, user.id).catch(console.error);
+      // Awaiting matters: if the space + owner membership don't reach Supabase,
+      // every expense/fixed write will silently fail RLS and live only locally.
+      syncSpaceToSupabase(space, user.id).catch((err) => {
+        console.error('Error al sincronizar el espacio con la nube:', err);
+        alert(
+          'No se pudo guardar tu lista en la nube. Tus datos podrían no conservarse al cerrar sesión. ' +
+          'Verifica tu conexión y vuelve a intentarlo, o contacta soporte si persiste.'
+        );
+      });
     }
   }, [user]);
 

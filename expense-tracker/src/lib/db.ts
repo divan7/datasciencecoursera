@@ -255,18 +255,27 @@ export const spacesDb = {
 
   async createSpace(space: AppSpace, ownerProfileId: string): Promise<void> {
     if (!supabase) return;
-    await supabase.from('spaces').upsert({
+    const { error: spaceErr } = await supabase.from('spaces').upsert({
       id: space.id, name: space.name, owner_id: space.ownerId,
       max_members: space.maxMembers, plan: space.plan ?? 'trial',
       created_at: space.createdAt,
     });
-    for (const m of space.members) {
-      await supabase.from('space_members').upsert({
+    if (spaceErr) throw new Error(spaceErr.message);
+
+    // Insert the owner's membership FIRST so my_space_ids() includes this space
+    // for the subsequent (non-owner) member inserts under RLS. Surface any error
+    // instead of swallowing it — a failed membership means writes won't persist.
+    const ordered = [...space.members].sort(
+      (a, b) => (a.id === space.ownerId ? -1 : 0) - (b.id === space.ownerId ? -1 : 0)
+    );
+    for (const m of ordered) {
+      const { error } = await supabase.from('space_members').upsert({
         id: m.id, space_id: space.id,
         profile_id: m.id === space.ownerId ? ownerProfileId : null,
         display_name: m.name, pin: m.pin, role: m.role,
         color_index: m.colorIndex, created_at: m.createdAt,
       });
+      if (error) throw new Error(error.message);
     }
   },
 

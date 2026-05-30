@@ -255,8 +255,9 @@ export const spacesDb = {
 
   async createSpace(space: AppSpace, ownerProfileId: string): Promise<void> {
     if (!supabase) return;
+    // owner_id must be the Supabase auth UID (a UUID), not the local member ID.
     const { error: spaceErr } = await supabase.from('spaces').upsert({
-      id: space.id, name: space.name, owner_id: space.ownerId,
+      id: space.id, name: space.name, owner_id: ownerProfileId,
       max_members: space.maxMembers, plan: space.plan ?? 'trial',
       created_at: space.createdAt,
     });

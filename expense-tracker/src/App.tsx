@@ -174,12 +174,12 @@ export default function App() {
     if (isSupabaseConfigured && user) {
       // Awaiting matters: if the space + owner membership don't reach Supabase,
       // every expense/fixed write will silently fail RLS and live only locally.
-      syncSpaceToSupabase(space, user.id).catch((err) => {
-        console.error('Error al sincronizar el espacio con la nube:', err);
-        alert(
-          'No se pudo guardar tu lista en la nube. Tus datos podrían no conservarse al cerrar sesión. ' +
-          'Verifica tu conexión y vuelve a intentarlo, o contacta soporte si persiste.'
-        );
+      syncSpaceToSupabase(space, user.id).then(() => {
+        setCacheOwner(user.id);
+      }).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('Error al sincronizar el espacio con la nube:', msg);
+        alert(`No se pudo guardar tu lista en la nube.\n\nDetalle: ${msg}\n\nVerifica tu conexión e intenta de nuevo.`);
       });
     }
   }, [user]);

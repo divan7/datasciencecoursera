@@ -21,6 +21,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { WelcomeChoice } from './components/WelcomeChoice';
 import { JoinSpace } from './components/JoinSpace';
 import { ChangePassword } from './components/ChangePassword';
+import { PWAUpdateBanner } from './components/PWAUpdateBanner';
 import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
@@ -369,6 +370,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <PWAUpdateBanner />
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}

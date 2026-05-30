@@ -223,15 +223,20 @@ export default function App() {
   }, []);
 
   const handleSaveMultipleExpenses = useCallback((items: ExpenseWithSpace[]) => {
+    let firstUnmatchedFijo: Expense | null = null;
     items.forEach(({ expense, spaceId: targetSpaceId }) => {
       if (targetSpaceId === spaceId) {
         const saved = addExpense(expense);
         const month = expense.date.slice(0, 7);
-        tryAutoMatch(saved, month);
+        const matched = tryAutoMatch(saved, month);
+        if (!matched && expense.expenseType === 'fijo' && !firstUnmatchedFijo) {
+          firstUnmatchedFijo = saved;
+        }
       } else {
         saveExpenseToAnySpace(expense, targetSpaceId);
       }
     });
+    if (firstUnmatchedFijo) setSuggestFixedTemplate(firstUnmatchedFijo);
     setActiveTab('list');
   }, [addExpense, tryAutoMatch, spaceId]);
 

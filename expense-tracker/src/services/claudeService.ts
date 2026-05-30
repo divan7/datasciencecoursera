@@ -39,10 +39,16 @@ El usuario describe UNA o VARIAS transacciones (gastos o ingresos) en su mensaje
 Devuelve ÚNICAMENTE un JSON array válido — siempre array, aunque sea un solo elemento.
 Sin texto adicional, sin comentarios, sin markdown. Solo el JSON array.
 
+REGLA IMPORTANTE — gastos fijos:
+Si el usuario menciona explícitamente la palabra "fijo" o "gasto fijo" para alguna transacción,
+establece expenseType:"fijo" para ese item. Si además menciona una frecuencia (mensual, semanal,
+quincenal, anual, etc.), inclúyela en el campo frequency. Si no la menciona, usa "mensual" por defecto.
+
 ${FIELDS}
 
-Ejemplo gastos: [{"transactionType":"gasto","amount":350,"concept":"Walmart","category":"alimentacion","paymentMethod":"tarjeta_debito"},{"transactionType":"gasto","amount":89,"concept":"Spotify","category":"suscripciones"}]
-Ejemplo mixto: [{"transactionType":"ingreso","amount":15000,"concept":"Salario","category":"salario","paymentMethod":"transferencia"},{"transactionType":"gasto","amount":500,"concept":"Gasolina","category":"transporte","paymentMethod":"efectivo"}]`;
+Ejemplo gastos: [{"transactionType":"gasto","amount":350,"concept":"Walmart","category":"alimentacion","paymentMethod":"tarjeta_debito","expenseType":"variable"},{"transactionType":"gasto","amount":89,"concept":"Spotify","category":"suscripciones","expenseType":"fijo","frequency":"mensual"}]
+Ejemplo con fijo: [{"transactionType":"gasto","amount":1200,"concept":"Renta mensual","category":"hogar","paymentMethod":"transferencia","expenseType":"fijo","frequency":"mensual"}]
+Ejemplo mixto: [{"transactionType":"ingreso","amount":15000,"concept":"Salario","category":"salario","paymentMethod":"transferencia"},{"transactionType":"gasto","amount":500,"concept":"Gasolina","category":"transporte","paymentMethod":"efectivo","expenseType":"variable"}]`;
 
 const RECEIPT_SYSTEM = `Eres un asistente de finanzas personales especializado en leer tickets de compra.
 

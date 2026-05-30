@@ -176,6 +176,43 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
         </button>
       </div>
 
+      {/* Expense type toggle — fijo vs variable, visible from the start */}
+      {!isIncome && (
+        <div className="space-y-2">
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+            <button
+              type="button"
+              onClick={() => set('expenseType', 'variable')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                form.expenseType === 'variable' ? 'bg-white text-gray-700 shadow-sm' : 'text-gray-400'
+              }`}
+            >
+              💳 Variable
+            </button>
+            <button
+              type="button"
+              onClick={() => set('expenseType', 'fijo')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                form.expenseType === 'fijo' ? 'text-white shadow-sm' : 'text-gray-400'
+              }`}
+              style={form.expenseType === 'fijo' ? { backgroundColor: 'var(--soi-teal)' } : {}}
+            >
+              🔄 Fijo
+            </button>
+          </div>
+
+          {/* Frequency — inline when fijo is selected */}
+          {form.expenseType === 'fijo' && (
+            <select value={form.frequency} onChange={(e) => set('frequency', e.target.value as Frequency)}
+              className="w-full px-3 py-2 border border-teal-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-teal-50 text-teal-800 font-medium">
+              {Object.entries(FREQUENCIES).map(([key, label]) => (
+                <option key={key} value={key}>{label as string}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
       {/* Amount */}
       <div className={`rounded-2xl p-4 border-2 ${isIncome ? '' : 'bg-teal-50 border-teal-100'}`}
         style={isIncome ? { backgroundColor: '#f5ede6', borderColor: '#e8c4a8' } : {}}>
@@ -403,31 +440,6 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
                   onChange={(e) => set('installments', e.target.value)}
                   placeholder="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo de gasto</label>
-                <div className="flex gap-2">
-                  {(['variable', 'fijo'] as ExpenseType[]).map((t) => (
-                    <button key={t} type="button" onClick={() => set('expenseType', t)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-all capitalize ${
-                        form.expenseType === t ? 'bg-teal-700 text-white border-teal-700' : 'border-gray-200 text-gray-500'
-                      }`}
-                    >{t}</button>
-                  ))}
-                </div>
-              </div>
-
-              {form.expenseType === 'fijo' && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 mb-1">Frecuencia</label>
-                  <select value={form.frequency} onChange={(e) => set('frequency', e.target.value as Frequency)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-300">
-                    {Object.entries(FREQUENCIES).map(([key, label]) => (
-                      <option key={key} value={key}>{label as string}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-2">
                 {[

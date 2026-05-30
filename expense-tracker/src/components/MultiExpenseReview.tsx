@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Trash2, CheckCircle2, Save, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Expense, Category, PaymentMethod } from '../types/expense';
+import type { Expense, Category, PaymentMethod, ExpenseType } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 import type { AppSpace } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
@@ -32,6 +32,7 @@ interface RowState {
   notes: string;
   showNotes: boolean;
   removed: boolean;
+  expenseType: ExpenseType;
 }
 
 export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser, onSaveAll, onCancel }: Props) {
@@ -53,6 +54,8 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
       notes:         item.notes ?? '',
       showNotes:     false,
       removed:       false,
+      // Photo items default to variable; user can flip individual ones to fijo
+      expenseType:   'variable' as ExpenseType,
     }))
   );
 
@@ -87,7 +90,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         // Attach the compressed receipt image to the first saved item only
         receiptImageBase64: idx === 0 ? receiptImage : undefined,
         transactionType:    'gasto' as const,
-        expenseType:        'variable' as const,
+        expenseType:        r.expenseType,
         currency:           'MXN',
       },
     }));
@@ -244,6 +247,25 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                       <option key={k} value={k}>{v as string}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Expense type toggle */}
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5">
+                  {(['variable', 'fijo'] as ExpenseType[]).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setRow(i, { expenseType: t })}
+                      className={`flex-1 py-1 rounded-md text-xs font-semibold transition-all ${
+                        row.expenseType === t
+                          ? t === 'fijo' ? 'text-white' : 'bg-white text-gray-700 shadow-sm'
+                          : 'text-gray-400'
+                      }`}
+                      style={row.expenseType === t && t === 'fijo' ? { backgroundColor: 'var(--soi-teal)' } : {}}
+                    >
+                      {t === 'variable' ? '💳 Variable' : '🔄 Fijo'}
+                    </button>
+                  ))}
                 </div>
 
                 {/* Paid by */}

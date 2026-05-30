@@ -175,10 +175,11 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
   }, [spaceId]);
 
   // ── Auto-match ─────────────────────────────────────────────────
-  const tryAutoMatch = useCallback((expense: Expense, month: string) => {
-    if ((expense.transactionType ?? 'gasto') !== 'gasto') return;
+  // Returns true if the expense was matched & confirmed against an existing template
+  const tryAutoMatch = useCallback((expense: Expense, month: string): boolean => {
+    if ((expense.transactionType ?? 'gasto') !== 'gasto') return false;
     const monthChecks = checks.filter((c) => c.month === month && c.status === 'pendiente');
-    if (monthChecks.length === 0) return;
+    if (monthChecks.length === 0) return false;
 
     for (const check of monthChecks) {
       const tpl = templates.find((t) => t.id === check.templateId);
@@ -190,9 +191,10 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       const amountMatch = amountDiff <= 0.25;
       if ((conceptMatch && categoryMatch) || (categoryMatch && amountMatch && tpl.expectedAmount > 0)) {
         confirmCheck(check.id, expense.id, expense.amount);
-        return;
+        return true;
       }
     }
+    return false;
   }, [checks, templates, confirmCheck]);
 
   const pendingCountCurrentMonth = useMemo(() => {

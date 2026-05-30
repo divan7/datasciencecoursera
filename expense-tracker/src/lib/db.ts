@@ -440,6 +440,19 @@ export interface SpaceInvite {
   createdAt: string;
 }
 
+export interface InvitePreviewMember {
+  id: string;
+  name: string;
+  colorIndex: number;
+  hasProfile: boolean;
+}
+
+export interface InvitePreview {
+  spaceId: string;
+  spaceName: string;
+  members: InvitePreviewMember[];
+}
+
 export const invitesDb = {
   generateCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -457,11 +470,22 @@ export const invitesDb = {
     return code;
   },
 
-  async preview(code: string): Promise<{ spaceId: string; spaceName: string } | null> {
+  async preview(code: string): Promise<InvitePreview | null> {
     if (!supabase) return null;
     const { data, error } = await supabase.rpc('preview_invite', { p_code: code.toUpperCase() });
     if (error || !data) return null;
-    return data as { spaceId: string; spaceName: string };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const d = data as any;
+    return {
+      spaceId:   d.spaceId,
+      spaceName: d.spaceName,
+      members:   (d.members ?? []).map((m: any) => ({
+        id:         m.id,
+        name:       m.name,
+        colorIndex: m.colorIndex ?? 0,
+        hasProfile: m.hasProfile ?? false,
+      })),
+    };
   },
 
   async join(code: string, displayName: string, colorIndex: number): Promise<{ spaceId: string; memberId: string }> {
@@ -470,6 +494,16 @@ export const invitesDb = {
       p_code: code.toUpperCase(),
       p_display_name: displayName,
       p_color_index: colorIndex,
+    });
+    if (error) throw new Error(error.message);
+    return data as { spaceId: string; memberId: string };
+  },
+
+  async joinAsExistingMember(code: string, memberId: string): Promise<{ spaceId: string; memberId: string }> {
+    if (!supabase) throw new Error('Supabase no configurado');
+    const { data, error } = await supabase.rpc('join_as_existing_member', {
+      p_code:      code.toUpperCase(),
+      p_member_id: memberId,
     });
     if (error) throw new Error(error.message);
     return data as { spaceId: string; memberId: string };

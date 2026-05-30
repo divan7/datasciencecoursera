@@ -3,6 +3,7 @@ import { Camera, Upload, X, AlertCircle, AlertTriangle, Sparkles } from 'lucide-
 import { format } from 'date-fns';
 import type { Expense, User } from '../types/expense';
 import { parseReceiptItems } from '../services/claudeService';
+import { compressImage } from '../utils/imageCompression';
 import type { SpaceMember, AppSpace } from '../types/space';
 import { MultiExpenseReview, type ExpenseWithSpace } from './MultiExpenseReview';
 
@@ -58,8 +59,11 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today);
-      // Attach the receipt image to the first item only (to avoid duplicating large base64)
-      if (items.length > 0) items[0].receiptImageBase64 = imageBase64;
+      // Compress and attach the receipt image to the first item only
+      if (items.length > 0) {
+        const compressed = await compressImage(imageBase64);
+        items[0].receiptImageBase64 = compressed;
+      }
 
       // Validate sum of items vs ticket total
       if (detectedTotal !== null && items.length > 0) {

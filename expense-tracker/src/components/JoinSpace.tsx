@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Search, Users, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Search, Users, CheckCircle, AlertCircle, ArrowLeft, UserCheck, UserPlus } from 'lucide-react';
 import { MEMBER_COLORS } from '../types/space';
 import { invitesDb } from '../lib/db';
-import type { Profile } from '../lib/db';
+import type { Profile, InvitePreview } from '../lib/db';
 
 interface Props {
   profile: Profile | null;
@@ -11,13 +11,13 @@ interface Props {
 }
 
 export function JoinSpace({ profile, onJoined, onBack }: Props) {
-  const [code, setCode]             = useState('');
-  const [step, setStep]             = useState<'code' | 'confirm'>('code');
-  const [preview, setPreview]       = useState<{ spaceId: string; spaceName: string } | null>(null);
+  const [code, setCode]               = useState('');
+  const [step, setStep]               = useState<'code' | 'whoami' | 'confirm'>('code');
+  const [preview, setPreview]         = useState<InvitePreview | null>(null);
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
-  const [colorIndex, setColorIndex] = useState(0);
-  const [loading, setLoading]       = useState(false);
-  const [error, setError]           = useState('');
+  const [colorIndex, setColorIndex]   = useState(0);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
 
   const formattedCode = code.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 6);
 
@@ -29,9 +29,28 @@ export function JoinSpace({ profile, onJoined, onBack }: Props) {
       const result = await invitesDb.preview(formattedCode);
       if (!result) { setError('Código inválido o expirado. Pide uno nuevo al dueño de la lista.'); return; }
       setPreview(result);
-      setStep('confirm');
+      setStep('whoami');
     } catch {
       setError('Error al verificar el código. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLinkExisting = async (memberId: string) => {
+    if (!preview) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await invitesDb.joinAsExistingMember(formattedCode, memberId);
+      onJoined(result.spaceId, result.memberId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('ya tiene una cuenta')) {
+        setError('Ese perfil ya tiene una cuenta vinculada. Elige otro o crea uno nuevo.');
+      } else {
+        setError(`Error: ${msg}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -51,6 +70,8 @@ export function JoinSpace({ profile, onJoined, onBack }: Props) {
       setLoading(false);
     }
   };
+
+  const availableMembers = preview?.members.filter((m) => !m.hasProfile) ?? [];
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10"
@@ -73,6 +94,7 @@ export function JoinSpace({ profile, onJoined, onBack }: Props) {
         </div>
 
         <div className="p-6">
+          {/* ── Step 1: Enter code ── */}
           {step === 'code' && (
             <div className="space-y-5">
               <div className="text-center">
@@ -120,16 +142,84 @@ export function JoinSpace({ profile, onJoined, onBack }: Props) {
             </div>
           )}
 
-          {step === 'confirm' && preview && (
+          {/* ── Step 2: Who are you? ── */}
+          {step === 'whoami' && preview && (
             <div className="space-y-5">
-              {/* Space preview */}
               <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 text-center">
                 <CheckCircle size={28} className="mx-auto mb-2 text-teal-500" />
                 <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide mb-1">Te unirás a</p>
                 <p className="text-xl font-extrabold text-gray-800">{preview.spaceName}</p>
               </div>
 
-              {/* Display name */}
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-1">¿Quién eres en esta lista?</p>
+                <p className="text-xs text-gray-400 mb-3">
+                  Si el dueño ya creó un perfil con tu nombre, selecciónalo para vincularte. De lo contrario crea uno nuevo.
+                </p>
+
+                {availableMembers.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {availableMembers.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => handleLinkExisting(m.id)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-gray-200 hover:border-teal-400 transition-all text-left disabled:opacity-50"
+                      >
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                          style={{ backgroundColor: MEMBER_COLORS[m.colorIndex] }}>
+                          {m.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800">{m.name}</p>
+                          <p className="text-xs text-teal-600">Sin cuenta vinculada — soy yo</p>
+                        </div>
+                        <UserCheck size={18} className="text-teal-500 flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setStep('confirm')}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 border-dashed border-gray-300 hover:border-teal-400 transition-all text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <UserPlus size={18} className="text-gray-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Soy alguien nuevo</p>
+                    <p className="text-xs text-gray-400">Crear un perfil nuevo en esta lista</p>
+                  </div>
+                </button>
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                  <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-red-600">{error}</p>
+                </div>
+              )}
+
+              <button onClick={() => { setStep('code'); setError(''); setPreview(null); }}
+                className="w-full py-2.5 rounded-2xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50">
+                Atrás
+              </button>
+            </div>
+          )}
+
+          {/* ── Step 3: New member details ── */}
+          {step === 'confirm' && preview && (
+            <div className="space-y-5">
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 text-center">
+                <CheckCircle size={28} className="mx-auto mb-2 text-teal-500" />
+                <p className="text-xs text-teal-600 font-semibold uppercase tracking-wide mb-1">Nuevo miembro en</p>
+                <p className="text-xl font-extrabold text-gray-800">{preview.spaceName}</p>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                   Tu nombre en esta lista
@@ -143,7 +233,6 @@ export function JoinSpace({ profile, onJoined, onBack }: Props) {
                 />
               </div>
 
-              {/* Color picker */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
                   Tu color
@@ -174,7 +263,7 @@ export function JoinSpace({ profile, onJoined, onBack }: Props) {
               )}
 
               <div className="flex gap-2">
-                <button onClick={() => { setStep('code'); setError(''); setPreview(null); }}
+                <button onClick={() => { setStep('whoami'); setError(''); }}
                   className="px-4 py-3 rounded-2xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50">
                   Atrás
                 </button>

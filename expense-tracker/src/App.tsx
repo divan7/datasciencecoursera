@@ -9,6 +9,7 @@ import { Dashboard } from './components/Dashboard';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MonthlyChecklist } from './components/MonthlyChecklist';
 import { FixedExpenseManager } from './components/FixedExpenseManager';
+import { FixedTemplateFromExpenseModal } from './components/FixedTemplateFromExpenseModal';
 import { PendingFixedTray } from './components/PendingFixedTray';
 import { SpaceOnboarding } from './components/SpaceOnboarding';
 import { UserSwitcher } from './components/UserSwitcher';
@@ -85,6 +86,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [inputMode, setInputMode] = useState<InputMode>('form');
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
+  const [suggestFixedTemplate, setSuggestFixedTemplate] = useState<Expense | null>(null);
 
   // ── Expense hooks ─────────────────────────────────────────────
   const { expenses, addExpense, updateExpense, deleteExpense } = useExpenses(spaceId);
@@ -190,7 +192,11 @@ export default function App() {
     (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
       const saved = addExpense(data);
       const month = data.date.slice(0, 7);
-      tryAutoMatch(saved, month);
+      const matched = tryAutoMatch(saved, month);
+      // Offer to create a fixed template when a fijo expense has no matching template
+      if (!matched && data.expenseType === 'fijo') {
+        setSuggestFixedTemplate(saved);
+      }
       setPrefillTemplate(null);
       setActiveTab('list');
     },
@@ -516,6 +522,19 @@ export default function App() {
           currentMemberId={session.memberId}
           onSwitch={handleMemberSwitch}
           onClose={() => setShowUserSwitcher(false)}
+        />
+      )}
+
+      {/* ── Suggest fixed template when fijo expense has no match ── */}
+      {suggestFixedTemplate && (
+        <FixedTemplateFromExpenseModal
+          expense={suggestFixedTemplate}
+          members={currentSpace.members}
+          onSave={(tpl) => {
+            addTemplate(tpl);
+            setSuggestFixedTemplate(null);
+          }}
+          onClose={() => setSuggestFixedTemplate(null)}
         />
       )}
     </div>

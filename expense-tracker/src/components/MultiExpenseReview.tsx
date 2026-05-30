@@ -37,6 +37,9 @@ interface RowState {
 export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser, onSaveAll, onCancel }: Props) {
   const today = format(new Date(), 'yyyy-MM-dd');
 
+  // Preserve the receipt image from item[0] — it survives through the review
+  const receiptImage = items[0]?.receiptImageBase64;
+
   const [rows, setRows] = useState<RowState[]>(() =>
     items.map((item) => ({
       concept:       item.concept ?? '',
@@ -68,22 +71,24 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
       ? `tkt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
       : undefined;
 
-    const result: ExpenseWithSpace[] = active.map((r) => ({
+    const result: ExpenseWithSpace[] = active.map((r, idx) => ({
       spaceId: r.spaceId,
       expense: {
-        concept:         r.concept.trim(),
-        amount:          parseFloat(r.amount),
-        category:        r.category,
-        paymentMethod:   r.paymentMethod,
-        paidBy:          r.paidBy,
-        date:            r.date,
-        store:           r.store.trim() || undefined,
-        notes:           r.notes.trim() || undefined,
+        concept:            r.concept.trim(),
+        amount:             parseFloat(r.amount),
+        category:           r.category,
+        paymentMethod:      r.paymentMethod,
+        paidBy:             r.paidBy,
+        date:               r.date,
+        store:              r.store.trim() || undefined,
+        notes:              r.notes.trim() || undefined,
         ticketId,
-        ticketNotes:     ticketId && ticketNotes.trim() ? ticketNotes.trim() : undefined,
-        transactionType: 'gasto' as const,
-        expenseType:     'variable' as const,
-        currency:        'MXN',
+        ticketNotes:        ticketId && ticketNotes.trim() ? ticketNotes.trim() : undefined,
+        // Attach the compressed receipt image to the first saved item only
+        receiptImageBase64: idx === 0 ? receiptImage : undefined,
+        transactionType:    'gasto' as const,
+        expenseType:        'variable' as const,
+        currency:           'MXN',
       },
     }));
     onSaveAll(result);

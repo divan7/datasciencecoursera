@@ -261,22 +261,20 @@ export const spacesDb = {
       max_members: space.maxMembers, plan: space.plan ?? 'trial',
       created_at: space.createdAt,
     });
-    if (spaceErr) throw new Error(spaceErr.message);
+    if (spaceErr) throw new Error(`spaces INSERT: ${spaceErr.message} (code: ${spaceErr.code})`);
 
-    // Insert the owner's membership FIRST so my_space_ids() includes this space
-    // for the subsequent (non-owner) member inserts under RLS. Surface any error
-    // instead of swallowing it — a failed membership means writes won't persist.
     const ordered = [...space.members].sort(
       (a, b) => (a.id === space.ownerId ? -1 : 0) - (b.id === space.ownerId ? -1 : 0)
     );
     for (const m of ordered) {
+      const isOwner = m.id === space.ownerId;
       const { error } = await supabase.from('space_members').upsert({
         id: m.id, space_id: space.id,
-        profile_id: m.id === space.ownerId ? ownerProfileId : null,
+        profile_id: isOwner ? ownerProfileId : null,
         display_name: m.name, pin: m.pin, role: m.role,
         color_index: m.colorIndex, created_at: m.createdAt,
       });
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(`space_members INSERT (${isOwner ? 'owner' : 'member'} ${m.id}): ${error.message} (code: ${error.code})`);
     }
   },
 

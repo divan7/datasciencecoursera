@@ -54,8 +54,9 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
       notes:         item.notes ?? '',
       showNotes:     false,
       removed:       false,
-      // Photo items default to variable; user can flip individual ones to fijo
-      expenseType:   'variable' as ExpenseType,
+      // Respect expenseType from AI (text parser may detect 'fijo'); photos always
+      // arrive as 'variable' from the receipt prompt, so this is safe for both flows.
+      expenseType:   ((item.expenseType as ExpenseType | undefined) ?? 'variable'),
     }))
   );
 

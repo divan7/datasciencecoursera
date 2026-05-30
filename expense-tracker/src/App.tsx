@@ -20,6 +20,7 @@ import { AuthGate } from './components/AuthGate';
 import { AdminPanel } from './components/AdminPanel';
 import { WelcomeChoice } from './components/WelcomeChoice';
 import { JoinSpace } from './components/JoinSpace';
+import { ChangePassword } from './components/ChangePassword';
 import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
@@ -41,7 +42,7 @@ type InputMode = 'form' | 'text' | 'image';
 
 export default function App() {
   // ── Auth ──────────────────────────────────────────────────────
-  const { user, profile, loading: authLoading, isAdmin, signInWithMagicLink, signOut } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin, signInWithMagicLink, signInWithPassword, signUpWithPassword, setPassword, signOut } = useAuth();
 
   // ── Space & session state ─────────────────────────────────────
   const [spaces, setSpaces] = useState<AppSpace[]>(() => {
@@ -298,7 +299,13 @@ export default function App() {
       );
     }
     if (!user) {
-      return <AuthGate onSignIn={signInWithMagicLink} />;
+      return (
+        <AuthGate
+          onSignIn={signInWithMagicLink}
+          onSignInPassword={signInWithPassword}
+          onSignUp={signUpWithPassword}
+        />
+      );
     }
   }
 
@@ -508,14 +515,15 @@ export default function App() {
             </div>
             {isSupabaseConfigured && profile && (
               <div className="border-t border-gray-200 pt-5">
-                <div className="bg-gray-50 rounded-2xl p-4 space-y-2">
+                <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                   <p className="text-xs text-gray-500">
                     Sesión: <strong>{profile.email}</strong>
                     <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700 font-semibold capitalize">{profile.plan}</span>
                   </p>
+                  <ChangePassword onSetPassword={setPassword} />
                   <button
                     onClick={signOut}
-                    className="text-sm text-red-500 font-semibold hover:text-red-700 transition-colors">
+                    className="block text-sm text-red-500 font-semibold hover:text-red-700 transition-colors">
                     Cerrar sesión
                   </button>
                 </div>

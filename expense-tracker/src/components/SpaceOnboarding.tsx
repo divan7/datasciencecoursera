@@ -268,6 +268,7 @@ export function SpaceOnboarding({ onComplete, isSupabaseMode = false }: Props) {
                 </p>
               </div>
               <PinPad
+                key={pinStep}
                 onConfirm={pinStep === 'first' ? handlePinFirst : handlePinConfirm}
                 onCancel={() => { setStep(2); setPinStep('first'); setFirstPin(''); setPinError(''); }}
                 error={pinError}
@@ -359,6 +360,7 @@ export function SpaceOnboarding({ onComplete, isSupabaseMode = false }: Props) {
                         {newMemberPinStep === 'first' ? `PIN para ${newMemberName}` : `Confirma el PIN de ${newMemberName}`}
                       </p>
                       <PinPad
+                        key={newMemberPinStep}
                         onConfirm={handleAddMemberPin}
                         onCancel={() => { setAddingMember(false); setNewMemberName(''); setNewMemberPinStep('first'); setNewMemberFirstPin(''); }}
                         error={newMemberPinError}

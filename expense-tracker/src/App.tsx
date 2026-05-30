@@ -10,6 +10,7 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { MonthlyChecklist } from './components/MonthlyChecklist';
 import { FixedExpenseManager } from './components/FixedExpenseManager';
 import { FixedTemplateFromExpenseModal } from './components/FixedTemplateFromExpenseModal';
+import { ReminderDialog } from './components/ReminderDialog';
 import { PendingFixedTray } from './components/PendingFixedTray';
 import { SpaceOnboarding } from './components/SpaceOnboarding';
 import { UserSwitcher } from './components/UserSwitcher';
@@ -87,6 +88,7 @@ export default function App() {
   const [inputMode, setInputMode] = useState<InputMode>('form');
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
   const [suggestFixedTemplate, setSuggestFixedTemplate] = useState<Expense | null>(null);
+  const [reminderTemplate, setReminderTemplate] = useState<FixedExpenseTemplate | null>(null);
 
   // ── Expense hooks ─────────────────────────────────────────────
   const { expenses, addExpense, updateExpense, deleteExpense } = useExpenses(spaceId);
@@ -530,14 +532,24 @@ export default function App() {
         />
       )}
 
+      {/* ── Calendar reminder after creating a fixed template ── */}
+      {reminderTemplate && (
+        <ReminderDialog
+          template={reminderTemplate}
+          onUpdate={updateTemplate}
+          onClose={() => setReminderTemplate(null)}
+        />
+      )}
+
       {/* ── Suggest fixed template when fijo expense has no match ── */}
       {suggestFixedTemplate && (
         <FixedTemplateFromExpenseModal
           expense={suggestFixedTemplate}
           members={currentSpace.members}
           onSave={(tpl) => {
-            addTemplate(tpl);
+            const saved = addTemplate(tpl);
             setSuggestFixedTemplate(null);
+            setReminderTemplate(saved);
           }}
           onClose={() => setSuggestFixedTemplate(null)}
         />

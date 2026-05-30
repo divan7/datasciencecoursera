@@ -140,18 +140,22 @@ export function SpaceOnboarding({ onComplete, isSupabaseMode = false }: Props) {
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="bg-teal-700 px-6 py-5 text-white text-center">
-          <svg width="48" height="48" viewBox="0 0 32 32" fill="none" className="mx-auto mb-2">
-            <rect width="32" height="32" rx="8" fill="#0f766e"/>
-            <path d="M16 6L4 16h4v10h8v-7h4v7h8V16h4L16 6z" fill="white"/>
-            <text x="16" y="28" textAnchor="middle" fontSize="7" fontWeight="bold" fill="#0f766e" fontFamily="sans-serif">SOI</text>
+        <div
+          className="px-6 py-7 text-white text-center"
+          style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}
+        >
+          {/* Logo — overlapping circles, consistent with login screen */}
+          <svg width="56" height="56" viewBox="0 0 64 64" fill="none" className="mx-auto mb-3">
+            <circle cx="24" cy="34" r="18" fill="white" opacity="0.9" />
+            <circle cx="40" cy="34" r="18" fill="#f5a884" opacity="0.9" />
+            <circle cx="32" cy="22" r="18" fill="white" opacity="0.55" />
           </svg>
-          <h1 className="text-xl font-bold">Orden Casa</h1>
-          <p className="text-teal-200 text-sm">by SOI</p>
+          <p className="text-white/70 text-[11px] tracking-[0.2em] uppercase font-medium mb-0.5">by SOIHogar</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">Orden Casa</h1>
           {/* Step indicator */}
-          <div className="flex justify-center gap-1.5 mt-3">
+          <div className="flex justify-center gap-1.5 mt-4">
             {(isSupabaseMode ? [1,2,3] : [1,2,3,4]).map((s) => (
-              <div key={s} className={`h-1.5 w-6 rounded-full transition-all ${s <= step ? 'bg-white' : 'bg-teal-600'}`} />
+              <div key={s} className={`h-1.5 w-6 rounded-full transition-all ${s <= step ? 'bg-white' : 'bg-white/30'}`} />
             ))}
           </div>
         </div>

@@ -89,7 +89,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [inputMode, setInputMode] = useState<InputMode>('form');
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
-  const [suggestFixedTemplate, setSuggestFixedTemplate] = useState<Expense | null>(null);
+  const [suggestQueue, setSuggestQueue] = useState<Expense[]>([]);
   const [reminderTemplate, setReminderTemplate] = useState<FixedExpenseTemplate | null>(null);
 
   // ── Expense hooks ─────────────────────────────────────────────
@@ -228,7 +228,7 @@ export default function App() {
       const matched = tryAutoMatch(saved, month);
       // Offer to create a fixed template when a fijo expense has no matching template
       if (!matched && data.expenseType === 'fijo') {
-        setSuggestFixedTemplate(saved);
+        setSuggestQueue((q) => [...q, saved]);
       }
       setPrefillTemplate(null);
       setActiveTab('list');
@@ -267,20 +267,20 @@ export default function App() {
   }, [user]);
 
   const handleSaveMultipleExpenses = useCallback((items: ExpenseWithSpace[]) => {
-    let firstUnmatchedFijo: Expense | null = null;
+    const unmatchedFijos: Expense[] = [];
     items.forEach(({ expense, spaceId: targetSpaceId }) => {
       if (targetSpaceId === spaceId) {
         const saved = addExpense(expense);
         const month = expense.date.slice(0, 7);
         const matched = tryAutoMatch(saved, month);
-        if (!matched && expense.expenseType === 'fijo' && !firstUnmatchedFijo) {
-          firstUnmatchedFijo = saved;
+        if (!matched && expense.expenseType === 'fijo') {
+          unmatchedFijos.push(saved);
         }
       } else {
         saveExpenseToAnySpace(expense, targetSpaceId);
       }
     });
-    if (firstUnmatchedFijo) setSuggestFixedTemplate(firstUnmatchedFijo);
+    if (unmatchedFijos.length > 0) setSuggestQueue((q) => [...q, ...unmatchedFijos]);
     setActiveTab('list');
   }, [addExpense, tryAutoMatch, spaceId]);
 
@@ -592,16 +592,17 @@ export default function App() {
       )}
 
       {/* ── Suggest fixed template when fijo expense has no match ── */}
-      {suggestFixedTemplate && (
+      {suggestQueue[0] && (
         <FixedTemplateFromExpenseModal
-          expense={suggestFixedTemplate}
+          key={suggestQueue[0].id}
+          expense={suggestQueue[0]}
           members={currentSpace.members}
           onSave={(tpl) => {
             const saved = addTemplate(tpl);
-            setSuggestFixedTemplate(null);
+            setSuggestQueue((q) => q.slice(1));
             setReminderTemplate(saved);
           }}
-          onClose={() => setSuggestFixedTemplate(null)}
+          onClose={() => setSuggestQueue((q) => q.slice(1))}
         />
       )}
     </div>

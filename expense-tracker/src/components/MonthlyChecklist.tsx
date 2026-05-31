@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { CheckCircle2, Circle, MinusCircle, ChevronDown, AlertTriangle, Link } from 'lucide-react';
+import { CheckCircle2, Circle, MinusCircle, ChevronDown, AlertTriangle, Link, Calendar, Clock } from 'lucide-react';
 import type { FixedExpenseTemplate, MonthlyCheck, CheckStatus } from '../types/fixedExpense';
 import type { Expense } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
-import { isDueInMonth } from '../utils/fixedStorage';
+import { isDueInMonth, getNextDueDate } from '../utils/fixedStorage';
 import type { SpaceMember } from '../types/space';
 
 interface Props {
@@ -17,7 +17,6 @@ interface Props {
   onSkip: (checkId: string, notes?: string) => void;
   onReset: (checkId: string) => void;
   onRegisterNow: (template: FixedExpenseTemplate) => void;
-  // members is accepted for API compatibility but not used internally
   members?: SpaceMember[];
 }
 
@@ -77,7 +76,6 @@ function CheckItem({
               )}
             </div>
 
-            {/* Linked expense */}
             {expense && (
               <div className="flex items-center gap-1 mt-1">
                 <Link size={11} className="text-green-600" />
@@ -96,7 +94,6 @@ function CheckItem({
           </button>
         </div>
 
-        {/* Actions */}
         {check.status === 'pendiente' && !showSkipInput && (
           <div className="flex gap-2 mt-2">
             <button
@@ -149,7 +146,6 @@ function CheckItem({
         )}
       </div>
 
-      {/* Expanded details */}
       {expanded && (
         <div className="border-t border-gray-100 px-4 py-2 bg-white/60 text-xs text-gray-500 space-y-0.5">
           {template.bank && <p>🏦 {template.bank}</p>}
@@ -167,6 +163,111 @@ function CheckItem({
   );
 }
 
+function UpcomingItem({
+  tpl, dueDate, daysUntil, check, onConfirmManual, onSkip, onReset, onRegisterNow,
+}: {
+  tpl: FixedExpenseTemplate;
+  dueDate: Date;
+  daysUntil: number;
+  check: MonthlyCheck | null;
+  onConfirmManual: (checkId: string) => void;
+  onSkip: (checkId: string, notes?: string) => void;
+  onReset: (checkId: string) => void;
+  onRegisterNow: (t: FixedExpenseTemplate) => void;
+}) {
+  const [showSkipInput, setShowSkipInput] = useState(false);
+  const [skipNote, setSkipNote] = useState('');
+
+  const status = check?.status ?? 'pendiente';
+  const cfg = STATUS_CONFIG[status];
+
+  const urgencyLabel =
+    daysUntil < 0  ? `Hace ${-daysUntil} días` :
+    daysUntil === 0 ? '¡Hoy!' :
+    daysUntil === 1 ? 'Mañana' :
+    `En ${daysUntil} días`;
+
+  const urgencyColor =
+    daysUntil <= 0 ? 'text-red-600 font-bold' :
+    daysUntil <= 3 ? 'text-orange-600 font-semibold' :
+    daysUntil <= 7 ? 'text-amber-600 font-medium' :
+    'text-gray-500';
+
+  return (
+    <div className={`border rounded-xl overflow-hidden ${cfg.bg}`}>
+      <div className="p-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex-shrink-0">{cfg.icon}</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-semibold text-gray-900 text-sm truncate">{tpl.concept}</p>
+              <span className={`text-xs flex-shrink-0 ${urgencyColor}`}>{urgencyLabel}</span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-sm font-bold text-gray-800">
+                ${tpl.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+              </span>
+              <span className="text-xs text-gray-400">
+                {(CATEGORIES[tpl.category] as string).replace(/^[^ ]+ /, '')}
+              </span>
+              <span className="text-xs text-gray-400">
+                📅 {format(dueDate, "d 'de' MMMM", { locale: es })}
+              </span>
+              {tpl.paidBy && <span className="text-xs text-gray-400">{tpl.paidBy}</span>}
+            </div>
+          </div>
+        </div>
+
+        {status === 'pendiente' && !showSkipInput && check && (
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => onRegisterNow(tpl)}
+              className="flex-1 py-1.5 bg-teal-700 text-white rounded-lg text-xs font-semibold hover:bg-teal-800 transition-all">
+              ✏️ Registrar
+            </button>
+            <button onClick={() => onConfirmManual(check.id)}
+              className="flex-1 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 transition-all">
+              ✅ Ya pagué
+            </button>
+            <button onClick={() => setShowSkipInput(true)}
+              className="px-3 py-1.5 border border-gray-200 text-gray-500 rounded-lg text-xs font-medium">
+              Omitir
+            </button>
+          </div>
+        )}
+
+        {status === 'pendiente' && !check && (
+          <div className="mt-2 py-1 text-xs text-center text-gray-400 animate-pulse">Preparando…</div>
+        )}
+
+        {showSkipInput && (
+          <div className="mt-2 space-y-2">
+            <input type="text" value={skipNote} onChange={(e) => setSkipNote(e.target.value)}
+              placeholder="Razón (opcional)..."
+              className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-300" />
+            <div className="flex gap-2">
+              <button onClick={() => { if (check) onSkip(check.id, skipNote); setShowSkipInput(false); }}
+                className="flex-1 py-1.5 bg-gray-500 text-white rounded-lg text-xs font-semibold">
+                Confirmar omisión
+              </button>
+              <button onClick={() => setShowSkipInput(false)}
+                className="px-3 py-1.5 border border-gray-200 text-gray-500 rounded-lg text-xs">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {status !== 'pendiente' && check && (
+          <button onClick={() => onReset(check.id)}
+            className="mt-2 w-full py-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+            ↺ Reabrir
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function MonthlyChecklist({
   templates, checks, expenses, onEnsureChecks,
   onConfirm, onSkip, onReset, onRegisterNow,
@@ -174,17 +275,47 @@ export function MonthlyChecklist({
 }: Props) {
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
   const [filter, setFilter] = useState<'all' | CheckStatus>('all');
+  const [viewMode, setViewMode] = useState<'month' | 'upcoming'>('month');
+  const [upcomingDays, setUpcomingDays] = useState(30);
 
-  // Ensure checks exist for this month whenever month or templates change
+  // Ensure checks for month view
   useEffect(() => {
-    onEnsureChecks(selectedMonth);
-  }, [selectedMonth, templates.length]);
+    if (viewMode === 'month') onEnsureChecks(selectedMonth);
+  }, [selectedMonth, templates.length, viewMode]);
 
+  // ── Upcoming view ──────────────────────────────────────────────
+  const upcomingItems = useMemo(() => {
+    if (viewMode !== 'upcoming') return [];
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const cutoff = new Date(now.getTime() + upcomingDays * 86_400_000);
+    return templates
+      .filter((t) => t.active)
+      .flatMap((tpl) => {
+        const dueDate = getNextDueDate(tpl, now);
+        if (!dueDate || dueDate > cutoff) return [];
+        const dueMonth = format(dueDate, 'yyyy-MM');
+        const check = checks.find((c) => c.month === dueMonth && c.templateId === tpl.id) ?? null;
+        const daysUntil = Math.ceil((dueDate.getTime() - now.getTime()) / 86_400_000);
+        return [{ tpl, dueDate, dueMonth, check, daysUntil }];
+      })
+      .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+  }, [templates, checks, viewMode, upcomingDays]);
+
+  // Ensure checks exist for all months that appear in the upcoming view
+  const upcomingMonthsKey = useMemo(
+    () => [...new Set(upcomingItems.map((i) => i.dueMonth))].sort().join(','),
+    [upcomingItems]
+  );
+  useEffect(() => {
+    if (!upcomingMonthsKey) return;
+    upcomingMonthsKey.split(',').forEach((m) => onEnsureChecks(m));
+  }, [upcomingMonthsKey]);
+
+  // ── Month view ─────────────────────────────────────────────────
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
-    // Add months where we have checks
     checks.forEach((c) => months.add(c.month));
-    // Add months where templates are due (current and next 2)
     const now = new Date();
     for (let i = -1; i <= 2; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
@@ -198,7 +329,6 @@ export function MonthlyChecklist({
     [checks, selectedMonth]
   );
 
-  // Items = checks + any active templates due this month with no check yet
   const items = useMemo(() => {
     const activeTemplates = templates.filter((t) => t.active && isDueInMonth(t, selectedMonth));
     return activeTemplates
@@ -218,9 +348,9 @@ export function MonthlyChecklist({
     omitido:    items.filter(({ check }) => check.status === 'omitido').length,
   }), [items]);
 
-  const totalExpected   = useMemo(() => items.reduce((s, { tpl }) => s + tpl.expectedAmount, 0), [items]);
-  const totalConfirmed  = useMemo(() => items.filter(({ check }) => check.status === 'confirmado').reduce((s, { check }) => s + (check.actualAmount ?? 0), 0), [items]);
-  const completionPct   = stats.total > 0 ? Math.round(((stats.confirmado + stats.omitido) / stats.total) * 100) : 0;
+  const totalExpected  = useMemo(() => items.reduce((s, { tpl }) => s + tpl.expectedAmount, 0), [items]);
+  const totalConfirmed = useMemo(() => items.filter(({ check }) => check.status === 'confirmado').reduce((s, { check }) => s + (check.actualAmount ?? 0), 0), [items]);
+  const completionPct  = stats.total > 0 ? Math.round(((stats.confirmado + stats.omitido) / stats.total) * 100) : 0;
 
   const monthLabel = useMemo(() => {
     const [y, m] = selectedMonth.split('-');
@@ -228,17 +358,15 @@ export function MonthlyChecklist({
       .replace(/^\w/, (c) => c.toUpperCase());
   }, [selectedMonth]);
 
-  // Manual confirm: link to the most recent expense of matching category
-  const handleConfirmManual = (checkId: string) => {
+  const handleConfirmManual = (checkId: string, month?: string) => {
     const check = checks.find((c) => c.id === checkId);
     if (!check) return;
     const tpl = templates.find((t) => t.id === check.templateId);
     if (!tpl) return;
-    // Find best matching expense this month
+    const targetMonth = month ?? selectedMonth;
     const candidate = expenses
-      .filter((e) => e.date.startsWith(selectedMonth) && e.category === tpl.category && (e.transactionType ?? 'gasto') === 'gasto')
+      .filter((e) => e.date.startsWith(targetMonth) && e.category === tpl.category && (e.transactionType ?? 'gasto') === 'gasto')
       .sort((a, b) => Math.abs(a.amount - tpl.expectedAmount) - Math.abs(b.amount - tpl.expectedAmount))[0];
-
     if (candidate) {
       onConfirm(checkId, candidate.id, candidate.amount);
     } else {
@@ -256,113 +384,210 @@ export function MonthlyChecklist({
     );
   }
 
+  // Pending count for upcoming badge (always compute from 30d window regardless of view)
+  const upcomingPendingCount = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const cutoff = new Date(now.getTime() + 30 * 86_400_000);
+    return templates.filter((t) => t.active).filter((tpl) => {
+      const d = getNextDueDate(tpl, now);
+      return d && d <= cutoff;
+    }).length;
+  }, [templates]);
+
   return (
     <div className="space-y-4">
-      {/* Month selector */}
-      <select
-        value={selectedMonth}
-        onChange={(e) => setSelectedMonth(e.target.value)}
-        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
-      >
-        {availableMonths.map((m) => {
-          const [y, mo] = m.split('-');
-          const d = new Date(parseInt(y), parseInt(mo) - 1, 1);
-          return (
-            <option key={m} value={m}>
-              {format(d, 'MMMM yyyy', { locale: es }).replace(/^\w/, (c) => c.toUpperCase())}
-            </option>
-          );
-        })}
-      </select>
+      {/* View mode toggle */}
+      <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1">
+        <button onClick={() => setViewMode('month')}
+          className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            viewMode === 'month' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400'
+          }`}>
+          <Calendar size={12} />
+          Por mes
+        </button>
+        <button onClick={() => setViewMode('upcoming')}
+          className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            viewMode === 'upcoming' ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400'
+          }`}>
+          <Clock size={12} />
+          Próximos pagos
+          {upcomingPendingCount > 0 && (
+            <span className="bg-amber-400 text-white text-[10px] font-bold rounded-full px-1.5 leading-5 ml-0.5">
+              {upcomingPendingCount}
+            </span>
+          )}
+        </button>
+      </div>
 
-      {/* Summary banner */}
-      <div className={`rounded-2xl p-4 ${
-        stats.pendiente > 0
-          ? 'bg-amber-50 border border-amber-200'
-          : 'bg-green-50 border border-green-200'
-      }`}>
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <p className="font-bold text-gray-800">{monthLabel}</p>
-            <p className="text-xs text-gray-500">
-              {stats.confirmado}/{stats.total} confirmados · {stats.pendiente} pendientes
-              {stats.omitido > 0 && ` · ${stats.omitido} omitidos`}
-            </p>
+      {/* ── Month view ── */}
+      {viewMode === 'month' && (
+        <>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+          >
+            {availableMonths.map((m) => {
+              const [y, mo] = m.split('-');
+              const d = new Date(parseInt(y), parseInt(mo) - 1, 1);
+              return (
+                <option key={m} value={m}>
+                  {format(d, 'MMMM yyyy', { locale: es }).replace(/^\w/, (c) => c.toUpperCase())}
+                </option>
+              );
+            })}
+          </select>
+
+          <div className={`rounded-2xl p-4 ${
+            stats.pendiente > 0
+              ? 'bg-amber-50 border border-amber-200'
+              : 'bg-green-50 border border-green-200'
+          }`}>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="font-bold text-gray-800">{monthLabel}</p>
+                <p className="text-xs text-gray-500">
+                  {stats.confirmado}/{stats.total} confirmados · {stats.pendiente} pendientes
+                  {stats.omitido > 0 && ` · ${stats.omitido} omitidos`}
+                </p>
+              </div>
+              {stats.pendiente > 0 && (
+                <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                  <AlertTriangle size={14} />
+                  <span className="text-xs font-bold">{stats.pendiente}</span>
+                </div>
+              )}
+              {stats.pendiente === 0 && <span className="text-2xl">🎉</span>}
+            </div>
+
+            <div className="h-2.5 bg-white/60 rounded-full overflow-hidden">
+              <div className="h-full flex">
+                <div className="bg-green-500 transition-all duration-500" style={{ width: `${stats.total > 0 ? (stats.confirmado / stats.total) * 100 : 0}%` }} />
+                <div className="bg-gray-300 transition-all duration-500" style={{ width: `${stats.total > 0 ? (stats.omitido / stats.total) * 100 : 0}%` }} />
+              </div>
+            </div>
+            <p className="text-right text-xs mt-1 text-gray-500">{completionPct}% completado</p>
+
+            <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-white/50">
+              <div className="text-center">
+                <p className="text-xs text-gray-400">Esperado</p>
+                <p className="font-bold text-gray-800 text-sm">
+                  ${totalExpected.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs text-gray-400">Confirmado</p>
+                <p className="font-bold text-green-700 text-sm">
+                  ${totalConfirmed.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                </p>
+              </div>
+            </div>
           </div>
-          {stats.pendiente > 0 && (
-            <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
-              <AlertTriangle size={14} />
-              <span className="text-xs font-bold">{stats.pendiente}</span>
+
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+            {([
+              { id: 'all',        label: `Todos (${stats.total})` },
+              { id: 'pendiente',  label: `⏳ ${stats.pendiente}` },
+              { id: 'confirmado', label: `✅ ${stats.confirmado}` },
+              { id: 'omitido',    label: `— ${stats.omitido}` },
+            ] as { id: typeof filter; label: string }[]).map((f) => (
+              <button key={f.id} onClick={() => setFilter(f.id)}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  filter === f.id ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400'
+                }`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No hay gastos en esta categoría</div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map(({ tpl, check }) => (
+                <CheckItem
+                  key={check.id}
+                  check={check}
+                  template={tpl}
+                  expense={check.expenseId && check.expenseId !== 'manual'
+                    ? expenses.find((e) => e.id === check.expenseId)
+                    : undefined}
+                  onConfirmManual={handleConfirmManual}
+                  onSkip={onSkip}
+                  onReset={onReset}
+                  onRegisterNow={onRegisterNow}
+                />
+              ))}
             </div>
           )}
-          {stats.pendiente === 0 && (
-            <span className="text-2xl">🎉</span>
+        </>
+      )}
+
+      {/* ── Upcoming view ── */}
+      {viewMode === 'upcoming' && (
+        <>
+          {/* Day range selector */}
+          <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1">
+            {[15, 30, 60, 90].map((d) => (
+              <button key={d} onClick={() => setUpcomingDays(d)}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  upcomingDays === d ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400'
+                }`}>
+                {d}d
+              </button>
+            ))}
+          </div>
+
+          {/* Summary */}
+          {upcomingItems.length > 0 && (() => {
+            const pending = upcomingItems.filter((i) => !i.check || i.check.status === 'pendiente').length;
+            const total$ = upcomingItems.reduce((s, i) => s + i.tpl.expectedAmount, 0);
+            return (
+              <div className={`rounded-2xl p-4 ${pending > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-green-50 border border-green-200'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">Próximos {upcomingDays} días</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {pending} pendiente{pending !== 1 ? 's' : ''} · ${total$.toLocaleString('es-MX', { minimumFractionDigits: 0 })} total
+                    </p>
+                  </div>
+                  {pending > 0
+                    ? <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full">
+                        <AlertTriangle size={14} />
+                        <span className="text-xs font-bold">{pending}</span>
+                      </div>
+                    : <span className="text-2xl">🎉</span>
+                  }
+                </div>
+              </div>
+            );
+          })()}
+
+          {upcomingItems.length === 0 ? (
+            <div className="text-center py-10 text-gray-400">
+              <p className="text-4xl mb-2">✅</p>
+              <p className="font-medium text-gray-600">Sin pagos en {upcomingDays} días</p>
+              <p className="text-xs mt-1">Prueba ampliar el rango de días</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {upcomingItems.map(({ tpl, dueDate, dueMonth, check, daysUntil }) => (
+                <UpcomingItem
+                  key={`${tpl.id}-${dueMonth}`}
+                  tpl={tpl}
+                  dueDate={dueDate}
+                  daysUntil={daysUntil}
+                  check={check}
+                  onConfirmManual={(checkId) => handleConfirmManual(checkId, dueMonth)}
+                  onSkip={onSkip}
+                  onReset={onReset}
+                  onRegisterNow={onRegisterNow}
+                />
+              ))}
+            </div>
           )}
-        </div>
-
-        {/* Progress bar */}
-        <div className="h-2.5 bg-white/60 rounded-full overflow-hidden">
-          <div className="h-full flex">
-            <div className="bg-green-500 transition-all duration-500" style={{ width: `${stats.total > 0 ? (stats.confirmado / stats.total) * 100 : 0}%` }} />
-            <div className="bg-gray-300 transition-all duration-500" style={{ width: `${stats.total > 0 ? (stats.omitido / stats.total) * 100 : 0}%` }} />
-          </div>
-        </div>
-        <p className="text-right text-xs mt-1 text-gray-500">{completionPct}% completado</p>
-
-        {/* Money totals */}
-        <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-white/50">
-          <div className="text-center">
-            <p className="text-xs text-gray-400">Esperado</p>
-            <p className="font-bold text-gray-800 text-sm">
-              ${totalExpected.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-xs text-gray-400">Confirmado</p>
-            <p className="font-bold text-green-700 text-sm">
-              ${totalConfirmed.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
-        {([
-          { id: 'all',       label: `Todos (${stats.total})` },
-          { id: 'pendiente', label: `⏳ ${stats.pendiente}` },
-          { id: 'confirmado',label: `✅ ${stats.confirmado}` },
-          { id: 'omitido',   label: `— ${stats.omitido}` },
-        ] as { id: typeof filter; label: string }[]).map((f) => (
-          <button key={f.id} onClick={() => setFilter(f.id)}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              filter === f.id ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400'
-            }`}>
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Checklist */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-8 text-gray-400 text-sm">No hay gastos en esta categoría</div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(({ tpl, check }) => (
-            <CheckItem
-              key={check.id}
-              check={check}
-              template={tpl}
-              expense={check.expenseId && check.expenseId !== 'manual'
-                ? expenses.find((e) => e.id === check.expenseId)
-                : undefined}
-              onConfirmManual={handleConfirmManual}
-              onSkip={onSkip}
-              onReset={onReset}
-              onRegisterNow={onRegisterNow}
-            />
-          ))}
-        </div>
+        </>
       )}
     </div>
   );

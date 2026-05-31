@@ -25,6 +25,36 @@ export function generateFixedId(): string {
   return `fix_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+// Returns the next calendar date when a template payment is due, starting from fromDate.
+export function getNextDueDate(template: FixedExpenseTemplate, fromDate: Date = new Date()): Date | null {
+  const today = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+
+  if (template.frequency === 'diario') {
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  }
+
+  if (template.frequency === 'semanal') {
+    // dayOfWeek: 1=Mon … 7=Sun → JS getDay(): 0=Sun, 1=Mon … 6=Sat
+    const targetDow = (template.dayOfWeek ?? 1) % 7;
+    const currentDow = today.getDay();
+    let daysAhead = targetDow - currentDow;
+    if (daysAhead <= 0) daysAhead += 7;
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + daysAhead);
+  }
+
+  // Month-based frequencies: mensual, quincenal, bimestral, trimestral, semestral, anual
+  const dom = template.dayOfMonth ?? 1;
+  for (let i = 0; i <= 24; i++) {
+    const y = today.getFullYear() + Math.floor((today.getMonth() + i) / 12);
+    const m = (today.getMonth() + i) % 12;
+    const yearMonth = `${y}-${String(m + 1).padStart(2, '0')}`;
+    if (!isDueInMonth(template, yearMonth)) continue;
+    const candidate = new Date(y, m, dom);
+    if (candidate >= today) return candidate;
+  }
+  return null;
+}
+
 // Returns true if a template with given frequency is due in month YYYY-MM
 export function isDueInMonth(template: FixedExpenseTemplate, yearMonth: string): boolean {
   const [ty, tm] = template.createdAt.slice(0, 7).split('-').map(Number);

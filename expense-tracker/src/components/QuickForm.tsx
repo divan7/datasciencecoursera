@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { Users } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
@@ -57,6 +58,10 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
   });
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [splitParticipants, setSplitParticipants] = useState<string[]>([]);
+  const [splitTotal, setSplitTotal] = useState('');
+  const [customSplitName, setCustomSplitName] = useState('');
   const [saved, setSaved] = useState(false);
 
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
@@ -115,12 +120,17 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.amount || !form.concept) return;
+    const isSplit = !isIncome && splitEnabled && parseFloat(splitTotal) > 0;
+    const rawAmount = isSplit ? splitTotal : form.amount;
+    if (!rawAmount || !form.concept) return;
+
+    const totalAmt = parseFloat(rawAmount);
+    const myShare = isSplit ? totalAmt / (splitParticipants.length + 1) : totalAmt;
 
     onSave({
       transactionType,
       date: form.date,
-      amount: parseFloat(form.amount),
+      amount: myShare,
       currency: 'MXN',
       paidBy: form.paidBy as User,
       concept: form.concept,
@@ -135,9 +145,11 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
       isReimbursable: form.isReimbursable,
       isTaxDeductible: form.isTaxDeductible,
       invoiceRequested: form.invoiceRequested,
-      sharedExpense: form.sharedExpense,
+      sharedExpense: isSplit || form.sharedExpense,
       notes: form.notes || undefined,
       receiptImageBase64: prefill?.receiptImageBase64,
+      totalAmount: isSplit ? totalAmt : undefined,
+      splitWith: isSplit && splitParticipants.length > 0 ? splitParticipants : undefined,
     });
 
     setSaved(true);
@@ -150,6 +162,10 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
       isReimbursable: false, isTaxDeductible: false, invoiceRequested: false,
       sharedExpense: false, paidBy: currentUser, notes: '',
     });
+    setSplitEnabled(false);
+    setSplitParticipants([]);
+    setSplitTotal('');
+    setCustomSplitName('');
     setShowAdvanced(false);
   };
 
@@ -465,6 +481,133 @@ export function QuickForm({ currentUser, onSave, prefill, members, fixedSuggesti
             </div>
           )}
         </>
+      )}
+
+      {/* Split section */}
+      {!isIncome && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setSplitEnabled((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Users size={16} className={splitEnabled ? 'text-teal-600' : 'text-gray-400'} />
+              <span className={`text-sm font-semibold ${splitEnabled ? 'text-teal-700' : 'text-gray-500'}`}>
+                Dividir este gasto
+              </span>
+            </div>
+            <div className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${splitEnabled ? 'bg-teal-600' : 'bg-gray-200'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${splitEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+
+          {splitEnabled && (
+            <div className="px-4 pb-4 space-y-3 border-t border-gray-100 bg-gray-50">
+              <div className="pt-3">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
+                  Total de la cuenta
+                </label>
+                <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-3 py-2.5">
+                  <span className="text-gray-400 text-lg">$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value={splitTotal}
+                    onChange={(e) => setSplitTotal(e.target.value)}
+                    placeholder="0.00"
+                    className="flex-1 text-xl font-bold bg-transparent border-none outline-none text-gray-800 placeholder-gray-300"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+                  Dividir con
+                </label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {members.map((m) => {
+                    const isAdded = splitParticipants.includes(m.name);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() =>
+                          setSplitParticipants((p) =>
+                            isAdded ? p.filter((n) => n !== m.name) : [...p, m.name]
+                          )
+                        }
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                          isAdded ? 'text-white border-transparent' : 'border-gray-200 text-gray-500 bg-white'
+                        }`}
+                        style={isAdded ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
+                      >
+                        {isAdded ? '✓ ' : '+ '}{m.name}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customSplitName}
+                    onChange={(e) => setCustomSplitName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const name = customSplitName.trim();
+                        if (name && !splitParticipants.includes(name)) {
+                          setSplitParticipants((p) => [...p, name]);
+                        }
+                        setCustomSplitName('');
+                      }
+                    }}
+                    placeholder="Otro nombre..."
+                    className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = customSplitName.trim();
+                      if (name && !splitParticipants.includes(name)) setSplitParticipants((p) => [...p, name]);
+                      setCustomSplitName('');
+                    }}
+                    className="px-3 py-1.5 bg-teal-100 text-teal-700 rounded-lg text-xs font-semibold"
+                  >
+                    +
+                  </button>
+                </div>
+
+                {splitParticipants.filter((n) => !members.some((m) => m.name === n)).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {splitParticipants.filter((n) => !members.some((m) => m.name === n)).map((name) => (
+                      <span key={name} className="inline-flex items-center gap-1 bg-white border border-gray-200 text-gray-600 px-2.5 py-1 rounded-full text-xs font-medium">
+                        {name}
+                        <button type="button" onClick={() => setSplitParticipants((p) => p.filter((n2) => n2 !== name))}
+                          className="text-gray-400 hover:text-red-400">✕</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {splitTotal && parseFloat(splitTotal) > 0 && (
+                <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 text-center">
+                  <p className="text-xs text-teal-600 mb-0.5">
+                    Tu parte ({splitParticipants.length + 1} persona{splitParticipants.length !== 0 ? 's' : ''})
+                  </p>
+                  <p className="text-2xl font-extrabold text-teal-800">
+                    ${(parseFloat(splitTotal) / (splitParticipants.length + 1)).toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-xs text-teal-500 mt-0.5">
+                    de ${parseFloat(splitTotal).toLocaleString('es-MX', { minimumFractionDigits: 0 })} total
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {isIncome && (

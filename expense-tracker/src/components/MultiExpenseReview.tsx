@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Trash2, CheckCircle2, Save, MessageSquare } from 'lucide-react';
+import { Trash2, CheckCircle2, Save, MessageSquare, Users } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Expense, Category, PaymentMethod, ExpenseType } from '../types/expense';
+import type { Expense, Category, PaymentMethod, ExpenseType, Frequency } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 import type { AppSpace } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
+import { BillSplitter } from './BillSplitter';
 
 export interface ExpenseWithSpace {
   expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>;
@@ -33,6 +34,7 @@ interface RowState {
   showNotes: boolean;
   removed: boolean;
   expenseType: ExpenseType;
+  frequency: Frequency;
 }
 
 export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser, onSaveAll, onCancel }: Props) {
@@ -57,10 +59,12 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
       // Respect expenseType from AI (text parser may detect 'fijo'); photos always
       // arrive as 'variable' from the receipt prompt, so this is safe for both flows.
       expenseType:   ((item.expenseType as ExpenseType | undefined) ?? 'variable'),
+      frequency:     (item.frequency as Frequency | undefined) ?? 'mensual',
     }))
   );
 
   const [ticketNotes, setTicketNotes] = useState('');
+  const [showBillSplitter, setShowBillSplitter] = useState(false);
 
   const setRow = (i: number, patch: Partial<RowState>) =>
     setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
@@ -92,6 +96,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         receiptImageBase64: idx === 0 ? receiptImage : undefined,
         transactionType:    'gasto' as const,
         expenseType:        r.expenseType,
+        frequency:          r.expenseType === 'fijo' ? r.frequency : undefined,
         currency:           'MXN',
       },
     }));
@@ -312,12 +317,30 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           Guardar {activeRows.length > 1 ? `los ${activeRows.length} gastos` : 'gasto'}
         </button>
         <button
-          onClick={onCancel}
-          className="px-4 py-3 rounded-2xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50 transition-all"
+          type="button"
+          onClick={() => setShowBillSplitter(true)}
+          disabled={!canSave}
+          className="px-4 py-3 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700 text-sm font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 active:scale-95 flex-shrink-0"
+          title="Dividir cuenta entre participantes"
         >
-          Cancelar
+          <Users size={16} />
+          Dividir
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-3 py-3 rounded-2xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50 transition-all"
+        >
+          ✕
         </button>
       </div>
+
+      {showBillSplitter && (
+        <BillSplitter
+          items={activeRows.map((r) => ({ concept: r.concept, amount: parseFloat(r.amount) || 0 }))}
+          members={currentSpaceMembers(activeRows[0]?.spaceId ?? defaultSpaceId)}
+          onClose={() => setShowBillSplitter(false)}
+        />
+      )}
     </div>
   );
 }

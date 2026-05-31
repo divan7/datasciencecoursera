@@ -39,10 +39,20 @@ El usuario describe UNA o VARIAS transacciones (gastos o ingresos) en su mensaje
 Devuelve ÚNICAMENTE un JSON array válido — siempre array, aunque sea un solo elemento.
 Sin texto adicional, sin comentarios, sin markdown. Solo el JSON array.
 
-REGLA IMPORTANTE — gastos fijos:
-Si el usuario menciona explícitamente la palabra "fijo" o "gasto fijo" para alguna transacción,
-establece expenseType:"fijo" para ese item. Si además menciona una frecuencia (mensual, semanal,
-quincenal, anual, etc.), inclúyela en el campo frequency. Si no la menciona, usa "mensual" por defecto.
+REGLAS — expenseType y frequency:
+1. Si el texto menciona "fijo", "fija", "gasto fijo", "pago fijo", o una frecuencia de pago → expenseType:"fijo". Si no → expenseType:"variable".
+2. Detecta la frecuencia EXACTA según el texto (no asumas mensual si hay otra indicación):
+   - "diario","cada día","todos los días" → "diario"
+   - "semanal","cada semana","todas las semanas" → "semanal"
+   - "quincenal","cada 15 días","dos veces al mes","cada quincena" → "quincenal"
+   - "mensual","cada mes","todos los meses","al mes" → "mensual"
+   - "bimestral","cada 2 meses","cada dos meses","bimestralmente" → "bimestral"
+   - "trimestral","cada 3 meses","cada trimestre","cada tres meses" → "trimestral"
+   - "semestral","cada 6 meses","cada semestre","dos veces al año" → "semestral"
+   - "anual","cada año","anualmente","una vez al año" → "anual"
+3. Si el texto dice "fijo" sin frecuencia, infiere del contexto: servicios públicos (luz, agua, gas, internet, teléfono) → "mensual"; suscripciones a servicios → "mensual"; seguros → "mensual" o "anual" según contexto.
+4. Extrae el día de pago si se menciona (ej "el día 5 de cada mes", "los viernes") → dayOfMonth o dayOfWeek.
+5. Extrae banco y últimos 4 dígitos si se mencionan → bank, cardLast4.
 
 ${FIELDS}
 

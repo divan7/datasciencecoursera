@@ -147,11 +147,23 @@ export default function App() {
           }
         }
       } else {
-        // This user has no spaces in the cloud → start clean so the welcome /
-        // join flow appears. Never inherit a previous user's local cache.
-        clearLocalSpaceData();
-        setSpaces([]);
-        setSession(null);
+        // Cloud returned empty. If this is the same user and they have local
+        // data, preserve it and re-sync — don't wipe on transient cloud errors.
+        if (cachedUid === user.id) {
+          const local = loadSpaces();
+          if (local.length > 0) {
+            setSpaces(local);
+            for (const s of local) {
+              syncSpaceToSupabase(s, user.id).catch(console.error);
+            }
+          }
+          // If no local data either, onboarding will show naturally
+        } else {
+          // Different user: cache was already cleared above; start clean
+          clearLocalSpaceData();
+          setSpaces([]);
+          setSession(null);
+        }
       }
       setCacheOwner(user.id);
       setSpacesLoaded(true);
@@ -171,12 +183,13 @@ export default function App() {
     setSpaces([space]);
     setSession(newSession);
     saveSpaces([space]);
+    // Set cache owner immediately so a sync failure doesn't cause data loss on
+    // next login (null cachedUid would trigger clearLocalSpaceData).
     if (isSupabaseConfigured && user) {
+      setCacheOwner(user.id);
       // Awaiting matters: if the space + owner membership don't reach Supabase,
       // every expense/fixed write will silently fail RLS and live only locally.
-      syncSpaceToSupabase(space, user.id).then(() => {
-        setCacheOwner(user.id);
-      }).catch((err) => {
+      syncSpaceToSupabase(space, user.id).catch((err) => {
         const msg = err instanceof Error ? err.message : String(err);
         console.error('Error al sincronizar el espacio con la nube:', msg);
         alert(`No se pudo guardar tu lista en la nube.\n\nDetalle: ${msg}\n\nVerifica tu conexión e intenta de nuevo.`);

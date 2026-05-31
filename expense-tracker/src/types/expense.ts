@@ -61,6 +61,8 @@ export interface Expense {
   isTaxDeductible?: boolean;       // deducible de impuestos
   invoiceRequested?: boolean;      // se solicitó factura
   sharedExpense?: boolean;         // gasto compartido entre ambos
+  totalAmount?: number;            // full bill before splitting (your share is in amount)
+  splitWith?: string[];            // other participant names (not including current user)
   notes?: string;
   tags?: string[];
   receiptImageBase64?: string;

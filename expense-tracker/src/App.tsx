@@ -249,6 +249,22 @@ export default function App() {
     [addExpense, tryAutoMatch]
   );
 
+  const handleSaveExpenseMultiple = useCallback(
+    (items: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+      const unmatchedFijos: Expense[] = [];
+      for (const data of items) {
+        const saved = addExpense(data);
+        const month = data.date.slice(0, 7);
+        const matched = tryAutoMatch(saved, month);
+        if (!matched && data.expenseType === 'fijo') unmatchedFijos.push(saved);
+      }
+      if (unmatchedFijos.length > 0) setSuggestQueue((q) => [...q, ...unmatchedFijos]);
+      setPrefillTemplate(null);
+      setActiveTab('list');
+    },
+    [addExpense, tryAutoMatch]
+  );
+
   const handleRegisterFromTemplate = useCallback((tpl: FixedExpenseTemplate) => {
     setPrefillTemplate(tpl);
     setInputMode('form');
@@ -471,6 +487,7 @@ export default function App() {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               {inputMode === 'form' && (
                 <QuickForm currentUser={currentUser} onSave={handleSaveExpense}
+                  onSaveMultiple={handleSaveExpenseMultiple}
                   prefill={templatePrefill}
                   members={currentSpace.members}
                   fixedSuggestions={templates}

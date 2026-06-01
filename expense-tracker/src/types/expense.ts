@@ -63,6 +63,8 @@ export interface Expense {
   sharedExpense?: boolean;         // gasto compartido entre ambos
   totalAmount?: number;            // full bill before splitting (your share is in amount)
   splitWith?: string[];            // other participant names (not including current user)
+  invoiceStatus?: 'pending' | 'invoiced' | 'not_applicable' | 'skipped';
+  fiscalNotes?: string;            // AI/rule-generated deductibility note
   notes?: string;
   tags?: string[];
   receiptImageBase64?: string;

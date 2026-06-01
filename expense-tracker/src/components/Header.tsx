@@ -1,7 +1,7 @@
-import { List, BarChart3, PlusCircle, Settings, LayoutDashboard, ClipboardCheck, ChevronDown, Shield } from 'lucide-react';
+import { List, BarChart3, PlusCircle, Settings, LayoutDashboard, ClipboardCheck, ChevronDown, Shield, Receipt } from 'lucide-react';
 import type { SpacePlan } from '../types/space';
 
-type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings' | 'admin';
+type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings' | 'fiscal' | 'admin';
 
 interface HeaderProps {
   activeTab: Tab;
@@ -46,6 +46,7 @@ export function Header({
     { id: 'dashboard', icon: <LayoutDashboard size={14} />, label: 'Dashboard' },
     { id: 'checklist', icon: <ClipboardCheck size={14} />,  label: 'Fijos', badge: pendingFixed },
     { id: 'report',    icon: <BarChart3 size={14} />,       label: 'Reporte' },
+    { id: 'fiscal',    icon: <Receipt size={14} />,         label: 'Fiscal' },
     { id: 'settings',  icon: <Settings size={14} />,        label: 'Config' },
     ...(isAdmin ? [{ id: 'admin' as Tab, icon: <Shield size={14} />, label: 'Admin' }] : []),
   ];

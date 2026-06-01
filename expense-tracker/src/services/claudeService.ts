@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Expense } from '../types/expense';
+import type { FiscalProfile, FiscalAnalysis } from '../types/fiscal';
+import { REGIMENES_FISCALES, CFDI_USES } from '../types/fiscal';
 
 const FIELDS = `Campos disponibles (todos en español):
 - transactionType: "gasto" o "ingreso" — OBLIGATORIO. Salarios, ventas, reembolsos, etc. son "ingreso".
@@ -197,6 +199,94 @@ export async function parseReceiptItems(
   return {
     items: Array.isArray(parsed.items) ? parsed.items : [],
     detectedTotal: typeof parsed.detectedTotal === 'number' ? parsed.detectedTotal : null,
+  };
+}
+
+/**
+ * Analyzes a ticket/receipt image for fiscal deductibility.
+ * If the image is an actual CFDI (factura), validates its key fields.
+ */
+export async function analyzeTicketFiscal(
+  base64Image: string,
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+  apiKey: string,
+  profile: FiscalProfile,
+  expenses: Array<Pick<Expense, 'concept' | 'amount' | 'category'>>,
+): Promise<FiscalAnalysis> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+
+  const regimeLabel = profile.regimenFiscal
+    ? `${profile.regimenFiscal} — ${REGIMENES_FISCALES[profile.regimenFiscal]}`
+    : 'No especificado';
+
+  const cfdiUsesJson = JSON.stringify(CFDI_USES);
+  const expensesJson = JSON.stringify(expenses);
+
+  const systemPrompt = `Eres un experto en fiscalidad mexicana (SAT, LISR, LIVA, CFDI 4.0).
+Analizas tickets y facturas para determinar si son deducibles y cómo facturarlos.
+
+Responde SIEMPRE con JSON puro, sin markdown, con exactamente estos campos:
+{
+  "isFacturatable": boolean,         // ¿se puede pedir CFDI por esta compra?
+  "isDeductible": boolean,           // ¿es deducible bajo el régimen del usuario?
+  "suggestedCfdiUse": string|null,   // código de uso CFDI (ej. "D01", "G03")
+  "deductionLimit": string|null,     // límite de deducción si aplica
+  "estimatedDeduction": number|null, // monto estimado deducible (número)
+  "howToInvoice": string|null,       // pasos concretos para pedir la factura
+  "vendorRfc": string|null,          // RFC del emisor si visible en la imagen
+  "vendorName": string|null,         // nombre del negocio
+  "isActualInvoice": boolean,        // ¿la imagen ES una factura CFDI? (no un ticket)
+  "cfdiUUID": string|null,           // UUID/folio fiscal si es factura
+  "cfdiValidIssues": string[]|null,  // problemas detectados si es factura
+  "reasoning": string                // explicación breve en español para el usuario
+}
+
+Legislación relevante:
+- Art. 27 LISR: deducción de gastos estrictamente indispensables para actividad empresarial
+- Art. 151 LISR: deducciones personales (D01-D10) para asalariados
+- CFDI 4.0: requiere RFC receptor, uso CFDI, régimen fiscal
+- Para ser deducible el CFDI debe incluir: RFC emisor válido, RFC receptor, uso CFDI correcto
+
+Usos CFDI disponibles: ${cfdiUsesJson}`;
+
+  const userMsg = `Régimen fiscal del usuario: ${regimeLabel}
+RFC del usuario: ${profile.rfc ?? 'No proporcionado'}
+Razón social: ${profile.razonSocial ?? 'No proporcionada'}
+
+Gastos registrados de este ticket:
+${expensesJson}
+
+Analiza la imagen y responde JSON.`;
+
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    system: systemPrompt,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
+        { type: 'text', text: userMsg },
+      ],
+    }],
+  });
+
+  const content = response.content[0];
+  if (content.type !== 'text') throw new Error('Respuesta inesperada');
+  const parsed = JSON.parse(stripJson(content.text)) as FiscalAnalysis;
+  return {
+    isFacturatable: parsed.isFacturatable ?? false,
+    isDeductible: parsed.isDeductible ?? false,
+    suggestedCfdiUse: parsed.suggestedCfdiUse,
+    deductionLimit: parsed.deductionLimit,
+    estimatedDeduction: parsed.estimatedDeduction ?? undefined,
+    howToInvoice: parsed.howToInvoice ?? undefined,
+    vendorRfc: parsed.vendorRfc ?? undefined,
+    vendorName: parsed.vendorName ?? undefined,
+    isActualInvoice: parsed.isActualInvoice ?? false,
+    cfdiUUID: parsed.cfdiUUID ?? undefined,
+    cfdiValidIssues: parsed.cfdiValidIssues ?? undefined,
+    reasoning: parsed.reasoning ?? '',
   };
 }
 

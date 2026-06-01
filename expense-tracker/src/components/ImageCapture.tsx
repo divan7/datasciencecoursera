@@ -7,6 +7,8 @@ import { compressImage } from '../utils/imageCompression';
 import type { SpaceMember, AppSpace } from '../types/space';
 import { MultiExpenseReview, type ExpenseWithSpace } from './MultiExpenseReview';
 
+import type { FiscalProfile } from '../types/fiscal';
+
 interface ImageCaptureProps {
   currentUser: User;
   currentSpaceId: string;
@@ -15,11 +17,12 @@ interface ImageCaptureProps {
   onSaveMultiple: (items: ExpenseWithSpace[]) => void;
   apiKey?: string;
   members: SpaceMember[];
+  fiscalProfile?: FiscalProfile;
 }
 
 type MediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
-export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey }: ImageCaptureProps) {
+export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile }: ImageCaptureProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string>('');
   const [mediaType, setMediaType] = useState<MediaType>('image/jpeg');
@@ -201,6 +204,8 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
           currentUser={currentUser}
           onSaveAll={handleSaveAll}
           onCancel={() => setParsedItems(null)}
+          fiscalProfile={fiscalProfile}
+          apiKey={apiKey}
         />
       )}
     </div>

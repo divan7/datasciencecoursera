@@ -22,11 +22,14 @@ import { WelcomeChoice } from './components/WelcomeChoice';
 import { JoinSpace } from './components/JoinSpace';
 import { ChangePassword } from './components/ChangePassword';
 import { PWAUpdateBanner } from './components/PWAUpdateBanner';
+import { FiscalProfileSection } from './components/FiscalProfileSection';
+import { FiscalSummary } from './components/FiscalSummary';
 import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace } from './utils/storage';
 import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, loadSpacesFromSupabase, syncSpaceToSupabase, getCacheOwner, setCacheOwner, clearLocalSpaceData } from './utils/spaceStorage';
+import { loadFiscalProfile } from './utils/fiscalStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
 import { profilesDb, spacesDb } from './lib/db';
@@ -35,10 +38,11 @@ import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { ExpenseWithSpace } from './components/MultiExpenseReview';
 import type { AppSpace, SessionState } from './types/space';
 import { MEMBER_COLORS } from './types/space';
+import type { FiscalProfile } from './types/fiscal';
 import { format } from 'date-fns';
 import './index.css';
 
-type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings' | 'admin';
+type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings' | 'fiscal' | 'admin';
 type InputMode = 'form' | 'text' | 'image';
 
 export default function App() {
@@ -84,6 +88,13 @@ export default function App() {
       setSettings(loadSettings(spaceId));
     }
   }, [spaceId]);
+
+  // ── Fiscal profile (per auth user, falls back to 'local' for offline mode) ──
+  const userId = user?.id ?? 'local';
+  const [fiscalProfile, setFiscalProfile] = useState<FiscalProfile>(() => loadFiscalProfile(userId));
+  useEffect(() => {
+    setFiscalProfile(loadFiscalProfile(user?.id ?? 'local'));
+  }, [user?.id]);
 
   // ── Tab / UI state ────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>('add');
@@ -502,6 +513,7 @@ export default function App() {
                   onSaveMultiple={handleSaveMultipleExpenses}
                   apiKey={settings.anthropicApiKey}
                   members={currentSpace.members}
+                  fiscalProfile={fiscalProfile}
                 />
               )}
               {inputMode === 'image' && (
@@ -513,6 +525,7 @@ export default function App() {
                   onSaveMultiple={handleSaveMultipleExpenses}
                   apiKey={settings.anthropicApiKey}
                   members={currentSpace.members}
+                  fiscalProfile={fiscalProfile}
                 />
               )}
             </div>
@@ -577,6 +590,12 @@ export default function App() {
                 expenseCount={expenses.length} onClearAll={handleClearAll}
                 isSupabaseConnected={isSupabaseConfigured && !!profile} />
             </div>
+            <div className="border-t border-gray-200 pt-5">
+              <FiscalProfileSection
+                userId={userId}
+                initialProfile={fiscalProfile}
+              />
+            </div>
             {isSupabaseConfigured && profile && (
               <div className="border-t border-gray-200 pt-5">
                 <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
@@ -593,6 +612,23 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Fiscal ── */}
+        {activeTab === 'fiscal' && (
+          <div className="space-y-6">
+            <FiscalSummary
+              expenses={expenses}
+              profile={fiscalProfile}
+              onUpdateExpense={(id, data) => updateExpense(id, data)}
+            />
+            <div className="border-t border-gray-200 pt-5">
+              <FiscalProfileSection
+                userId={userId}
+                initialProfile={fiscalProfile}
+              />
+            </div>
           </div>
         )}
 

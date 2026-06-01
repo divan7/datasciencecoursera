@@ -5,6 +5,7 @@ import type { Expense, User } from '../types/expense';
 import { parseMultipleExpensesFromText } from '../services/claudeService';
 import type { SpaceMember, AppSpace } from '../types/space';
 import { MultiExpenseReview, type ExpenseWithSpace } from './MultiExpenseReview';
+import type { FiscalProfile } from '../types/fiscal';
 
 interface TextParserProps {
   currentUser: User;
@@ -14,6 +15,7 @@ interface TextParserProps {
   onSaveMultiple: (items: ExpenseWithSpace[]) => void;
   apiKey?: string;
   members: SpaceMember[];
+  fiscalProfile?: FiscalProfile;
 }
 
 const EXAMPLES = [
@@ -23,7 +25,7 @@ const EXAMPLES = [
   'Amazon Prime 169, CFE 580, agua 230 este mes',
 ];
 
-export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey }: TextParserProps) {
+export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile }: TextParserProps) {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -135,6 +137,8 @@ export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSave
           currentUser={currentUser}
           onSaveAll={handleSaveAll}
           onCancel={() => setParsedItems(null)}
+          fiscalProfile={fiscalProfile}
+          apiKey={apiKey}
         />
       )}
     </div>

@@ -6,6 +6,8 @@ import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 import type { AppSpace } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
 import { BillSplitter } from './BillSplitter';
+import { FiscalAdvice } from './FiscalAdvice';
+import type { FiscalProfile } from '../types/fiscal';
 
 export interface ExpenseWithSpace {
   expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>;
@@ -19,6 +21,8 @@ interface Props {
   currentUser: string;
   onSaveAll: (items: ExpenseWithSpace[]) => void;
   onCancel: () => void;
+  fiscalProfile?: FiscalProfile;
+  apiKey?: string;
 }
 
 interface RowState {
@@ -37,7 +41,7 @@ interface RowState {
   frequency: Frequency;
 }
 
-export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser, onSaveAll, onCancel }: Props) {
+export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser, onSaveAll, onCancel, fiscalProfile, apiKey }: Props) {
   const today = format(new Date(), 'yyyy-MM-dd');
 
   // Preserve the receipt image from item[0] — it survives through the review
@@ -65,6 +69,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
 
   const [ticketNotes, setTicketNotes] = useState('');
   const [showBillSplitter, setShowBillSplitter] = useState(false);
+  const [invoiceDecision, setInvoiceDecision] = useState<Expense['invoiceStatus']>(undefined);
 
   const setRow = (i: number, patch: Partial<RowState>) =>
     setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
@@ -94,6 +99,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         ticketNotes:        ticketId && ticketNotes.trim() ? ticketNotes.trim() : undefined,
         // Attach the compressed receipt image to the first saved item only
         receiptImageBase64: idx === 0 ? receiptImage : undefined,
+        invoiceStatus:      invoiceDecision,
         transactionType:    'gasto' as const,
         expenseType:        r.expenseType,
         frequency:          r.expenseType === 'fijo' ? r.frequency : undefined,
@@ -339,6 +345,23 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           items={activeRows.map((r) => ({ concept: r.concept, amount: parseFloat(r.amount) || 0 }))}
           members={currentSpaceMembers(activeRows[0]?.spaceId ?? defaultSpaceId)}
           onClose={() => setShowBillSplitter(false)}
+        />
+      )}
+
+      {fiscalProfile?.regimenFiscal && activeRows.length > 0 && (
+        <FiscalAdvice
+          expenses={activeRows.map((r) => ({
+            concept: r.concept,
+            amount: parseFloat(r.amount) || 0,
+            category: r.category,
+            transactionType: 'gasto' as const,
+            invoiceStatus: invoiceDecision,
+          }))}
+          ticketImage={receiptImage}
+          ticketMediaType="image/jpeg"
+          profile={fiscalProfile}
+          apiKey={apiKey}
+          onDecide={setInvoiceDecision}
         />
       )}
     </div>

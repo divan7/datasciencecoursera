@@ -69,13 +69,8 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
                   {e.expenseType === 'fijo' && (
                     <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full">fijo</span>
                   )}
-                  {e.sharedExpense && !e.payments && !e.obligations && (
+                  {e.sharedExpense && !e.obligations && (
                     <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">compartido</span>
-                  )}
-                  {e.payments && e.payments.length > 1 && (
-                    <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full">
-                      💳 {e.payments.length} pagadores
-                    </span>
                   )}
                   {e.obligations && e.obligations.length > 1 && (
                     <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">

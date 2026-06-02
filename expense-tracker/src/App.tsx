@@ -24,6 +24,7 @@ import { ChangePassword } from './components/ChangePassword';
 import { PWAUpdateBanner } from './components/PWAUpdateBanner';
 import { FiscalProfileSection } from './components/FiscalProfileSection';
 import { FiscalSummary } from './components/FiscalSummary';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
@@ -441,6 +442,7 @@ export default function App() {
   const currentUser = currentMember.name;
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-gray-50">
       <PWAUpdateBanner />
       <Header
@@ -672,5 +674,6 @@ export default function App() {
         />
       )}
     </div>
+    </ErrorBoundary>
   );
 }

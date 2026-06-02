@@ -174,8 +174,12 @@ export function downloadICS(tpl: FixedExpenseTemplate, daysBefore = 1): void {
   const a    = document.createElement('a');
   a.href     = url;
   a.download = `${tpl.concept.replace(/[^a-zA-Z0-9]/g, '_')}.ics`;
+  // Append to body so the click works reliably in all browsers (including iOS Safari PWA)
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  // Delay revocation so the browser has time to start the download before the URL is freed
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 export function buildGoogleCalendarUrl(tpl: FixedExpenseTemplate): string {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Receipt, CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import type { Expense } from '../types/expense';
 import type { FiscalProfile, FiscalAnalysis } from '../types/fiscal';
 import { CFDI_USES } from '../types/fiscal';

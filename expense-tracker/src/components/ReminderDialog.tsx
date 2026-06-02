@@ -51,19 +51,23 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
   const handleConfirm = async () => {
     if (!chosenType) return;
 
-    // Open Google Calendar URL *before* any await to avoid popup blockers on mobile
-    if (chosenType === 'google' || chosenType === 'both') {
-      const url = buildGoogleCalendarUrl(template);
-      if (url) openUrl(url);
-    }
+    try {
+      // Open Google Calendar URL *before* any await to avoid popup blockers on mobile
+      if (chosenType === 'google' || chosenType === 'both') {
+        const url = buildGoogleCalendarUrl(template);
+        if (url) openUrl(url);
+      }
 
-    if (chosenType === 'ics') {
-      downloadICS(template, daysBefore);
-    }
+      if (chosenType === 'ics') {
+        downloadICS(template, daysBefore);
+      }
 
-    if (chosenType === 'push' || chosenType === 'both') {
-      const granted = await requestNotificationPermission();
-      onUpdate(template.id, { reminderEnabled: granted, reminderDaysBefore: daysBefore });
+      if (chosenType === 'push' || chosenType === 'both') {
+        const granted = await requestNotificationPermission();
+        onUpdate(template.id, { reminderEnabled: granted, reminderDaysBefore: daysBefore });
+      }
+    } catch (err) {
+      console.error('Error configurando recordatorio:', err);
     }
 
     setStep('done');

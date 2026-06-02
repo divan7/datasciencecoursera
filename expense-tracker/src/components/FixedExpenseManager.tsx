@@ -389,7 +389,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
                         <span className="text-xs text-orange-500">mín ${tpl.minimumPayment.toLocaleString('es-MX')}</span>
                       )}
                       <span className="text-xs text-gray-400">
-                        {(CATEGORIES[tpl.category] as string).replace(/^[^ ]+ /, '')}
+                        {((CATEGORIES[tpl.category] as string) ?? tpl.category ?? '').replace(/^[^ ]+ /, '')}
                       </span>
                       <span className="text-xs text-gray-400">{tpl.paidBy}</span>
                       {tpl.cardLast4 && <span className="text-xs text-gray-400">···{tpl.cardLast4}</span>}

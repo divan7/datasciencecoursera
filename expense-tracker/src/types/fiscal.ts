@@ -62,11 +62,19 @@ export interface FiscalProfile {
   rfc?: string;
   curp?: string;
   razonSocial?: string;           // nombre tal como está en el RFC
-  regimenFiscal?: RegimenFiscal;
+  regimenFiscal?: RegimenFiscal;  // legacy — kept for backward compat
+  regimenes?: RegimenFiscal[];    // all active regimes (use this going forward)
   actividadEconomica?: string;    // actividad principal (SCIAN)
   cfdiUseDefault?: CfdiUse;       // uso CFDI preferido por defecto
   isPersonaMoral?: boolean;
   taxYear?: number;               // año fiscal para límites
+}
+
+/** Returns the union of regimenes + regimenFiscal (deduped) for a profile. */
+export function getActiveRegimenes(profile: FiscalProfile): RegimenFiscal[] {
+  const set = new Set<RegimenFiscal>(profile.regimenes ?? []);
+  if (profile.regimenFiscal) set.add(profile.regimenFiscal);
+  return Array.from(set);
 }
 
 // Result of per-ticket fiscal analysis (returned by AI + rule engine)

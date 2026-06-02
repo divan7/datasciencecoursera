@@ -184,7 +184,7 @@ export function FiscalAdvice({ expenses, ticketImage, ticketMediaType, profile, 
           {/* Rule-based results (shown when no AI analysis yet) */}
           {!analysis && (
             <div className="mt-3 space-y-1.5">
-              {ruleResults.map(({ expense, isDeductible, reasoning, suggestedCfdiUse }) => (
+              {ruleResults.map(({ expense, isDeductible, reasoning, suggestedCfdiUse, bestRegime }) => (
                 <div key={expense.id} className="flex items-start gap-2">
                   {isDeductible
                     ? <CheckCircle size={13} className="text-teal-600 flex-shrink-0 mt-0.5" />
@@ -192,7 +192,10 @@ export function FiscalAdvice({ expenses, ticketImage, ticketMediaType, profile, 
                   <div className="flex-1 min-w-0">
                     <span className="text-xs font-medium text-gray-700 truncate block">{expense.concept}</span>
                     {isDeductible && suggestedCfdiUse && (
-                      <span className="text-[10px] text-teal-600">CFDI: {suggestedCfdiUse}</span>
+                      <span className="text-[10px] text-teal-600">
+                        CFDI: {suggestedCfdiUse}
+                        {bestRegime && <span className="ml-1 text-teal-400">· régimen {bestRegime}</span>}
+                      </span>
                     )}
                     {!isDeductible && (
                       <span className="text-[10px] text-gray-400">{reasoning.slice(0, 80)}…</span>

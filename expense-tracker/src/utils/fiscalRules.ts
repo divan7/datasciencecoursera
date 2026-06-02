@@ -1,38 +1,46 @@
 import type { Expense } from '../types/expense';
-import type { FiscalProfile, CfdiUse, DeductionRule } from '../types/fiscal';
-import { DEDUCTION_RULES_BY_REGIME, CFDI_USES } from '../types/fiscal';
+import type { FiscalProfile, CfdiUse, DeductionRule, RegimenFiscal } from '../types/fiscal';
+import { DEDUCTION_RULES_BY_REGIME, CFDI_USES, REGIMENES_FISCALES, getActiveRegimenes } from '../types/fiscal';
 
 export interface QuickDeductionResult {
   isDeductible: boolean;
   rule?: DeductionRule;
   reasoning: string;
   suggestedCfdiUse?: CfdiUse;
+  bestRegime?: RegimenFiscal;
 }
 
-/** Rule-based deductibility check — no AI required. */
+/** Rule-based deductibility check across all active regimes — no AI required. */
 export function checkDeductibility(expense: Expense, profile: FiscalProfile): QuickDeductionResult {
-  if (!profile.regimenFiscal) {
+  const regimenes = getActiveRegimenes(profile);
+  if (regimenes.length === 0) {
     return { isDeductible: false, reasoning: 'Sin régimen fiscal configurado en tu perfil.' };
   }
   if (expense.transactionType === 'ingreso') {
     return { isDeductible: false, reasoning: 'Los ingresos no se deducen.' };
   }
 
-  const rules = DEDUCTION_RULES_BY_REGIME[profile.regimenFiscal] ?? [];
-  const match = rules.find((r) => r.applicableCategories.includes(expense.category));
-
-  if (!match) {
-    return {
-      isDeductible: false,
-      reasoning: `En el régimen "${profile.regimenFiscal}" los gastos de la categoría "${expense.category}" generalmente no son deducibles.`,
-    };
+  // Try each regime; return the first (best) match
+  for (const regime of regimenes) {
+    const rules = DEDUCTION_RULES_BY_REGIME[regime] ?? [];
+    const match = rules.find((r) => r.applicableCategories.includes(expense.category));
+    if (match) {
+      const regimeName = REGIMENES_FISCALES[regime];
+      const multiNote = regimenes.length > 1 ? ` (régimen ${regime} — ${regimeName})` : '';
+      return {
+        isDeductible: true,
+        rule: match,
+        suggestedCfdiUse: match.cfdiUse,
+        bestRegime: regime,
+        reasoning: `${match.description}${multiNote}. Uso CFDI: ${match.cfdiUse} — ${CFDI_USES[match.cfdiUse]}${match.limit ? `. Límite: ${match.limit}` : ''}.`,
+      };
+    }
   }
 
+  const regimeNames = regimenes.map((r) => `${r} — ${REGIMENES_FISCALES[r]}`).join(', ');
   return {
-    isDeductible: true,
-    rule: match,
-    suggestedCfdiUse: match.cfdiUse,
-    reasoning: `${match.description}. Uso CFDI: ${match.cfdiUse} — ${CFDI_USES[match.cfdiUse]}${match.limit ? `. Límite: ${match.limit}` : ''}.`,
+    isDeductible: false,
+    reasoning: `En ninguno de tus regímenes (${regimeNames}) los gastos de la categoría "${expense.category}" son deducibles.`,
   };
 }
 

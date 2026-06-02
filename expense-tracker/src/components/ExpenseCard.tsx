@@ -69,8 +69,13 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
                   {e.expenseType === 'fijo' && (
                     <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full">fijo</span>
                   )}
-                  {e.sharedExpense && (
+                  {e.sharedExpense && !e.payments && (
                     <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">compartido</span>
+                  )}
+                  {e.payments && e.payments.length > 1 && (
+                    <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full">
+                      💳 {e.payments.length} pagadores
+                    </span>
                   )}
                 </div>
               </div>
@@ -137,6 +142,16 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
           {e.isReimbursable && <p>💰 Reembolsable</p>}
           {e.isTaxDeductible && <p>🧾 Deducible de impuestos</p>}
           {e.invoiceRequested && <p>📋 Factura solicitada</p>}
+          {e.payments && e.payments.length > 1 && (
+            <div>
+              <p className="font-medium text-gray-600 mb-0.5">💳 Quién pagó:</p>
+              {e.payments.map((p, i) => (
+                <p key={i} className="pl-3">
+                  {p.name}: <span className="text-gray-700 font-medium">${p.amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </p>
+              ))}
+            </div>
+          )}
           {e.notes && <p>📝 {e.notes}</p>}
           {e.receiptImageBase64 && (
             <details>

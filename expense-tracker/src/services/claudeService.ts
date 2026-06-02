@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Expense } from '../types/expense';
 import type { FiscalProfile, FiscalAnalysis } from '../types/fiscal';
-import { REGIMENES_FISCALES, CFDI_USES } from '../types/fiscal';
+import { REGIMENES_FISCALES, CFDI_USES, getActiveRegimenes } from '../types/fiscal';
 
 const FIELDS = `Campos disponibles (todos en español):
 - transactionType: "gasto" o "ingreso" — OBLIGATORIO. Salarios, ventas, reembolsos, etc. son "ingreso".
@@ -23,6 +23,7 @@ const FIELDS = `Campos disponibles (todos en español):
 - isTaxDeductible: true o false
 - invoiceRequested: true o false
 - sharedExpense: true o false
+- payments: array de pagadores [{name, amount}] — solo si el gasto fue pagado por más de una persona; ej. [{"name":"Ivan","amount":300},{"name":"María","amount":200}]
 - notes: notas adicionales
 - tags: array de etiquetas`;
 
@@ -60,7 +61,8 @@ ${FIELDS}
 
 Ejemplo gastos: [{"transactionType":"gasto","amount":350,"concept":"Walmart","category":"alimentacion","paymentMethod":"tarjeta_debito","expenseType":"variable"},{"transactionType":"gasto","amount":89,"concept":"Spotify","category":"suscripciones","expenseType":"fijo","frequency":"mensual"}]
 Ejemplo con fijo: [{"transactionType":"gasto","amount":1200,"concept":"Renta mensual","category":"hogar","paymentMethod":"transferencia","expenseType":"fijo","frequency":"mensual"}]
-Ejemplo mixto: [{"transactionType":"ingreso","amount":15000,"concept":"Salario","category":"salario","paymentMethod":"transferencia"},{"transactionType":"gasto","amount":500,"concept":"Gasolina","category":"transporte","paymentMethod":"efectivo","expenseType":"variable"}]`;
+Ejemplo mixto: [{"transactionType":"ingreso","amount":15000,"concept":"Salario","category":"salario","paymentMethod":"transferencia"},{"transactionType":"gasto","amount":500,"concept":"Gasolina","category":"transporte","paymentMethod":"efectivo","expenseType":"variable"}]
+Ejemplo multi-pagador: [{"transactionType":"gasto","amount":500,"concept":"Cena restaurante","category":"restaurantes","paymentMethod":"tarjeta_debito","expenseType":"variable","sharedExpense":true,"payments":[{"name":"Ivan","amount":300},{"name":"María","amount":200}]}]`;
 
 const RECEIPT_SYSTEM = `Eres un asistente de finanzas personales especializado en leer tickets de compra.
 
@@ -215,8 +217,9 @@ export async function analyzeTicketFiscal(
 ): Promise<FiscalAnalysis> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
-  const regimeLabel = profile.regimenFiscal
-    ? `${profile.regimenFiscal} — ${REGIMENES_FISCALES[profile.regimenFiscal]}`
+  const activeRegimenes = getActiveRegimenes(profile);
+  const regimeLabel = activeRegimenes.length > 0
+    ? activeRegimenes.map((r) => `${r} — ${REGIMENES_FISCALES[r]}`).join('; ')
     : 'No especificado';
 
   const cfdiUsesJson = JSON.stringify(CFDI_USES);
@@ -224,11 +227,12 @@ export async function analyzeTicketFiscal(
 
   const systemPrompt = `Eres un experto en fiscalidad mexicana (SAT, LISR, LIVA, CFDI 4.0).
 Analizas tickets y facturas para determinar si son deducibles y cómo facturarlos.
+El usuario puede tener más de un régimen fiscal; evalúa en cuál le conviene más deducir el gasto.
 
 Responde SIEMPRE con JSON puro, sin markdown, con exactamente estos campos:
 {
   "isFacturatable": boolean,         // ¿se puede pedir CFDI por esta compra?
-  "isDeductible": boolean,           // ¿es deducible bajo el régimen del usuario?
+  "isDeductible": boolean,           // ¿es deducible bajo alguno de los regímenes del usuario?
   "suggestedCfdiUse": string|null,   // código de uso CFDI (ej. "D01", "G03")
   "deductionLimit": string|null,     // límite de deducción si aplica
   "estimatedDeduction": number|null, // monto estimado deducible (número)
@@ -238,7 +242,7 @@ Responde SIEMPRE con JSON puro, sin markdown, con exactamente estos campos:
   "isActualInvoice": boolean,        // ¿la imagen ES una factura CFDI? (no un ticket)
   "cfdiUUID": string|null,           // UUID/folio fiscal si es factura
   "cfdiValidIssues": string[]|null,  // problemas detectados si es factura
-  "reasoning": string                // explicación breve en español para el usuario
+  "reasoning": string                // explicación breve en español para el usuario, indicando en qué régimen conviene deducir si aplica
 }
 
 Legislación relevante:
@@ -249,7 +253,7 @@ Legislación relevante:
 
 Usos CFDI disponibles: ${cfdiUsesJson}`;
 
-  const userMsg = `Régimen fiscal del usuario: ${regimeLabel}
+  const userMsg = `Régimen(es) fiscal(es) del usuario: ${regimeLabel}
 RFC del usuario: ${profile.rfc ?? 'No proporcionado'}
 Razón social: ${profile.razonSocial ?? 'No proporcionada'}
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Save, Receipt } from 'lucide-react';
 import type { FiscalProfile, RegimenFiscal, CfdiUse } from '../types/fiscal';
-import { REGIMENES_FISCALES, CFDI_USES, DEDUCTION_RULES_BY_REGIME } from '../types/fiscal';
+import { REGIMENES_FISCALES, CFDI_USES, DEDUCTION_RULES_BY_REGIME, getActiveRegimenes } from '../types/fiscal';
 import { saveFiscalProfile } from '../utils/fiscalStorage';
 
 interface Props {
@@ -25,12 +25,25 @@ export function FiscalProfileSection({ userId, initialProfile }: Props) {
       return;
     }
     setRfcError('');
-    saveFiscalProfile({ ...form, rfc: form.rfc?.trim().toUpperCase() }, userId);
+    // Keep regimenFiscal in sync with regimenes[0] for backward compat
+    const regimenes = form.regimenes ?? (form.regimenFiscal ? [form.regimenFiscal] : []);
+    saveFiscalProfile({
+      ...form,
+      rfc: form.rfc?.trim().toUpperCase(),
+      regimenes,
+      regimenFiscal: regimenes[0],
+    }, userId);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const rules = form.regimenFiscal ? (DEDUCTION_RULES_BY_REGIME[form.regimenFiscal] ?? []) : [];
+  const toggleRegime = (code: RegimenFiscal) => {
+    const current = getActiveRegimenes(form);
+    const next = current.includes(code) ? current.filter((r) => r !== code) : [...current, code];
+    setForm((f) => ({ ...f, regimenes: next, regimenFiscal: next[0] }));
+  };
+
+  const activeRegimenes = getActiveRegimenes(form);
 
   return (
     <div className="space-y-4">
@@ -82,19 +95,36 @@ export function FiscalProfileSection({ userId, initialProfile }: Props) {
         />
       </div>
 
-      {/* Régimen fiscal */}
+      {/* Régimen(es) fiscal(es) */}
       <div>
-        <label className="block text-xs font-semibold text-gray-500 mb-1">Régimen fiscal SAT</label>
-        <select
-          value={form.regimenFiscal ?? ''}
-          onChange={(e) => set('regimenFiscal', (e.target.value || undefined) as RegimenFiscal | undefined)}
-          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
-        >
-          <option value="">— Selecciona tu régimen —</option>
-          {(Object.entries(REGIMENES_FISCALES) as [RegimenFiscal, string][]).map(([code, name]) => (
-            <option key={code} value={code}>{code} · {name}</option>
-          ))}
-        </select>
+        <label className="block text-xs font-semibold text-gray-500 mb-1">
+          Régimen(es) fiscal(es) SAT
+          <span className="font-normal text-gray-400 ml-1">(puedes seleccionar más de uno)</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {(Object.entries(REGIMENES_FISCALES) as [RegimenFiscal, string][]).map(([code, name]) => {
+            const active = activeRegimenes.includes(code);
+            return (
+              <button
+                key={code}
+                type="button"
+                onClick={() => toggleRegime(code)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all text-left ${
+                  active
+                    ? 'bg-teal-700 text-white border-teal-700'
+                    : 'border-gray-200 text-gray-500 bg-white hover:border-teal-300'
+                }`}
+              >
+                <span className="font-bold">{code}</span> · {name}
+              </button>
+            );
+          })}
+        </div>
+        {activeRegimenes.length > 0 && (
+          <p className="text-xs text-teal-600 mt-1.5 font-medium">
+            ✓ {activeRegimenes.length} régimen{activeRegimenes.length > 1 ? 'es' : ''} activo{activeRegimenes.length > 1 ? 's' : ''}: {activeRegimenes.join(', ')}
+          </p>
+        )}
       </div>
 
       {/* Actividad económica */}
@@ -125,19 +155,30 @@ export function FiscalProfileSection({ userId, initialProfile }: Props) {
       </div>
 
       {/* Deductible categories preview */}
-      {rules.length > 0 && (
+      {activeRegimenes.length > 0 && (
         <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 space-y-2">
-          <p className="text-xs font-bold text-teal-800">Gastos potencialmente deducibles en tu régimen:</p>
-          {rules.map((r, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className="text-teal-500 text-xs mt-0.5 flex-shrink-0">✓</span>
-              <div>
-                <span className="text-xs text-teal-800 font-medium">{r.cfdiUse}</span>
-                <span className="text-xs text-teal-700"> — {r.description}</span>
-                {r.limit && <p className="text-[10px] text-teal-500 mt-0.5">{r.limit}</p>}
+          <p className="text-xs font-bold text-teal-800">Gastos potencialmente deducibles en tu{activeRegimenes.length > 1 ? 's' : ''} régimen{activeRegimenes.length > 1 ? 'es' : ''}:</p>
+          {activeRegimenes.map((regime) => {
+            const regimeRules = DEDUCTION_RULES_BY_REGIME[regime] ?? [];
+            if (regimeRules.length === 0) return null;
+            return (
+              <div key={regime}>
+                {activeRegimenes.length > 1 && (
+                  <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wide mb-1">{regime} — {REGIMENES_FISCALES[regime]}</p>
+                )}
+                {regimeRules.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 mb-1">
+                    <span className="text-teal-500 text-xs mt-0.5 flex-shrink-0">✓</span>
+                    <div>
+                      <span className="text-xs text-teal-800 font-medium">{r.cfdiUse}</span>
+                      <span className="text-xs text-teal-700"> — {r.description}</span>
+                      {r.limit && <p className="text-[10px] text-teal-500 mt-0.5">{r.limit}</p>}
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

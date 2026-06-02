@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Users } from 'lucide-react';
+import { Users, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType } from '../types/expense';
+import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType, PaymentEntry } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
 import type { FixedExpenseTemplate } from '../types/fixedExpense';
 import type { SpaceMember } from '../types/space';
@@ -72,6 +72,11 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
   const [customSplitName, setCustomSplitName] = useState('');
   const [saved, setSaved] = useState(false);
 
+  // Multi-payer: track who physically paid and how much
+  const [multiPayerEnabled, setMultiPayerEnabled] = useState(false);
+  // maps member name → amount they paid
+  const [payerAmounts, setPayerAmounts] = useState<Record<string, string>>({});
+
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }));
 
   const isIncome = transactionType === 'ingreso';
@@ -127,6 +132,31 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
     setSplitShares((prev) => { const next = { ...prev }; delete next[name]; return next; });
   };
 
+  // Total amount to use for multi-payer validation (bill total if split is active, else form amount)
+  const referenceAmount = (splitEnabled && splitTotal ? parseFloat(splitTotal) : parseFloat(form.amount)) || 0;
+  // Sum of amounts already entered across all payers
+  const payerSum = useMemo(
+    () => Object.values(payerAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0),
+    [payerAmounts]
+  );
+  // Remainder assigned implicitly to the primary payer (form.paidBy)
+  const primaryPayerImplicit = Math.max(0, referenceAmount - payerSum);
+
+  const buildPayments = (): PaymentEntry[] | undefined => {
+    if (!multiPayerEnabled || members.length < 2) return undefined;
+    const entries: PaymentEntry[] = [];
+    // Primary payer gets the remainder
+    if (primaryPayerImplicit > 0.001) {
+      entries.push({ name: form.paidBy, amount: parseFloat(primaryPayerImplicit.toFixed(2)) });
+    }
+    for (const m of members) {
+      if (m.name === form.paidBy) continue;
+      const amt = parseFloat(payerAmounts[m.name] ?? '0') || 0;
+      if (amt > 0) entries.push({ name: m.name, amount: amt });
+    }
+    return entries.length > 1 ? entries : undefined;
+  };
+
   const resetSplit = () => {
     setSplitEnabled(false);
     setSplitType('own');
@@ -135,6 +165,8 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
     setSplitShares({});
     setSplitTotal('');
     setCustomSplitName('');
+    setMultiPayerEnabled(false);
+    setPayerAmounts({});
   };
 
   // ── Autocomplete ─────────────────────────────────────────────────
@@ -210,6 +242,8 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
       receiptImageBase64: prefill?.receiptImageBase64,
     } as const;
 
+    const payments = buildPayments();
+
     if (isSplit && splitTotal && totalAmt > 0) {
       if (splitType === 'prorate' && onSaveMultiple) {
         // Create one expense record per person
@@ -222,6 +256,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
           sharedExpense: true,
           totalAmount: totalAmt,
           splitWith: splitParticipants,
+          payments,
         });
 
         // Member participants get their own expense record
@@ -238,6 +273,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
               sharedExpense: true,
               totalAmount: totalAmt,
               splitWith: theirSplitWith,
+              payments,
             });
           }
         }
@@ -251,13 +287,15 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
           sharedExpense: true,
           totalAmount: totalAmt,
           splitWith: splitParticipants.length > 0 ? splitParticipants : undefined,
+          payments,
         });
       }
     } else {
       onSave({
         ...baseData,
         amount: parseFloat(rawAmount),
-        sharedExpense: form.sharedExpense,
+        sharedExpense: form.sharedExpense || !!payments,
+        payments,
       });
     }
 
@@ -529,6 +567,78 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
           </div>
         </div>
       </div>
+
+      {/* Multi-payer section (only when there are multiple members and it's an expense) */}
+      {!isIncome && members.length > 1 && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => { setMultiPayerEnabled((v) => !v); setPayerAmounts({}); }}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <CreditCard size={16} className={multiPayerEnabled ? 'text-teal-600' : 'text-gray-400'} />
+              <span className={`text-sm font-semibold ${multiPayerEnabled ? 'text-teal-700' : 'text-gray-500'}`}>
+                Múltiples pagadores
+              </span>
+            </div>
+            <div className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${multiPayerEnabled ? 'bg-teal-600' : 'bg-gray-200'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${multiPayerEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+
+          {multiPayerEnabled && (
+            <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-2">
+              <p className="text-xs text-gray-500">
+                Indica cuánto pagó cada miembro. El resto se asigna a <strong>{form.paidBy}</strong>.
+              </p>
+              {members
+                .filter((m) => m.name !== form.paidBy)
+                .map((m) => (
+                  <div key={m.id} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-100">
+                    <span
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-[9px]"
+                      style={{ backgroundColor: MEMBER_COLORS[m.colorIndex] }}
+                    >
+                      {m.name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="flex-1 text-xs font-semibold text-gray-700 truncate">{m.name}</span>
+                    <span className="text-gray-400 text-xs">$</span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      value={payerAmounts[m.name] ?? ''}
+                      onChange={(e) => setPayerAmounts((prev) => ({ ...prev, [m.name]: e.target.value }))}
+                      placeholder="0.00"
+                      className="w-20 text-xs text-right border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-teal-300"
+                    />
+                  </div>
+                ))}
+              {/* Primary payer remainder row */}
+              {referenceAmount > 0 && (
+                <div className="flex items-center gap-2 bg-teal-50 rounded-lg px-3 py-2 border border-teal-100">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-[9px]"
+                    style={{ backgroundColor: memberColorOf(form.paidBy) }}
+                  >
+                    {form.paidBy.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="flex-1 text-xs font-semibold text-teal-800 truncate">
+                    {form.paidBy} <span className="font-normal text-teal-500">(resto)</span>
+                  </span>
+                  <span className={`text-sm font-bold ${primaryPayerImplicit < -0.01 ? 'text-red-500' : 'text-teal-700'}`}>
+                    ${fmt$(Math.max(0, primaryPayerImplicit))}
+                  </span>
+                </div>
+              )}
+              {primaryPayerImplicit < -0.01 && (
+                <p className="text-xs text-red-500 text-center">Los montos superan el total del gasto</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Advanced toggle */}
       {!isIncome && (

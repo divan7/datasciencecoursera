@@ -1,5 +1,18 @@
 export type User = string; // was: 'Ivan' | 'Esposa'
 
+/** Who physically paid and how much of the bill they covered. */
+export interface PaymentEntry {
+  name: string;
+  amount: number;
+}
+
+/** What each participant owes (their share of the obligation). */
+export interface ObligationEntry {
+  name: string;
+  amount: number;
+  percent?: number;
+}
+
 export type PaymentMethod = 'efectivo' | 'tarjeta_debito' | 'tarjeta_credito' | 'transferencia' | 'otro';
 
 export type ExpenseType = 'variable' | 'fijo';
@@ -63,6 +76,8 @@ export interface Expense {
   sharedExpense?: boolean;         // gasto compartido entre ambos
   totalAmount?: number;            // full bill before splitting (your share is in amount)
   splitWith?: string[];            // other participant names (not including current user)
+  payments?: PaymentEntry[];       // who physically paid and how much
+  obligations?: ObligationEntry[]; // what each person owes
   invoiceStatus?: 'pending' | 'invoiced' | 'not_applicable' | 'skipped';
   fiscalNotes?: string;            // AI/rule-generated deductibility note
   notes?: string;

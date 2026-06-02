@@ -16,5 +16,5 @@ export function saveFiscalProfile(profile: FiscalProfile, userId: string): void 
 
 export function hasFiscalProfile(userId: string): boolean {
   const p = loadFiscalProfile(userId);
-  return !!(p.rfc || p.regimenFiscal);
+  return !!(p.rfc || p.regimenFiscal || (p.regimenes && p.regimenes.length > 0));
 }

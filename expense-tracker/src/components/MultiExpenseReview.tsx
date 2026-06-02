@@ -8,6 +8,7 @@ import { MEMBER_COLORS } from '../types/space';
 import { BillSplitter } from './BillSplitter';
 import { FiscalAdvice } from './FiscalAdvice';
 import type { FiscalProfile } from '../types/fiscal';
+import { getActiveRegimenes } from '../types/fiscal';
 
 export interface ExpenseWithSpace {
   expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>;
@@ -348,7 +349,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         />
       )}
 
-      {fiscalProfile?.regimenFiscal && activeRows.length > 0 && (
+      {fiscalProfile && getActiveRegimenes(fiscalProfile).length > 0 && activeRows.length > 0 && (
         <FiscalAdvice
           expenses={activeRows.map((r) => ({
             concept: r.concept,

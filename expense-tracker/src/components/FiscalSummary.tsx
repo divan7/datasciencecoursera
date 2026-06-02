@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Expense } from '../types/expense';
 import type { FiscalProfile } from '../types/fiscal';
-import { REGIMENES_FISCALES } from '../types/fiscal';
+import { REGIMENES_FISCALES, getActiveRegimenes } from '../types/fiscal';
 import { summarizeDeductions, checkDeductibility } from '../utils/fiscalRules';
 
 interface Props {
@@ -70,7 +70,9 @@ export function FiscalSummary({ expenses, profile, onUpdateExpense }: Props) {
   const fmt$ = (v: number) =>
     v.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 });
 
-  if (!profile.regimenFiscal) {
+  const activeRegimenes = getActiveRegimenes(profile);
+
+  if (activeRegimenes.length === 0) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center space-y-2">
         <Receipt size={24} className="mx-auto text-amber-500" />
@@ -102,7 +104,10 @@ export function FiscalSummary({ expenses, profile, onUpdateExpense }: Props) {
       {/* Regime badge */}
       <div className="bg-teal-50 border border-teal-100 rounded-xl px-3 py-2">
         <p className="text-xs text-teal-700">
-          Régimen: <span className="font-semibold">{profile.regimenFiscal} — {REGIMENES_FISCALES[profile.regimenFiscal]}</span>
+          Régimen{activeRegimenes.length > 1 ? 'es' : ''}:{' '}
+          <span className="font-semibold">
+            {activeRegimenes.map((r) => `${r} — ${REGIMENES_FISCALES[r]}`).join(' · ')}
+          </span>
         </p>
         {profile.rfc && <p className="text-xs text-teal-600">RFC: <span className="font-mono">{profile.rfc}</span></p>}
       </div>
@@ -237,7 +242,7 @@ export function FiscalSummary({ expenses, profile, onUpdateExpense }: Props) {
 
       {yearExpenses.length > 0 && summary.deductibleCount === 0 && (
         <p className="text-xs text-gray-400 text-center py-2">
-          Ningún gasto registrado es deducible en el régimen {profile.regimenFiscal}.
+          Ningún gasto registrado es deducible en {activeRegimenes.length > 1 ? 'ninguno de tus regímenes' : `el régimen ${activeRegimenes[0]}`}.
         </p>
       )}
     </div>

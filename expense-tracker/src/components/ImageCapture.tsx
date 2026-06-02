@@ -3,7 +3,7 @@ import { Camera, Upload, X, AlertCircle, AlertTriangle, Sparkles } from 'lucide-
 import { format } from 'date-fns';
 import type { Expense, User } from '../types/expense';
 import { parseReceiptItems } from '../services/claudeService';
-import { compressImage } from '../utils/imageCompression';
+import { compressImage, base64SizeBytes } from '../utils/imageCompression';
 import type { SpaceMember, AppSpace } from '../types/space';
 import { MultiExpenseReview, type ExpenseWithSpace } from './MultiExpenseReview';
 
@@ -36,14 +36,17 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
 
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) { setError('Por favor selecciona una imagen válida.'); return; }
-    setMediaType(file.type as MediaType);
+    setMediaType('image/jpeg'); // output is always JPEG after compression
     setError('');
     setParsedItems(null);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const result = e.target?.result as string;
-      setImagePreview(result);
-      setImageBase64(result.split(',')[1]);
+      setImagePreview(result); // show original as preview
+      const raw = result.split(',')[1];
+      // Compress before sending to Claude API: max 1600px, 82% quality → typically < 400 KB
+      const compressed = await compressImage(raw, 1600, 0.82, file.type as MediaType);
+      setImageBase64(compressed);
     };
     reader.readAsDataURL(file);
   };
@@ -62,10 +65,10 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today);
-      // Compress and attach the receipt image to the first item only
+      // Attach thumbnail (further compressed) to first item for storage
       if (items.length > 0) {
-        const compressed = await compressImage(imageBase64);
-        items[0].receiptImageBase64 = compressed;
+        const thumbnail = await compressImage(imageBase64, 900, 0.70);
+        items[0].receiptImageBase64 = thumbnail;
       }
 
       // Validate sum of items vs ticket total
@@ -122,8 +125,8 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
 
   return (
     <div className="space-y-4">
-      <input ref={fileInputRef}   type="file" accept="image/*"              onChange={handleFileSelect} id="file-upload" />
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} id="camera-capture" />
+      <input ref={fileInputRef}   type="file" accept="image/*"              onChange={handleFileSelect} id="file-upload"     className="hidden" />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handleFileSelect} id="camera-capture" className="hidden" />
 
       {!imagePreview ? (
         <div className="space-y-3">
@@ -170,14 +173,23 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
           </div>
 
           {!parsedItems && (
-            <button onClick={handleAnalyze} disabled={loading}
-              className="w-full py-3 bg-orange-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-60 active:scale-95 transition-all">
-              {loading ? (
-                <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Desglosando ticket...</>
-              ) : (
-                <><Sparkles size={18} /> Desglosar con IA</>
+            <>
+              <button onClick={handleAnalyze} disabled={loading || !imageBase64}
+                className="w-full py-3 bg-orange-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-60 active:scale-95 transition-all">
+                {loading ? (
+                  <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Desglosando ticket...</>
+                ) : !imageBase64 ? (
+                  <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Preparando imagen...</>
+                ) : (
+                  <><Sparkles size={18} /> Desglosar con IA</>
+                )}
+              </button>
+              {imageBase64 && (
+                <p className="text-center text-xs text-gray-400">
+                  Imagen lista · {(base64SizeBytes(imageBase64) / 1024).toFixed(0)} KB
+                </p>
               )}
-            </button>
+            </>
           )}
         </div>
       )}

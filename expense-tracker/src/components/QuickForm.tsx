@@ -547,7 +547,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
               <button
                 key={member.id}
                 type="button"
-                onClick={() => set('paidBy', member.name)}
+                onClick={() => { set('paidBy', member.name); if (multiPayerEnabled) setPayerAmounts({}); }}
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all flex-shrink-0 ${
                   form.paidBy === member.name
                     ? 'text-white border-transparent'

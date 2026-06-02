@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { X, Users, Copy, Check } from 'lucide-react';
 import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
+import type { ObligationEntry } from '../types/expense';
 
 interface Item {
   concept: string;
@@ -12,9 +13,11 @@ interface BillSplitterProps {
   items: Item[];
   members: SpaceMember[];
   onClose: () => void;
+  /** Called when user clicks "Aplicar" — receives per-item obligation arrays */
+  onApplySplit?: (itemObligations: ObligationEntry[][]) => void;
 }
 
-export function BillSplitter({ items, members, onClose }: BillSplitterProps) {
+export function BillSplitter({ items, members, onClose, onApplySplit }: BillSplitterProps) {
   const [participants, setParticipants] = useState<string[]>(members.map((m) => m.name));
   const [assignments, setAssignments] = useState<Record<number, string[]>>({});
   const [tipMode, setTipMode] = useState<'pct' | 'fixed'>('pct');
@@ -52,6 +55,25 @@ export function BillSplitter({ items, members, onClose }: BillSplitterProps) {
   }, [participants, items, assignments, tipAmount, tipForAll, tipParticipants]);
 
   const grandTotal = useMemo(() => Object.values(perPerson).reduce((s, v) => s + v, 0), [perPerson]);
+
+  // Per-item obligations for persisting — includes proportional tip per item
+  const itemObligations = useMemo<ObligationEntry[][]>(() => {
+    const tipees = tipForAll ? participants : tipParticipants.filter((p) => participants.includes(p));
+    return items.map((item, i) => {
+      const raw = assignments[i] ?? participants;
+      const actual = raw.filter((n) => participants.includes(n));
+      if (actual.length === 0) return [];
+      const baseShare = item.amount / actual.length;
+      const itemTip =
+        tipAmount > 0 && tipees.length > 0 && totalItems > 0
+          ? (tipAmount * item.amount / totalItems) / tipees.length
+          : 0;
+      return actual.map((p) => ({
+        name: p,
+        amount: parseFloat((baseShare + (tipees.includes(p) ? itemTip : 0)).toFixed(2)),
+      }));
+    });
+  }, [items, assignments, participants, tipAmount, tipForAll, tipParticipants, totalItems]);
 
   const memberColor = (name: string) => {
     const m = members.find((mem) => mem.name === name);
@@ -271,14 +293,27 @@ export function BillSplitter({ items, members, onClose }: BillSplitterProps) {
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={copySummary}
-                className="mt-3 w-full py-3 rounded-2xl border-2 border-purple-200 text-purple-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-purple-50 transition-all active:scale-95"
-              >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-                {copied ? '¡Copiado!' : 'Copiar resumen'}
-              </button>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={copySummary}
+                  className="flex-1 py-3 rounded-2xl border-2 border-purple-200 text-purple-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-purple-50 transition-all active:scale-95"
+                >
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                  {copied ? '¡Copiado!' : 'Copiar'}
+                </button>
+                {onApplySplit && (
+                  <button
+                    type="button"
+                    onClick={() => { onApplySplit(itemObligations); onClose(); }}
+                    className="flex-1 py-3 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
+                    style={{ backgroundColor: '#0c6878' }}
+                  >
+                    <Check size={16} />
+                    Aplicar división
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>

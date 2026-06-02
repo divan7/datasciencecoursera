@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Users, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType, PaymentEntry } from '../types/expense';
+import type { Expense, User, Category, PaymentMethod, ExpenseType, Frequency, TransactionType, PaymentEntry, ObligationEntry } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
 import type { FixedExpenseTemplate } from '../types/fixedExpense';
 import type { SpaceMember } from '../types/space';
@@ -157,6 +157,23 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
     return entries.length > 1 ? entries : undefined;
   };
 
+  const buildObligations = (): ObligationEntry[] | undefined => {
+    if (!splitEnabled || !totalAmt || splitParticipants.length === 0) return undefined;
+    const obligations: ObligationEntry[] = [
+      {
+        name: form.paidBy,
+        amount: parseFloat(userAmount.toFixed(2)),
+        ...(splitMode === 'percent' ? { percent: userPercent } : {}),
+      },
+      ...splitParticipants.map((name) => ({
+        name,
+        amount: parseFloat(participantAmount(name).toFixed(2)),
+        ...(splitMode === 'percent' ? { percent: splitShares[name] ?? 0 } : {}),
+      })),
+    ];
+    return obligations;
+  };
+
   const resetSplit = () => {
     setSplitEnabled(false);
     setSplitType('own');
@@ -243,6 +260,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
     } as const;
 
     const payments = buildPayments();
+    const obligations = buildObligations();
 
     if (isSplit && splitTotal && totalAmt > 0) {
       if (splitType === 'prorate' && onSaveMultiple) {
@@ -257,6 +275,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
           totalAmount: totalAmt,
           splitWith: splitParticipants,
           payments,
+          obligations,
         });
 
         // Member participants get their own expense record
@@ -264,7 +283,6 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
           const isMember = members.some((m) => m.name === name);
           if (isMember) {
             const theirAmount = participantAmount(name);
-            // Their splitWith = everyone except themselves
             const theirSplitWith = [form.paidBy, ...splitParticipants.filter((n) => n !== name)];
             allExpenses.push({
               ...baseData,
@@ -274,6 +292,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
               totalAmount: totalAmt,
               splitWith: theirSplitWith,
               payments,
+              obligations,
             });
           }
         }
@@ -288,6 +307,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
           totalAmount: totalAmt,
           splitWith: splitParticipants.length > 0 ? splitParticipants : undefined,
           payments,
+          obligations,
         });
       }
     } else {

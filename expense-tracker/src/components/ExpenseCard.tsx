@@ -69,12 +69,17 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
                   {e.expenseType === 'fijo' && (
                     <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full">fijo</span>
                   )}
-                  {e.sharedExpense && !e.payments && (
+                  {e.sharedExpense && !e.payments && !e.obligations && (
                     <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">compartido</span>
                   )}
                   {e.payments && e.payments.length > 1 && (
                     <span className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full">
                       💳 {e.payments.length} pagadores
+                    </span>
+                  )}
+                  {e.obligations && e.obligations.length > 1 && (
+                    <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">
+                      ÷ {e.obligations.length} personas
                     </span>
                   )}
                 </div>
@@ -148,6 +153,19 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
               {e.payments.map((p, i) => (
                 <p key={i} className="pl-3">
                   {p.name}: <span className="text-gray-700 font-medium">${p.amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </p>
+              ))}
+            </div>
+          )}
+          {e.obligations && e.obligations.length > 0 && (
+            <div>
+              <p className="font-medium text-gray-600 mb-0.5">👥 Corresponde pagar:</p>
+              {e.obligations.map((o, i) => (
+                <p key={i} className="pl-3">
+                  {o.name}: <span className="text-gray-700 font-medium">
+                    ${o.amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {o.percent !== undefined ? ` (${o.percent % 1 === 0 ? o.percent : o.percent.toFixed(1)}%)` : ''}
+                  </span>
                 </p>
               ))}
             </div>

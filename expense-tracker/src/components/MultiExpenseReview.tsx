@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { Trash2, CheckCircle2, Save, MessageSquare, Users } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Trash2, CheckCircle2, Save, MessageSquare, Users, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Expense, Category, PaymentMethod, ExpenseType, Frequency } from '../types/expense';
+import type { Expense, Category, PaymentMethod, ExpenseType, Frequency, ObligationEntry, PaymentEntry } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 import type { AppSpace } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
@@ -40,6 +40,7 @@ interface RowState {
   removed: boolean;
   expenseType: ExpenseType;
   frequency: Frequency;
+  obligations?: ObligationEntry[];
 }
 
 export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser, onSaveAll, onCancel, fiscalProfile, apiKey }: Props) {
@@ -72,18 +73,74 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
   const [showBillSplitter, setShowBillSplitter] = useState(false);
   const [invoiceDecision, setInvoiceDecision] = useState<Expense['invoiceStatus']>(undefined);
 
+  // Ticket-level multi-payer state
+  const [multiPayerEnabled, setMultiPayerEnabled] = useState(false);
+  const [ticketPayerAmounts, setTicketPayerAmounts] = useState<Record<string, string>>({});
+
   const setRow = (i: number, patch: Partial<RowState>) =>
     setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+
+  const currentSpaceName = (id: string) => spaces.find((s) => s.id === id)?.name ?? id;
+  const currentSpaceMembers = (id: string) => spaces.find((s) => s.id === id)?.members ?? [];
 
   const activeRows = rows.filter((r) => !r.removed);
   const canSave = activeRows.length > 0 && activeRows.every((r) => r.concept.trim() && parseFloat(r.amount) > 0);
   const isTicket = activeRows.length > 1;
+
+  // Members for payer UI come from the first active row's space
+  const payerMembers = currentSpaceMembers(activeRows[0]?.spaceId ?? defaultSpaceId);
+  const primaryPayer = activeRows[0]?.paidBy ?? currentUser;
+
+  const ticketTotal = useMemo(
+    () => activeRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeRows.map((r) => r.amount).join(',')]
+  );
+  const ticketPayerSum = useMemo(
+    () => Object.values(ticketPayerAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0),
+    [ticketPayerAmounts]
+  );
+  const primaryPayerImplicit = Math.max(0, ticketTotal - ticketPayerSum);
+
+  const buildTicketPayments = (): PaymentEntry[] | undefined => {
+    if (!multiPayerEnabled || payerMembers.length < 2) return undefined;
+    const entries: PaymentEntry[] = [];
+    if (primaryPayerImplicit > 0.001) {
+      entries.push({ name: primaryPayer, amount: parseFloat(primaryPayerImplicit.toFixed(2)) });
+    }
+    for (const m of payerMembers) {
+      if (m.name === primaryPayer) continue;
+      const amt = parseFloat(ticketPayerAmounts[m.name] ?? '0') || 0;
+      if (amt > 0) entries.push({ name: m.name, amount: amt });
+    }
+    return entries.length > 1 ? entries : undefined;
+  };
+
+  // Called by BillSplitter "Aplicar división" — writes per-item obligations to each row
+  const handleApplySplit = (itemObligations: ObligationEntry[][]) => {
+    let activeIdx = 0;
+    setRows((prev) =>
+      prev.map((r) => {
+        if (r.removed) return r;
+        const obs = itemObligations[activeIdx++];
+        return { ...r, obligations: obs && obs.length > 0 ? obs : undefined };
+      })
+    );
+  };
+
+  const memberColorOf = (name: string) => {
+    const m = payerMembers.find((mem) => mem.name === name);
+    return m ? MEMBER_COLORS[m.colorIndex] : '#9ca3af';
+  };
+
+  const fmt$ = (v: number) => v.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
   const handleSave = () => {
     const active = rows.filter((r) => !r.removed);
     const ticketId = active.length > 1
       ? `tkt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
       : undefined;
+    const ticketPayments = buildTicketPayments();
 
     const result: ExpenseWithSpace[] = active.map((r, idx) => ({
       spaceId: r.spaceId,
@@ -98,20 +155,19 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         notes:              r.notes.trim() || undefined,
         ticketId,
         ticketNotes:        ticketId && ticketNotes.trim() ? ticketNotes.trim() : undefined,
-        // Attach the compressed receipt image to the first saved item only
         receiptImageBase64: idx === 0 ? receiptImage : undefined,
         invoiceStatus:      invoiceDecision,
         transactionType:    'gasto' as const,
         expenseType:        r.expenseType,
         frequency:          r.expenseType === 'fijo' ? r.frequency : undefined,
         currency:           'MXN',
+        payments:           ticketPayments,
+        obligations:        r.obligations,
+        sharedExpense:      !!(ticketPayments || r.obligations),
       },
     }));
     onSaveAll(result);
   };
-
-  const currentSpaceName = (id: string) => spaces.find((s) => s.id === id)?.name ?? id;
-  const currentSpaceMembers = (id: string) => spaces.find((s) => s.id === id)?.members ?? [];
 
   return (
     <div className="space-y-3">
@@ -303,6 +359,18 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                     </button>
                   ))}
                 </div>
+
+                {/* Obligations badge — set by BillSplitter */}
+                {row.obligations && row.obligations.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-[10px] text-purple-500 font-semibold">÷ corresponde:</span>
+                    {row.obligations.map((o, oi) => (
+                      <span key={oi} className="text-[10px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold">
+                        {o.name} ${o.amount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -311,6 +379,73 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
 
       {activeRows.length === 0 && (
         <p className="text-sm text-gray-400 text-center py-4">Eliminaste todos los gastos</p>
+      )}
+
+      {/* Ticket-level multi-payer section */}
+      {payerMembers.length > 1 && canSave && (
+        <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => { setMultiPayerEnabled((v) => !v); setTicketPayerAmounts({}); }}
+            className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <CreditCard size={16} className={multiPayerEnabled ? 'text-teal-600' : 'text-gray-400'} />
+              <span className={`text-sm font-semibold ${multiPayerEnabled ? 'text-teal-700' : 'text-gray-500'}`}>
+                Múltiples pagadores
+              </span>
+            </div>
+            <div className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${multiPayerEnabled ? 'bg-teal-600' : 'bg-gray-200'}`}>
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${multiPayerEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
+
+          {multiPayerEnabled && (
+            <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-2">
+              <p className="text-xs text-gray-500">
+                Indica cuánto pagó cada miembro. El resto se asigna a <strong>{primaryPayer}</strong>.
+              </p>
+              {payerMembers.filter((m) => m.name !== primaryPayer).map((m) => (
+                <div key={m.id} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-100">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-[9px]"
+                    style={{ backgroundColor: MEMBER_COLORS[m.colorIndex] }}
+                  >
+                    {m.name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="flex-1 text-xs font-semibold text-gray-700 truncate">{m.name}</span>
+                  <span className="text-gray-400 text-xs">$</span>
+                  <input
+                    type="number" inputMode="decimal" min="0"
+                    value={ticketPayerAmounts[m.name] ?? ''}
+                    onChange={(e) => setTicketPayerAmounts((prev) => ({ ...prev, [m.name]: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-20 text-xs text-right border border-gray-200 rounded-lg px-2 py-1 outline-none focus:ring-1 focus:ring-teal-300"
+                  />
+                </div>
+              ))}
+              {ticketTotal > 0 && (
+                <div className="flex items-center gap-2 bg-teal-50 rounded-lg px-3 py-2 border border-teal-100">
+                  <span
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-[9px]"
+                    style={{ backgroundColor: memberColorOf(primaryPayer) }}
+                  >
+                    {primaryPayer.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="flex-1 text-xs font-semibold text-teal-800 truncate">
+                    {primaryPayer} <span className="font-normal text-teal-500">(resto)</span>
+                  </span>
+                  <span className={`text-sm font-bold ${primaryPayerImplicit < 0 ? 'text-red-500' : 'text-teal-700'}`}>
+                    ${fmt$(Math.max(0, primaryPayerImplicit))}
+                  </span>
+                </div>
+              )}
+              {ticketPayerSum > ticketTotal + 0.01 && (
+                <p className="text-xs text-red-500 text-center">Los montos superan el total del gasto</p>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex gap-2 pt-1">
@@ -328,7 +463,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           onClick={() => setShowBillSplitter(true)}
           disabled={!canSave}
           className="px-4 py-3 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700 text-sm font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 active:scale-95 flex-shrink-0"
-          title="Dividir cuenta entre participantes"
+          title="Dividir quién debe qué"
         >
           <Users size={16} />
           Dividir
@@ -346,6 +481,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           items={activeRows.map((r) => ({ concept: r.concept, amount: parseFloat(r.amount) || 0 }))}
           members={currentSpaceMembers(activeRows[0]?.spaceId ?? defaultSpaceId)}
           onClose={() => setShowBillSplitter(false)}
+          onApplySplit={handleApplySplit}
         />
       )}
 

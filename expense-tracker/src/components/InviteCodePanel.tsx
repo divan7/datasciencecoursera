@@ -57,7 +57,12 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
       await withTimeout(invitesDb.create(space.id, space.name, currentMemberId), 15000, 'generar código');
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo generar el código. Inténtalo de nuevo.');
+      // Supabase errors are plain objects with a `message` field, not Error instances
+      const msg =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? 'No se pudo generar el código. Inténtalo de nuevo.';
+      setError(msg);
     } finally {
       setGenerating(false);
     }

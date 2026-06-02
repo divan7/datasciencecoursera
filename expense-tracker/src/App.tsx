@@ -210,12 +210,23 @@ export default function App() {
   }, [user]);
 
   const handleUpdateSpaces = useCallback((updated: AppSpace[]) => {
-    setSpaces(updated);
+    setSpaces((prev) => {
+      if (isSupabaseConfigured) {
+        const prevIds = new Set(prev.map((s) => s.id));
+        updated.forEach((s) => {
+          if (!prevIds.has(s.id) && user?.id) {
+            // Brand-new space: use createSpace RPC so the owner member gets profile_id set,
+            // which is required by the my_space_ids() RLS check on space_invites and other tables.
+            syncSpaceToSupabase(s, user.id).catch(console.error);
+          } else {
+            syncSpaceToSupabase(s).catch(console.error);
+          }
+        });
+      }
+      return updated;
+    });
     saveSpaces(updated);
-    if (isSupabaseConfigured) {
-      updated.forEach((s) => syncSpaceToSupabase(s).catch(console.error));
-    }
-  }, []);
+  }, [user?.id]);
 
   const handleSwitchSpace = useCallback((newSpaceId: string, memberId: string) => {
     const newSession: SessionState = { spaceId: newSpaceId, memberId };

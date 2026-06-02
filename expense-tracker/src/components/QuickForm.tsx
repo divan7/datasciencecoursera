@@ -232,13 +232,14 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
     if (isSplit && splitTotal && totalAmt > 0) {
       if (splitType === 'prorate' && onSaveMultiple) {
         const allExpenses: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[] = [];
+        // Prorate: each member records their own share — no obligations[] to avoid
+        // double-counting in balance analysis (each person pays exactly their own amount).
         allExpenses.push({
           ...baseData,
           amount: userAmount,
           sharedExpense: true,
           totalAmount: totalAmt,
           splitWith: splitParticipants,
-          obligations,
         });
         for (const name of splitParticipants) {
           const isMember = members.some((m) => m.name === name);
@@ -252,7 +253,6 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
               sharedExpense: true,
               totalAmount: totalAmt,
               splitWith: theirSplitWith,
-              obligations,
             });
           }
         }

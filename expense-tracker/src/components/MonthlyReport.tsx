@@ -6,6 +6,7 @@ import type { Expense, Category } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
 import type { SpaceMember, AppSpace } from '../types/space';
 import { ExportDialog } from './ExportDialog';
+import { BalanceAnalysis } from './BalanceAnalysis';
 
 interface MonthlyReportProps {
   expenses: Expense[];
@@ -185,6 +186,13 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
               ))}
             </div>
           </div>
+
+          {/* Balance analysis — only shown when there are multiple members */}
+          {members.length > 1 && (
+            <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+              <BalanceAnalysis expenses={monthExpenses} members={members} />
+            </div>
+          )}
 
           {/* Top expenses */}
           <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">

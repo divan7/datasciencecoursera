@@ -354,10 +354,10 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           onClick={() => setShowBillSplitter(true)}
           disabled={!canSave}
           className="px-4 py-3 rounded-2xl bg-purple-50 border border-purple-200 text-purple-700 text-sm font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 active:scale-95 flex-shrink-0"
-          title="Dividir quién debe qué"
+          title={isTicket ? 'Dividir por ítem entre participantes' : 'Dividir entre participantes'}
         >
           <Users size={16} />
-          Dividir
+          {isTicket ? 'Dividir por ítem' : 'Dividir'}
         </button>
         <button
           onClick={onCancel}

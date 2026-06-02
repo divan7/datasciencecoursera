@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link2, Copy, Check, Trash2, RefreshCw } from 'lucide-react';
-import { invitesDb, type SpaceInvite } from '../lib/db';
+import { invitesDb, spacesDb, type SpaceInvite } from '../lib/db';
 import { isSupabaseConfigured } from '../lib/supabase';
 import type { AppSpace } from '../types/space';
 
@@ -50,6 +50,13 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
 
   const activeInvite: SpaceInvite | undefined = invites[0];
 
+  const isRlsError = (err: unknown): boolean => {
+    const msg = err instanceof Error
+      ? err.message
+      : (err as { message?: string })?.message ?? '';
+    return msg.includes('row-level security') || msg.includes('42501');
+  };
+
   const handleGenerate = async () => {
     setGenerating(true);
     setError('');
@@ -57,7 +64,17 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
       await withTimeout(invitesDb.create(space.id, space.name, currentMemberId), 15000, 'generar código');
       await load();
     } catch (err) {
-      // Supabase errors are plain objects with a `message` field, not Error instances
+      if (isRlsError(err)) {
+        // profile_id may be NULL on this member — repair silently and retry once
+        try {
+          await spacesDb.claimMemberProfile(space.id, currentMemberId);
+          await withTimeout(invitesDb.create(space.id, space.name, currentMemberId), 15000, 'generar código');
+          await load();
+          return;
+        } catch {
+          // fall through to show error below
+        }
+      }
       const msg =
         err instanceof Error
           ? err.message

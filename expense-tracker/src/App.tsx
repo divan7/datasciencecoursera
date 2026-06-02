@@ -182,6 +182,17 @@ export default function App() {
     }).catch(() => setSpacesLoaded(true));
   }, [user]);
 
+  // ── Proactive profile_id repair ──────────────────────────────
+  // Spaces created before the updateSpace-path fix have profile_id = NULL
+  // in space_members, which breaks all RLS policies. Fix silently on login
+  // and whenever the active space changes.
+  useEffect(() => {
+    if (!user?.id || !isSupabaseConfigured || !session || !spacesLoaded) return;
+    spacesDb.claimMemberProfile(session.spaceId, session.memberId).catch(() => {
+      // Non-fatal: the member may already have profile_id set (RPC is idempotent)
+    });
+  }, [user?.id, session?.spaceId, session?.memberId, spacesLoaded]);
+
   // ── Notification check on mount and focus ────────────────────
   useEffect(() => {
     checkAndFireNotifications(templates);

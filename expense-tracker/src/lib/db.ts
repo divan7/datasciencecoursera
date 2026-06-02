@@ -310,6 +310,17 @@ export const spacesDb = {
     await supabase.from('space_members')
       .update({ profile_id: profileId }).eq('id', memberId);
   },
+
+  /** Fix spaces where the owner's profile_id is NULL due to the old updateSpace path.
+   *  Uses a SECURITY DEFINER RPC to bypass the chicken-and-egg RLS issue. */
+  async claimMemberProfile(spaceId: string, memberId: string): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase.rpc('claim_member_profile', {
+      p_space_id:  spaceId,
+      p_member_id: memberId,
+    });
+    if (error) throw new Error(`claim_member_profile: ${error.message}`);
+  },
 };
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────

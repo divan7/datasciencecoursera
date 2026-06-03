@@ -51,8 +51,8 @@ function computeSettlement(balances: MemberBalance[]): Transfer[] {
 }
 
 export function BalanceAnalysis({ expenses, members }: Props) {
-  const { balances, transfers, sharedCount } = useMemo(() => {
-    // Only expenses where someone other than paidBy has an explicit obligation
+  const { balances, transfers, sharedCount, totalSpentByMember } = useMemo(() => {
+    // Expenses with obligations where someone other than paidBy shares the cost
     const shared = expenses.filter(
       (e) => e.obligations && e.obligations.length > 0 && e.obligations.some((o) => o.name !== e.paidBy && o.amount > 0.005)
     );
@@ -78,7 +78,16 @@ export function BalanceAnalysis({ expenses, members }: Props) {
       net: (paid[m.name] ?? 0) - (owed[m.name] ?? 0),
     }));
 
-    return { balances, transfers: computeSettlement(balances), sharedCount: shared.length };
+    // Per-member total spending (all expenses, not just shared)
+    const totalSpentByMember: Record<string, number> = {};
+    members.forEach((m) => { totalSpentByMember[m.name] = 0; });
+    expenses.forEach((e) => {
+      if (e.transactionType !== 'ingreso') {
+        totalSpentByMember[e.paidBy] = (totalSpentByMember[e.paidBy] ?? 0) + e.amount;
+      }
+    });
+
+    return { balances, transfers: computeSettlement(balances), sharedCount: shared.length, totalSpentByMember };
   }, [expenses, members]);
 
   if (members.length < 2) return null;
@@ -92,6 +101,28 @@ export function BalanceAnalysis({ expenses, members }: Props) {
         <Scale size={16} className="text-teal-700" />
         <h3 className="text-sm font-bold text-gray-700">Análisis de saldos</h3>
       </div>
+
+      {/* Per-member spending summary — always shown when there are expenses */}
+      {expenses.filter((e) => e.transactionType !== 'ingreso').length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gastos registrados por persona</p>
+          <div className="flex gap-2">
+            {members.map((m) => {
+              const spent = totalSpentByMember[m.name] ?? 0;
+              return (
+                <div key={m.name} className="flex-1 bg-gray-50 rounded-xl p-3 text-center">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold mx-auto mb-1"
+                    style={{ backgroundColor: MEMBER_COLORS[m.colorIndex] }}>
+                    {m.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <p className="text-xs text-gray-500 truncate">{m.name}</p>
+                  <p className="text-sm font-extrabold text-gray-800">${fmt(spent)}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {sharedCount === 0 ? (
         <div className="bg-gray-50 rounded-2xl px-4 py-5 text-center space-y-1">

@@ -592,6 +592,19 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
                 ))}
               </div>
 
+              {form.isTaxDeductible && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+                  <p className="text-xs font-bold text-amber-800">🧾 Gasto potencialmente deducible</p>
+                  <p className="text-xs text-amber-700">
+                    Para deducirlo necesitas un CFDI (factura electrónica) a nombre tuyo con tu RFC.
+                    Solicítala en el establecimiento o en su portal web antes de salir.
+                  </p>
+                  <p className="text-xs text-amber-600">
+                    💡 Configura tu perfil fiscal en Ajustes para recomendaciones según tu régimen.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">Notas</label>
                 <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)}

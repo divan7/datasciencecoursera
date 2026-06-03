@@ -101,7 +101,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [inputMode, setInputMode] = useState<InputMode>('form');
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
-  const [suggestQueue, setSuggestQueue] = useState<Expense[]>([]);
+  const [suggestQueue, setSuggestQueue] = useState<{ expense: Expense; autoConfirm?: boolean }[]>([]);
   const [reminderTemplate, setReminderTemplate] = useState<FixedExpenseTemplate | null>(null);
 
   // ── Expense hooks ─────────────────────────────────────────────
@@ -111,7 +111,7 @@ export default function App() {
     addTemplate, updateTemplate, deleteTemplate,
     ensureChecksForMonth,
     confirmCheck, skipCheck, resetCheck,
-    tryAutoMatch,
+    tryAutoMatch, addAndConfirmTemplate,
     pendingCountCurrentMonth,
   } = useFixedExpenses(expenses, spaceId);
 
@@ -275,7 +275,7 @@ export default function App() {
       const matched = tryAutoMatch(saved, month);
       // Offer to create a fixed template when a fijo expense has no matching template
       if (!matched && data.expenseType === 'fijo') {
-        setSuggestQueue((q) => [...q, saved]);
+        setSuggestQueue((q) => [...q, { expense: saved }]);
       }
       setPrefillTemplate(null);
       setActiveTab('list');
@@ -285,12 +285,12 @@ export default function App() {
 
   const handleSaveExpenseMultiple = useCallback(
     (items: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[]) => {
-      const unmatchedFijos: Expense[] = [];
+      const unmatchedFijos: { expense: Expense }[] = [];
       for (const data of items) {
         const saved = addExpense(data);
         const month = data.date.slice(0, 7);
         const matched = tryAutoMatch(saved, month);
-        if (!matched && data.expenseType === 'fijo') unmatchedFijos.push(saved);
+        if (!matched && data.expenseType === 'fijo') unmatchedFijos.push({ expense: saved });
       }
       if (unmatchedFijos.length > 0) setSuggestQueue((q) => [...q, ...unmatchedFijos]);
       setPrefillTemplate(null);
@@ -330,14 +330,15 @@ export default function App() {
   }, [user]);
 
   const handleSaveMultipleExpenses = useCallback((items: ExpenseWithSpace[]) => {
-    const unmatchedFijos: Expense[] = [];
+    const unmatchedFijos: { expense: Expense; autoConfirm: boolean }[] = [];
     items.forEach(({ expense, spaceId: targetSpaceId }) => {
       if (targetSpaceId === spaceId) {
         const saved = addExpense(expense);
         const month = expense.date.slice(0, 7);
         const matched = tryAutoMatch(saved, month);
         if (!matched && expense.expenseType === 'fijo') {
-          unmatchedFijos.push(saved);
+          // Photo/text expenses are already paid — auto-confirm the template check
+          unmatchedFijos.push({ expense: saved, autoConfirm: true });
         }
       } else {
         saveExpenseToAnySpace(expense, targetSpaceId);
@@ -618,6 +619,7 @@ export default function App() {
               <FiscalProfileSection
                 userId={userId}
                 initialProfile={fiscalProfile}
+                onSave={(p) => setFiscalProfile(p)}
               />
             </div>
             {isSupabaseConfigured && profile && (
@@ -651,6 +653,7 @@ export default function App() {
               <FiscalProfileSection
                 userId={userId}
                 initialProfile={fiscalProfile}
+                onSave={(p) => setFiscalProfile(p)}
               />
             </div>
           </div>
@@ -684,11 +687,14 @@ export default function App() {
       {/* ── Suggest fixed template when fijo expense has no match ── */}
       {suggestQueue[0] && (
         <FixedTemplateFromExpenseModal
-          key={suggestQueue[0].id}
-          expense={suggestQueue[0]}
+          key={suggestQueue[0].expense.id}
+          expense={suggestQueue[0].expense}
           members={currentSpace.members}
           onSave={(tpl) => {
-            const saved = addTemplate(tpl);
+            const qItem = suggestQueue[0];
+            const saved = qItem.autoConfirm
+              ? addAndConfirmTemplate(tpl, qItem.expense)
+              : addTemplate(tpl);
             setSuggestQueue((q) => q.slice(1));
             setReminderTemplate(saved);
           }}

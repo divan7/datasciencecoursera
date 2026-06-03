@@ -1,11 +1,35 @@
 import { useState } from 'react';
-import { X, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Save, ChevronDown, ChevronUp, Users, ExternalLink } from 'lucide-react';
 import type {
-  Expense, Category, PaymentMethod, TransactionType, ExpenseType, Frequency,
+  Expense, Category, PaymentMethod, TransactionType, ExpenseType, Frequency, ObligationEntry,
 } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
 import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
+
+const VENDOR_PORTALS: Record<string, { name: string; url: string }> = {
+  walmart: { name: 'Walmart', url: 'https://factura.walmart.com.mx' },
+  'sams': { name: "Sam's Club", url: 'https://factura.samsclub.com.mx' },
+  amazon: { name: 'Amazon México', url: 'https://factura.amazon.com.mx' },
+  costco: { name: 'Costco', url: 'https://www.facturacostco.com' },
+  homedepot: { name: 'Home Depot', url: 'https://factura.homedepot.com.mx' },
+  liverpool: { name: 'Liverpool', url: 'https://factura.liverpool.com.mx' },
+  soriana: { name: 'Soriana', url: 'https://factura.soriana.com' },
+  chedraui: { name: 'Chedraui', url: 'https://factura.chedraui.com.mx' },
+  '7eleven': { name: '7-Eleven', url: 'https://factura.7-eleven.com.mx' },
+  oxxo: { name: 'OXXO', url: 'https://factura.oxxo.com' },
+  elektra: { name: 'Elektra', url: 'https://factura.elektra.com.mx' },
+  coppel: { name: 'Coppel', url: 'https://factura.coppel.com' },
+  mercadolibre: { name: 'MercadoLibre', url: 'https://factura.mercadolibre.com.mx' },
+};
+
+function findVendorPortal(store: string) {
+  const normalized = store.toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const [key, portal] of Object.entries(VENDOR_PORTALS)) {
+    if (normalized.includes(key)) return portal;
+  }
+  return null;
+}
 
 interface ExpenseEditModalProps {
   expense: Expense;
@@ -36,12 +60,15 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
   const [notes, setNotes]               = useState(expense.notes ?? '');
   const [tags, setTags]                 = useState((expense.tags ?? []).join(', '));
   const [showAdvanced, setShowAdv]      = useState(false);
+  const [obligations, setObligations]   = useState<ObligationEntry[]>(expense.obligations ?? []);
+  const [showSplit, setShowSplit]        = useState(!!(expense.obligations && expense.obligations.length > 0));
 
   const categoryOptions = transactionType === 'ingreso' ? INCOME_CATEGORIES : CATEGORIES;
   const canSave = concept.trim() && parseFloat(amount) > 0;
 
   const handleSave = () => {
     if (!canSave) return;
+    const activeObligations = showSplit && obligations.length > 0 ? obligations : undefined;
     onSave(expense.id, {
       concept:         concept.trim(),
       amount:          parseFloat(amount),
@@ -60,11 +87,34 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
       isReimbursable:  isReimbursable || undefined,
       isTaxDeductible: isTaxDeductible || undefined,
       invoiceRequested:invoiceRequested || undefined,
-      sharedExpense:   sharedExpense || undefined,
+      sharedExpense:   (activeObligations ? true : sharedExpense) || undefined,
+      obligations:     activeObligations,
       notes:           notes.trim() || undefined,
       tags:            tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
     });
     onClose();
+  };
+
+  const initEqualSplit = () => {
+    const amt = parseFloat(amount);
+    if (!amt || members.length === 0) return;
+    const share = parseFloat((amt / members.length).toFixed(2));
+    setObligations(members.map((m) => ({ name: m.name, amount: share })));
+    setShared(true);
+  };
+
+  const updateObligationAmount = (name: string, val: string) => {
+    setObligations((prev) => prev.map((o) => o.name === name ? { ...o, amount: parseFloat(val) || 0 } : o));
+  };
+
+  const toggleMemberObligation = (name: string) => {
+    setObligations((prev) => {
+      const exists = prev.find((o) => o.name === name);
+      if (exists) return prev.filter((o) => o.name !== name);
+      const amt = parseFloat(amount);
+      const remaining = amt - prev.reduce((s, o) => s + o.amount, 0);
+      return [...prev, { name, amount: Math.max(0, parseFloat(remaining.toFixed(2))) }];
+    });
   };
 
   const inputCls = 'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300';
@@ -252,6 +302,34 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
                 ))}
               </div>
 
+              {/* Tax tip when deductible is checked */}
+              {isTaxDeductible && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
+                  <p className="text-xs font-bold text-amber-800">🧾 Gasto potencialmente deducible</p>
+                  <p className="text-xs text-amber-700">
+                    Para deducirlo necesitas un CFDI (factura electrónica) a nombre tuyo con tu RFC.
+                    {store && findVendorPortal(store) ? null : ' Pídela en el establecimiento o en su portal web.'}
+                  </p>
+                  {store && (() => {
+                    const portal = findVendorPortal(store);
+                    return portal ? (
+                      <a
+                        href={portal.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 underline"
+                      >
+                        <ExternalLink size={12} />
+                        Facturar en {portal.name}
+                      </a>
+                    ) : null;
+                  })()}
+                  <p className="text-xs text-amber-600">
+                    💡 Configura tu perfil fiscal en Ajustes para recomendaciones personalizadas.
+                  </p>
+                </div>
+              )}
+
               {/* Notes */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-1 block">Notas</label>
@@ -266,6 +344,73 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
                 <input type="text" value={tags} onChange={(e) => setTags(e.target.value)}
                   placeholder="súper, semanal, mercado..." className={inputSmCls} />
               </div>
+            </div>
+          )}
+
+          {/* Division / Obligations */}
+          {members.length > 1 && (
+            <div className="border-t border-gray-100 pt-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !showSplit;
+                  setShowSplit(next);
+                  if (next && obligations.length === 0) initEqualSplit();
+                }}
+                className="flex items-center gap-2 text-xs font-semibold text-purple-600 mb-2"
+              >
+                <Users size={14} />
+                {showSplit ? 'Ocultar división' : 'Modificar división entre miembros'}
+              </button>
+
+              {showSplit && (
+                <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 space-y-2">
+                  <p className="text-xs text-purple-700 font-semibold mb-1">¿A quién le corresponde pagar?</p>
+                  {members.map((m) => {
+                    const ob = obligations.find((o) => o.name === m.name);
+                    const included = !!ob;
+                    return (
+                      <div key={m.id} className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleMemberObligation(m.name)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all flex-shrink-0 ${
+                            included ? 'text-white border-transparent' : 'border-gray-200 text-gray-400 bg-white'
+                          }`}
+                          style={included ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
+                        >
+                          {m.name.slice(0, 1).toUpperCase()}. {m.name}
+                        </button>
+                        {included && (
+                          <div className="flex items-center gap-1 flex-1">
+                            <span className="text-xs text-gray-400">$</span>
+                            <input
+                              type="number"
+                              value={ob.amount || ''}
+                              onChange={(e) => updateObligationAmount(m.name, e.target.value)}
+                              className="w-full text-xs px-2 py-1 border border-purple-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
+                              step="0.01"
+                              min="0"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={initEqualSplit}
+                    className="text-xs text-purple-500 hover:text-purple-700 mt-1"
+                  >
+                    ↺ Dividir en partes iguales
+                  </button>
+                  {obligations.length > 0 && (
+                    <p className="text-xs text-gray-400">
+                      Total asignado: ${obligations.reduce((s, o) => s + o.amount, 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

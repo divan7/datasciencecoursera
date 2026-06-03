@@ -202,6 +202,48 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     return checks.filter((c) => c.month === month && c.status === 'pendiente').length;
   }, [checks]);
 
+  // Creates a template and immediately creates a confirmed check for the expense's month.
+  // Used when a fixed expense arrives via photo (already paid — no user confirmation needed).
+  const addAndConfirmTemplate = useCallback(
+    (t: Omit<FixedExpenseTemplate, 'id' | 'createdAt'>, expense: Expense): FixedExpenseTemplate => {
+      const tpl: FixedExpenseTemplate = {
+        ...t,
+        id: generateFixedId(),
+        createdAt: format(new Date(), 'yyyy-MM-dd'),
+      };
+      setTemplates((prev) => {
+        const updated = [tpl, ...prev];
+        saveTemplates(updated, spaceId);
+        return updated;
+      });
+      if (isSupabaseConfigured) {
+        fixedDb.createTemplate(spaceId, tpl).catch(console.error);
+      }
+
+      const month = expense.date.slice(0, 7);
+      const check: MonthlyCheck = {
+        id: generateFixedId(),
+        month,
+        templateId: tpl.id,
+        status: 'confirmado',
+        expenseId: expense.id,
+        actualAmount: expense.amount,
+        confirmedAt: new Date().toISOString(),
+      };
+      setChecks((prev) => {
+        const updated = [...prev, check];
+        saveChecks(updated, spaceId);
+        if (isSupabaseConfigured) {
+          fixedDb.upsertChecks(spaceId, [check]).catch(console.error);
+        }
+        return updated;
+      });
+
+      return tpl;
+    },
+    [spaceId]
+  );
+
   return {
     templates,
     checks,
@@ -209,6 +251,7 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     getChecksForMonth, ensureChecksForMonth,
     confirmCheck, skipCheck, resetCheck,
     tryAutoMatch,
+    addAndConfirmTemplate,
     pendingCountCurrentMonth,
   };
 }

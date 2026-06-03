@@ -10,25 +10,28 @@ const ACTIVITIES: { value: ActivityLevel; label: string; desc: string; emoji: st
   { value: 'active',    label: 'Activo',     desc: 'Entrenamiento intenso 5+x/sem', emoji: '💪' },
 ];
 
-interface Props {
-  onSave: (data: {
-    weight_kg: number;
-    activity_level: ActivityLevel;
-    wake_time: string;
-    sleep_time: string;
-    glass_size_ml: number;
-  }) => void;
-  loading?: boolean;
-  isEditing?: boolean;
+interface ProfileData {
+  weight_kg: number;
+  activity_level: ActivityLevel;
+  wake_time: string;
+  sleep_time: string;
+  glass_size_ml: number;
 }
 
-export function Setup({ onSave, loading, isEditing }: Props) {
-  const [weight, setWeight]       = useState('');
+interface Props {
+  onSave: (data: ProfileData) => void;
+  loading?: boolean;
+  isEditing?: boolean;
+  initialData?: ProfileData;
+}
+
+export function Setup({ onSave, loading, isEditing, initialData }: Props) {
+  const [weight, setWeight]       = useState(initialData ? String(initialData.weight_kg) : '');
   const [unit, setUnit]           = useState<'kg' | 'lbs'>('kg');
-  const [activity, setActivity]   = useState<ActivityLevel>('sedentary');
-  const [wakeTime, setWakeTime]   = useState('06:00');
-  const [sleepTime, setSleepTime] = useState('22:00');
-  const [glassSize, setGlassSize] = useState('250');
+  const [activity, setActivity]   = useState<ActivityLevel>(initialData?.activity_level ?? 'sedentary');
+  const [wakeTime, setWakeTime]   = useState(initialData?.wake_time   ?? '06:00');
+  const [sleepTime, setSleepTime] = useState(initialData?.sleep_time  ?? '22:00');
+  const [glassSize, setGlassSize] = useState(String(initialData?.glass_size_ml ?? 250));
   const [error, setError]         = useState('');
 
   const weightNum = parseFloat(weight);

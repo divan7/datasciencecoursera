@@ -57,6 +57,13 @@ export default function App() {
     return (
       <Setup
         isEditing={showSetup && Boolean(profile)}
+        initialData={showSetup && profile ? {
+          weight_kg:     profile.weight_kg,
+          activity_level: profile.activity_level,
+          wake_time:     profile.wake_time,
+          sleep_time:    profile.sleep_time,
+          glass_size_ml: profile.glass_size_ml,
+        } : undefined}
         onSave={async (data) => {
           await saveProfile(data);
           plan.resetPlan(); // reset assessment when profile changes

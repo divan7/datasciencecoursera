@@ -41,20 +41,23 @@ export function useIntake(userId: string | null) {
       });
   }, [userId, persist]);
 
-  async function addIntake(amountMl: number) {
+  async function addIntake(amountMl: number, loggedAt?: Date) {
+    const timestamp = (loggedAt ?? new Date()).toISOString();
     const entry: IntakeLog = {
       id: crypto.randomUUID(),
       user_id: userId ?? 'local',
       amount_ml: amountMl,
-      logged_at: new Date().toISOString(),
+      logged_at: timestamp,
     };
-    const next = [...logs, entry];
+    const next = [...logs, entry].sort(
+      (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime(),
+    );
     persist(next);
 
     if (userId && isSupabaseConfigured && supabase) {
       const { data } = await supabase
         .from('water_intake')
-        .insert({ user_id: userId, amount_ml: amountMl, logged_at: entry.logged_at })
+        .insert({ user_id: userId, amount_ml: amountMl, logged_at: timestamp })
         .select()
         .single();
       if (data) {

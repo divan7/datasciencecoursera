@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { buildSchedule, getScheduleStatus, dailyGlasses } from '../utils/formula';
+import { buildSchedule, getScheduleStatus, dailyGlasses, timeToMinutes } from '../utils/formula';
 import type { UserProfile } from '../types';
 
 const isNotifSupported = typeof Notification !== 'undefined';
@@ -23,6 +23,16 @@ export function useReminder(profile: UserProfile | null, totalMl: number) {
   const completedGlasses = profile ? Math.floor(totalMl / profile.glass_size_ml) : 0;
   const totalGlasses = profile ? dailyGlasses(profile.daily_goal_ml, profile.glass_size_ml) : 0;
   const status = getScheduleStatus(schedule, completedGlasses);
+
+  // Glasses whose scheduled time has passed but haven't been consumed yet
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const scheduledBeforeNow = schedule.filter((t) => timeToMinutes(t) <= nowMin).length;
+  const overdueGlasses = Math.max(0, scheduledBeforeNow - completedGlasses);
+
+  // Time slot of the first overdue glass (for pre-filling "log past drink")
+  const firstOverdueTime: string | null =
+    overdueGlasses > 0 ? (schedule[completedGlasses] ?? null) : null;
 
   // Schedule browser notification for next glass
   useEffect(() => {
@@ -68,6 +78,8 @@ export function useReminder(profile: UserProfile | null, totalMl: number) {
         : formatCountdown(status.minutesUntil),
     isOverdue: status.isOverdue,
     isDone: status.isDone,
+    overdueGlasses,
+    firstOverdueTime,
     notifPermission,
     requestPermission,
   };

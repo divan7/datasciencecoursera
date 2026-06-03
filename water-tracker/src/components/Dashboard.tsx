@@ -5,17 +5,12 @@ import { WaterCircle } from './WaterCircle';
 import { QuickAdd } from './QuickAdd';
 import { IntakeTimeline } from './IntakeTimeline';
 import { ReminderCard } from './ReminderCard';
+import { HabitCard } from './HabitCard';
+import { DailyMessage } from './DailyMessage';
 import { useIntake } from '../hooks/useIntake';
 import { useReminder } from '../hooks/useReminder';
+import { useStreak } from '../hooks/useStreak';
 import type { UserProfile } from '../types';
-
-const QUOTES = [
-  'El agua es el primer alimento que necesita tu metabolismo.',
-  'La hidratación activa tu metabolismo y aumenta tu energía.',
-  'El agua oxigena cada célula de tu cuerpo.',
-  '¡Casi llegas! El agua es la gasolina de tu metabolismo.',
-  '¡Meta cumplida! Tu metabolismo te lo agradece.',
-];
 
 interface Props {
   profile: UserProfile;
@@ -27,10 +22,19 @@ interface Props {
 export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
   const { logs, totalMl, addIntake, removeIntake } = useIntake(userId);
   const reminder = useReminder(profile, totalMl);
+  const streak = useStreak(totalMl, profile.daily_goal_ml);
 
   const pct = Math.min(100, (totalMl / profile.daily_goal_ml) * 100);
-  const quoteIndex = Math.min(4, Math.floor(pct / 25));
   const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
+
+  async function handleLogPastDrink(amountMl: number, timeStr: string) {
+    const [h, m] = timeStr.split(':').map(Number);
+    const past = new Date();
+    past.setHours(h, m, 0, 0);
+    // Sanity check: don't allow future times
+    if (past > new Date()) past.setTime(new Date().getTime() - 60_000);
+    await addIntake(amountMl, past);
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-sky-950 flex flex-col">
@@ -64,19 +68,23 @@ export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
       </header>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-8 space-y-5" style={{ scrollbarWidth: 'none' }}>
+      <div
+        className="flex-1 overflow-y-auto px-4 pb-10 space-y-4"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {/* Daily motivational message (dismissible) */}
+        <DailyMessage />
+
         {/* Water progress circle */}
-        <div className="pt-2">
-          <WaterCircle percentage={pct} consumedMl={totalMl} goalMl={profile.daily_goal_ml} />
+        <div className="pt-1">
+          <WaterCircle
+            percentage={pct}
+            consumedMl={totalMl}
+            goalMl={profile.daily_goal_ml}
+          />
         </div>
 
-        {/* Quote */}
-        <p className="text-center text-white/40 text-xs px-6 italic">
-          "{QUOTES[quoteIndex]}"
-          <span className="not-italic text-white/20"> — Frank Suarez</span>
-        </p>
-
-        {/* Reminder */}
+        {/* Reminder + deficit/catch-up */}
         <ReminderCard
           nextTime={reminder.nextTime}
           countdown={reminder.countdown}
@@ -85,7 +93,11 @@ export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
           notifPermission={reminder.notifPermission}
           completedGlasses={reminder.completedGlasses}
           totalGlasses={reminder.totalGlasses}
+          overdueGlasses={reminder.overdueGlasses}
+          firstOverdueTime={reminder.firstOverdueTime}
+          glassSizeMl={profile.glass_size_ml}
           onRequestPermission={reminder.requestPermission}
+          onLogPastDrink={handleLogPastDrink}
         />
 
         {/* Quick add */}
@@ -97,6 +109,16 @@ export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
           schedule={reminder.schedule}
           glassSizeMl={profile.glass_size_ml}
           onRemove={removeIntake}
+        />
+
+        {/* Habit streak tracker */}
+        <HabitCard
+          currentStreak={streak.currentStreak}
+          longestStreak={streak.longestStreak}
+          todayCompleted={streak.todayCompleted}
+          nextMilestone={streak.nextMilestone}
+          milestoneProgress={streak.milestoneProgress}
+          level={streak.level}
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download } from 'lucide-react';
-import { downloadICS, getCalendarApiUrl } from '../utils/calendar';
+import { openCalendar, downloadICS, type CalendarPlanParams } from '../utils/calendar';
 
 interface Props {
   nextTime: string | null;
@@ -14,6 +14,7 @@ interface Props {
   firstOverdueTime: string | null;
   glassSizeMl: number;
   schedule: string[];
+  calendarPlan: CalendarPlanParams | null;
   onRequestPermission: () => void;
   onLogPastDrink: (amountMl: number, time: string) => void;
 }
@@ -30,6 +31,7 @@ export function ReminderCard({
   firstOverdueTime,
   glassSizeMl,
   schedule,
+  calendarPlan,
   onRequestPermission,
   onLogPastDrink,
 }: Props) {
@@ -200,32 +202,47 @@ export function ReminderCard({
           {showCalendar && (
             <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
               <p className="text-white/40 text-xs leading-relaxed">
-                Guarda los <strong className="text-white/60">{schedule.length} recordatorios</strong> de hoy en tu calendario — se repiten cada día automáticamente.
+                Guarda <strong className="text-white/60">todo tu plan de hidratación</strong> en tu calendario —
+                cubre cada semana con el número correcto de recordatorios hasta alcanzar tu meta.
               </p>
 
-              {/* Primary: open via API URL so mobile handles it natively */}
-              <a
-                href={getCalendarApiUrl(schedule, glassSizeMl)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
-              >
-                <CalendarDays size={15} />
-                Guardar en mi calendario
-              </a>
+              {/* Primary action */}
+              {calendarPlan ? (
+                <button
+                  onClick={() => openCalendar(calendarPlan)}
+                  className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
+                >
+                  <CalendarDays size={15} />
+                  Guardar plan en mi calendario
+                </button>
+              ) : (
+                <button
+                  onClick={() => downloadICS(schedule, glassSizeMl)}
+                  className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
+                >
+                  <Download size={15} />
+                  Descargar recordatorios
+                </button>
+              )}
 
-              <p className="text-white/25 text-xs text-center leading-relaxed">
-                iOS abre Calendar automáticamente · Android abre Google Calendar · Desktop descarga el archivo
-              </p>
+              <div className="space-y-1">
+                <p className="text-white/25 text-xs text-center">
+                  📱 iOS — se abre Calendar para confirmar
+                </p>
+                <p className="text-white/25 text-xs text-center">
+                  🤖 Android — descarga el archivo, ábrelo para importar en Google Calendar
+                </p>
+              </div>
 
-              {/* Fallback manual download */}
-              <button
-                onClick={() => downloadICS(schedule, glassSizeMl)}
-                className="flex items-center justify-center gap-1.5 w-full text-white/35 hover:text-white/60 text-xs transition-colors py-1"
-              >
-                <Download size={12} />
-                Descargar archivo .ics manualmente
-              </button>
+              {calendarPlan && (
+                <button
+                  onClick={() => downloadICS(schedule, glassSizeMl)}
+                  className="flex items-center justify-center gap-1.5 w-full text-white/30 hover:text-white/55 text-xs transition-colors py-1"
+                >
+                  <Download size={11} />
+                  Solo descargar esta semana (.ics)
+                </button>
+              )}
             </div>
           )}
         </div>

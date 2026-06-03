@@ -1,25 +1,63 @@
-export function generateICS(schedule: string[], glassSizeMl: number): string {
+export interface CalendarPlanParams {
+  startDate: string;      // "YYYY-MM-DD"
+  initialGlasses: number;
+  finalGoalMl: number;
+  glassSizeMl: number;
+  wakeTime: string;
+  sleepTime: string;
+}
+
+function buildSearch(p: CalendarPlanParams): string {
+  return new URLSearchParams({
+    t0:    p.startDate,
+    ig:    String(p.initialGlasses),
+    goal:  String(p.finalGoalMl),
+    ml:    String(p.glassSizeMl),
+    wake:  p.wakeTime,
+    sleep: p.sleepTime,
+  }).toString();
+}
+
+/** Open the plan calendar.
+ *  - iOS: webcal:// → Calendar.app opens and asks to subscribe (includes all plan weeks)
+ *  - Android/Desktop: downloads the .ics → open to import into any calendar app */
+export function openCalendar(p: CalendarPlanParams): void {
+  const search = buildSearch(p);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  if (isIOS) {
+    window.location.href = `webcal://${window.location.host}/api/calendar?${search}`;
+  } else {
+    const a = document.createElement('a');
+    a.href = `/api/calendar?${search}`;
+    a.download = 'aquavital-plan.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+}
+
+// --- Legacy client-side ICS (fallback, not tied to plan weeks) ---
+
+export function downloadICS(schedule: string[], glassSizeMl: number): void {
   const today = new Date();
-  const yyyy = today.getFullYear();
-  const MM = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
+  const yyyy  = today.getFullYear();
+  const MM    = String(today.getMonth() + 1).padStart(2, '0');
+  const dd    = String(today.getDate()).padStart(2, '0');
   const dateStr = `${yyyy}${MM}${dd}`;
 
   const events = schedule.map((time, i) => {
     const [h, m] = time.split(':').map(Number);
     const hStr = String(h).padStart(2, '0');
     const mStr = String(m).padStart(2, '0');
-    const dtStart = `${dateStr}T${hStr}${mStr}00`;
-    const uid = `aquavital-${hStr}${mStr}-${i}@aquavital`;
-
     return [
       'BEGIN:VEVENT',
-      `UID:${uid}`,
-      `DTSTART:${dtStart}`,
+      `UID:aquavital-${hStr}${mStr}-${i}@aquavital`,
+      `DTSTART:${dateStr}T${hStr}${mStr}00`,
       'DURATION:PT1M',
-      'RRULE:FREQ=DAILY',
+      'RRULE:FREQ=DAILY;COUNT=7',
       `SUMMARY:💧 Tomar agua (${glassSizeMl} ml)`,
-      `DESCRIPTION:Toma #${i + 1} del día. Bebe ${glassSizeMl} ml de agua pura. — AquaVital`,
+      `DESCRIPTION:Toma #${i + 1}. Bebe ${glassSizeMl} ml. — AquaVital`,
       'BEGIN:VALARM',
       'TRIGGER:PT0S',
       'ACTION:DISPLAY',
@@ -29,37 +67,20 @@ export function generateICS(schedule: string[], glassSizeMl: number): string {
     ].join('\r\n');
   });
 
-  return [
+  const ics = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//AquaVital//Hydration Reminders//ES',
     'X-WR-CALNAME:AquaVital – Hidratación',
-    'X-WR-CALDESC:Recordatorios diarios de hidratación · AquaVital',
     ...events,
     'END:VCALENDAR',
   ].join('\r\n');
-}
 
-/** URL to the Vercel API endpoint that serves the ICS with proper Content-Type.
- *  Mobile browsers (iOS/Android) will open this directly in the native calendar app. */
-export function getCalendarApiUrl(schedule: string[], glassSizeMl: number): string {
-  const params = new URLSearchParams({
-    schedule: schedule.join(','),
-    ml: String(glassSizeMl),
-  });
-  return `/api/calendar?${params.toString()}`;
-}
-
-/** Fallback: download ICS client-side (works on desktop, requires manual import on mobile). */
-export function downloadICS(schedule: string[], glassSizeMl: number): void {
-  const content = generateICS(schedule, glassSizeMl);
-  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'aquavital-recordatorios.ics';
-  document.body.appendChild(a);
-  a.click();
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = 'aquavital-recordatorios.ics';
+  document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }

@@ -104,6 +104,14 @@ export function Dashboard({ profile, plan, userId, onEditProfile, onLogout }: Pr
           firstOverdueTime={reminder.firstOverdueTime}
           glassSizeMl={profile.glass_size_ml}
           schedule={reminder.schedule}
+          calendarPlan={plan.planStartDate ? {
+            startDate: plan.planStartDate,
+            initialGlasses: plan.planInitialGlasses,
+            finalGoalMl: profile.daily_goal_ml,
+            glassSizeMl: profile.glass_size_ml,
+            wakeTime: profile.wake_time,
+            sleepTime: profile.sleep_time,
+          } : null}
           onRequestPermission={reminder.requestPermission}
           onLogPastDrink={handleLogPastDrink}
         />

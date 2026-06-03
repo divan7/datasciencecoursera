@@ -75,6 +75,8 @@ export function usePlan(profile: UserProfile | null, userId: string | null) {
     currentGoalMl,
     isOnFinalGoal: weekIndex >= weeks.length - 1,
     daysIntoWeek: daysSinceStart % 7,
+    planStartDate: stored?.startDate ?? null,
+    planInitialGlasses: stored?.initialGlasses ?? 0,
     startPlan,
     resetPlan,
   };

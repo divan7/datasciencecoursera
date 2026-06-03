@@ -13,8 +13,9 @@ export default function App() {
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
   const [showSetup, setShowSetup] = useState(false);
 
-  const { profile, loading: profileLoading, saveProfile, clearProfile } = useProfile(user?.id ?? null);
-  const plan = usePlan(profile);
+  const userId = user?.id ?? null;
+  const { profile, loading: profileLoading, saveProfile, clearProfile } = useProfile(userId);
+  const plan = usePlan(profile, userId);
 
   // Supabase auth listener
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function App() {
     if (supabase) await supabase.auth.signOut();
     setUser(null);
     clearProfile();
-    plan.resetPlan();
+    // Plan is keyed by userId — preserved in localStorage for when they log back in
   }
 
   // Loading splash

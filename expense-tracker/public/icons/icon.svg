@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo teal -->
+  <rect width="512" height="512" rx="112" fill="#0c6878"/>
+  <!-- Casa -->
+  <path d="M256 120 L120 240 L156 240 L156 380 L220 380 L220 300 L292 300 L292 380 L356 380 L356 240 L392 240 Z" fill="white"/>
+  <!-- Ventana -->
+  <rect x="224" y="168" width="64" height="52" rx="8" fill="#0c6878" opacity="0.5"/>
+  <!-- Texto SOI -->
+  <text x="256" y="448" text-anchor="middle" font-size="48" font-weight="900" font-family="sans-serif" fill="white" opacity="0.85">SOI</text>
+</svg>

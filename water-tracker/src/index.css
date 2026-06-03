@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Wave animations for WaterCircle */
+@keyframes wave1 {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: #0f172a;
+  color: #fff;
+  overscroll-behavior: none;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* Hide scrollbar globally but keep functionality */
+::-webkit-scrollbar { display: none; }
+
+/* Time inputs on dark backgrounds */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.4);
+}
+input[type="time"] {
+  color-scheme: dark;
+}

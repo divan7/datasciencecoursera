@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download } from 'lucide-react';
-import { openCalendar, downloadICS, type CalendarPlanParams } from '../utils/calendar';
+import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download, Copy, Check } from 'lucide-react';
+import { openCalendar, downloadICS, getCalendarUrl, type CalendarPlanParams } from '../utils/calendar';
+
+const isIOS     = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isAndroid = /Android/.test(navigator.userAgent);
 
 interface Props {
   nextTime: string | null;
@@ -37,7 +40,14 @@ export function ReminderCard({
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [icsDownloaded, setIcsDownloaded] = useState(false);
+  const [urlCopied, setUrlCopied] = useState(false);
+
+  async function copyCalendarUrl() {
+    if (!calendarPlan) return;
+    await navigator.clipboard.writeText(getCalendarUrl(calendarPlan));
+    setUrlCopied(true);
+    setTimeout(() => setUrlCopied(false), 3000);
+  }
   const [catchUpTime, setCatchUpTime] = useState(firstOverdueTime ?? '');
   const [catchUpAmount, setCatchUpAmount] = useState(String(glassSizeMl));
 
@@ -203,51 +213,58 @@ export function ReminderCard({
           {showCalendar && (
             <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
               <p className="text-white/40 text-xs leading-relaxed">
-                Guarda <strong className="text-white/60">todo tu plan de hidratación</strong> en tu calendario —
-                cubre cada semana con el número correcto de recordatorios hasta alcanzar tu meta.
+                Agrega <strong className="text-white/60">todo tu plan de hidratación</strong> al calendario —
+                cubre cada semana con los recordatorios correctos hasta alcanzar tu meta.
               </p>
 
-              {/* Primary action */}
-              {calendarPlan ? (
+              {/* iOS — webcal:// subscription */}
+              {isIOS && calendarPlan && (
                 <button
-                  onClick={() => { openCalendar(calendarPlan); setIcsDownloaded(true); }}
+                  onClick={() => openCalendar(calendarPlan)}
                   className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
                 >
                   <CalendarDays size={15} />
-                  Guardar plan en mi calendario
-                </button>
-              ) : (
-                <button
-                  onClick={() => { downloadICS(schedule, glassSizeMl); setIcsDownloaded(true); }}
-                  className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
-                >
-                  <Download size={15} />
-                  Descargar recordatorios
+                  Agregar a Calendar (iOS)
                 </button>
               )}
 
-              {/* Post-action hint */}
-              {icsDownloaded && (
-                <div className="bg-sky-500/10 border border-sky-400/25 rounded-xl px-3 py-2.5 space-y-1">
-                  <p className="text-sky-200 text-xs font-semibold">📅 Abriendo Google Calendar…</p>
-                  <p className="text-sky-200/70 text-xs leading-relaxed">
-                    Confirma <strong className="text-sky-200/90">"Agregar calendario"</strong> en la pantalla que se abre. Si no se abrió automáticamente, toca el botón de nuevo.
-                  </p>
+              {/* Android — copy URL + manual instructions */}
+              {isAndroid && calendarPlan && (
+                <div className="space-y-2">
+                  <button
+                    onClick={copyCalendarUrl}
+                    className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
+                  >
+                    {urlCopied ? <Check size={15} /> : <Copy size={15} />}
+                    {urlCopied ? '¡URL copiada!' : 'Copiar URL del calendario'}
+                  </button>
+                  <div className="bg-white/5 rounded-xl px-3 py-3 space-y-2 border border-white/8">
+                    <p className="text-white/60 text-xs font-semibold">Pasos en Google Calendar:</p>
+                    <ol className="text-white/40 text-xs space-y-1 list-none">
+                      <li>1. Abre <strong className="text-white/60">Google Calendar</strong></li>
+                      <li>2. Toca el menú <strong className="text-white/60">☰</strong> → <strong className="text-white/60">Otros calendarios</strong> → <strong className="text-white/60">+</strong></li>
+                      <li>3. Selecciona <strong className="text-white/60">"Desde URL"</strong></li>
+                      <li>4. Pega la URL y toca <strong className="text-white/60">"Agregar calendario"</strong></li>
+                    </ol>
+                  </div>
                 </div>
               )}
 
-              <div className="space-y-1">
-                <p className="text-white/25 text-xs text-center">
-                  📱 iOS — se abre Calendar para confirmar
-                </p>
-                <p className="text-white/25 text-xs text-center">
-                  🤖 Android — se abre Google Calendar para agregar
-                </p>
-              </div>
-
-              {calendarPlan && (
+              {/* Desktop — download ICS */}
+              {!isIOS && !isAndroid && (
                 <button
-                  onClick={() => { downloadICS(schedule, glassSizeMl); setIcsDownloaded(true); }}
+                  onClick={() => calendarPlan ? openCalendar(calendarPlan) : downloadICS(schedule, glassSizeMl)}
+                  className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
+                >
+                  <Download size={15} />
+                  Descargar plan (.ics)
+                </button>
+              )}
+
+              {/* Fallback download for iOS/Android */}
+              {(isIOS || isAndroid) && calendarPlan && (
+                <button
+                  onClick={() => downloadICS(schedule, glassSizeMl)}
                   className="flex items-center justify-center gap-1.5 w-full text-white/30 hover:text-white/55 text-xs transition-colors py-1"
                 >
                   <Download size={11} />

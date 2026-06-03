@@ -37,7 +37,7 @@ export function WaterAssessment({ profile, onStart }: Props) {
             <Droplets size={28} className="text-sky-400" />
           </div>
           <h1 className="text-2xl font-black text-white">Tu plan de hidratación</h1>
-          <p className="text-sky-300/50 text-xs mt-1">Método Frank Suarez · MetabolismoTV</p>
+          <p className="text-sky-300/50 text-xs mt-1">Método científico de hidratación</p>
         </div>
 
         {/* ── INTRO TEXT ─────────────────────────────────────────── */}
@@ -48,7 +48,7 @@ export function WaterAssessment({ profile, onStart }: Props) {
           </p>
 
           <p className="text-white/75 text-sm leading-relaxed">
-            Frank Suarez lo repetía siempre:{' '}
+            La ciencia es clara:{' '}
             <em className="text-sky-200 not-italic font-medium">
               "El metabolismo lento casi siempre tiene detrás un cuerpo deshidratado."
             </em>{' '}
@@ -63,7 +63,7 @@ export function WaterAssessment({ profile, onStart }: Props) {
 
           <div className="border-t border-white/8 pt-4 space-y-2">
             <p className="text-white/85 text-sm font-semibold">
-              Por eso seguiremos el enfoque que Frank recomendaba:
+              Por eso seguiremos un enfoque gradual y sostenible:
             </p>
             <p className="text-sky-200/80 text-sm leading-relaxed">
               Sumar <strong className="text-sky-300">2 vasos por semana</strong> hasta llegar
@@ -91,7 +91,7 @@ export function WaterAssessment({ profile, onStart }: Props) {
           <p className="text-white/40 text-xs border-t border-white/8 pt-3 leading-snug">
             Tu meta final: <strong className="text-white/60">{formatMl(profile.daily_goal_ml)}/día</strong>{' '}
             ({Math.ceil(profile.daily_goal_ml / profile.glass_size_ml)} vasos de {profile.glass_size_ml} ml)
-            — calculada con la fórmula de Frank Suarez para {profile.weight_kg} kg.
+            — calculada según tu peso y nivel de actividad para {profile.weight_kg} kg.
           </p>
         </div>
 

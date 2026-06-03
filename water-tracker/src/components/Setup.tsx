@@ -63,7 +63,7 @@ export function Setup({ onSave, loading, isEditing }: Props) {
             {isEditing ? 'Editar perfil' : 'Configura tu perfil'}
           </h1>
           <p className="text-sky-300/50 text-xs mt-1">
-            Fórmula de Frank Suarez · MetabolismoTV
+            Basado en ciencia de la hidratación
           </p>
         </div>
 
@@ -178,7 +178,7 @@ export function Setup({ onSave, loading, isEditing }: Props) {
           {/* Preview */}
           {preview > 0 && (
             <div className="bg-sky-500/20 rounded-2xl p-4 border border-sky-400/30 text-center">
-              <p className="text-sky-300 text-sm">Tu meta diaria (Frank Suarez)</p>
+              <p className="text-sky-300 text-sm">Tu meta diaria recomendada</p>
               <p className="text-white text-4xl font-black mt-1">
                 {preview.toLocaleString('es')} ml
               </p>

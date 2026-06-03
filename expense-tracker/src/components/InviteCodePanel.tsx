@@ -90,9 +90,12 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
     setInvites((prev) => prev.filter((i) => i.id !== id));
   };
 
+  const joinUrl = (code: string) => `${window.location.origin}${window.location.pathname}?join=${code}`;
+
   const handleCopy = () => {
     if (!activeInvite) return;
-    const text = `Te invito a unirte a mi lista "${space.name}" en Orden Casa.\nUsa el código: ${activeInvite.code}`;
+    const url = joinUrl(activeInvite.code);
+    const text = `Te invito a unirte a mi lista "${space.name}" en Orden Casa.\nEntra con este enlace: ${url}\nO usa el código: ${activeInvite.code}`;
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -101,8 +104,9 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
 
   const handleWhatsApp = () => {
     if (!activeInvite) return;
+    const url = joinUrl(activeInvite.code);
     const text = encodeURIComponent(
-      `Te invito a unirte a mi lista "${space.name}" en Orden Casa 🏠\nUsa el código: *${activeInvite.code}*`
+      `Te invito a unirte a mi lista "${space.name}" en Orden Casa 🏠\nEntra con este enlace: ${url}\nO usa el código: *${activeInvite.code}*`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
@@ -137,6 +141,9 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
             </p>
             <p className="text-xs text-gray-400 mt-1">
               Válido {daysLeft(activeInvite.expiresAt)} días más · {activeInvite.useCount}/{activeInvite.maxUses} usos
+            </p>
+            <p className="text-xs text-teal-700 mt-1.5 font-medium break-all px-1">
+              🔗 {joinUrl(activeInvite.code)}
             </p>
           </div>
 

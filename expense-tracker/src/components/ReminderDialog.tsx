@@ -38,33 +38,30 @@ function openUrl(url: string) {
 export function ReminderDialog({ template, onUpdate, onClose }: Props) {
   const [step, setStep]         = useState<Step>('choose');
   const [chosenType, setChosenType] = useState<ReminderType | null>(null);
-  const [daysBefore, setDaysBefore] = useState(1);
+  const [daysBefore, setDaysBefore] = useState(template.reminderDaysBefore ?? 1);
 
   const dueDate  = getEffectiveDueDate(template);
   const onIPhone = isIOS();
 
-  const selectType = (type: ReminderType) => {
-    setChosenType(type);
-    setStep('days');
-  };
-
-  const handleConfirm = async () => {
-    if (!chosenType) return;
+  const handleConfirm = async (type?: ReminderType, days?: number) => {
+    const t = type ?? chosenType;
+    const d = days ?? daysBefore;
+    if (!t) return;
 
     try {
       // Open Google Calendar URL *before* any await to avoid popup blockers on mobile
-      if (chosenType === 'google' || chosenType === 'both') {
+      if (t === 'google' || t === 'both') {
         const url = buildGoogleCalendarUrl(template);
         if (url) openUrl(url);
       }
 
-      if (chosenType === 'ics') {
-        downloadICS(template, daysBefore);
+      if (t === 'ics') {
+        downloadICS(template, d);
       }
 
-      if (chosenType === 'push' || chosenType === 'both') {
+      if (t === 'push' || t === 'both') {
         const granted = await requestNotificationPermission();
-        onUpdate(template.id, { reminderEnabled: granted, reminderDaysBefore: daysBefore });
+        onUpdate(template.id, { reminderEnabled: granted, reminderDaysBefore: d });
       }
     } catch (err) {
       console.error('Error configurando recordatorio:', err);
@@ -72,6 +69,16 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
 
     setStep('done');
     setTimeout(onClose, 2200);
+  };
+
+  const selectType = (type: ReminderType) => {
+    setChosenType(type);
+    // If days were already configured (e.g. from FixedTemplateFromExpenseModal), skip that step
+    if (template.reminderDaysBefore != null) {
+      handleConfirm(type, template.reminderDaysBefore);
+    } else {
+      setStep('days');
+    }
   };
 
   return (
@@ -202,7 +209,7 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
 
             <div className="flex gap-2">
               <button
-                onClick={handleConfirm}
+                onClick={() => handleConfirm()}
                 className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-all"
               >
                 Confirmar

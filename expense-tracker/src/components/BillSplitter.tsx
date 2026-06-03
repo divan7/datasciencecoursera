@@ -15,9 +15,11 @@ interface BillSplitterProps {
   onClose: () => void;
   /** Called when user clicks "Aplicar" — receives per-item obligation arrays */
   onApplySplit?: (itemObligations: ObligationEntry[][]) => void;
+  /** Called when user clicks "Prorratear" — creates separate records per member per item */
+  onApplyProrate?: (itemObligations: ObligationEntry[][]) => void;
 }
 
-export function BillSplitter({ items, members, onClose, onApplySplit }: BillSplitterProps) {
+export function BillSplitter({ items, members, onClose, onApplySplit, onApplyProrate }: BillSplitterProps) {
   const [participants, setParticipants] = useState<string[]>(members.map((m) => m.name));
   const [assignments, setAssignments] = useState<Record<number, string[]>>({});
   const [tipMode, setTipMode] = useState<'pct' | 'fixed'>('pct');
@@ -297,11 +299,19 @@ export function BillSplitter({ items, members, onClose, onApplySplit }: BillSpli
                 <button
                   type="button"
                   onClick={copySummary}
-                  className="flex-1 py-3 rounded-2xl border-2 border-purple-200 text-purple-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-purple-50 transition-all active:scale-95"
+                  className="flex-shrink-0 py-3 px-4 rounded-2xl border-2 border-purple-200 text-purple-700 text-sm font-bold flex items-center justify-center gap-2 hover:bg-purple-50 transition-all active:scale-95"
                 >
                   {copied ? <Check size={16} /> : <Copy size={16} />}
-                  {copied ? '¡Copiado!' : 'Copiar'}
                 </button>
+                {onApplyProrate && (
+                  <button
+                    type="button"
+                    onClick={() => { onApplyProrate(itemObligations); onClose(); }}
+                    className="flex-1 py-3 rounded-2xl text-sm font-bold border-2 border-teal-600 text-teal-700 flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                  >
+                    ↕ Prorratear
+                  </button>
+                )}
                 {onApplySplit && (
                   <button
                     type="button"
@@ -310,7 +320,7 @@ export function BillSplitter({ items, members, onClose, onApplySplit }: BillSpli
                     style={{ backgroundColor: '#0c6878' }}
                   >
                     <Check size={16} />
-                    Aplicar división
+                    Aplicar
                   </button>
                 )}
               </div>

@@ -7,11 +7,12 @@ import { saveFiscalProfile } from '../utils/fiscalStorage';
 interface Props {
   userId: string;
   initialProfile: FiscalProfile;
+  onSave?: (profile: FiscalProfile) => void;
 }
 
 const RFC_RE = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i;
 
-export function FiscalProfileSection({ userId, initialProfile }: Props) {
+export function FiscalProfileSection({ userId, initialProfile, onSave }: Props) {
   const [form, setForm] = useState<FiscalProfile>(initialProfile);
   const [saved, setSaved] = useState(false);
   const [rfcError, setRfcError] = useState('');
@@ -27,12 +28,14 @@ export function FiscalProfileSection({ userId, initialProfile }: Props) {
     setRfcError('');
     // Keep regimenFiscal in sync with regimenes[0] for backward compat
     const regimenes = form.regimenes ?? (form.regimenFiscal ? [form.regimenFiscal] : []);
-    saveFiscalProfile({
+    const saved = {
       ...form,
       rfc: form.rfc?.trim().toUpperCase(),
       regimenes,
       regimenFiscal: regimenes[0],
-    }, userId);
+    };
+    saveFiscalProfile(saved, userId);
+    onSave?.(saved);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };

@@ -83,7 +83,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
   const canSave = activeRows.length > 0 && activeRows.every((r) => r.concept.trim() && parseFloat(r.amount) > 0);
   const isTicket = activeRows.length > 1;
 
-  // Called by BillSplitter "Aplicar división" — writes per-item obligations to each row
+  // Called by BillSplitter "Aplicar" — writes per-item obligations to each row
   const handleApplySplit = (itemObligations: ObligationEntry[][]) => {
     let activeIdx = 0;
     setRows((prev) =>
@@ -93,6 +93,26 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         return { ...r, obligations: obs && obs.length > 0 ? obs : undefined };
       })
     );
+  };
+
+  // Called by BillSplitter "Prorratear" — expands each row into N rows (one per member)
+  const handleApplyProrate = (itemObligations: ObligationEntry[][]) => {
+    const newRows: RowState[] = [];
+    let activeIdx = 0;
+    for (const row of rows) {
+      if (row.removed) { newRows.push(row); continue; }
+      const obs = itemObligations[activeIdx++];
+      if (!obs || obs.length === 0) { newRows.push(row); continue; }
+      for (const ob of obs) {
+        newRows.push({
+          ...row,
+          paidBy: ob.name,
+          amount: String(ob.amount),
+          obligations: undefined,
+        });
+      }
+    }
+    setRows(newRows);
   };
 
   const handleSave = () => {
@@ -373,6 +393,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           members={currentSpaceMembers(activeRows[0]?.spaceId ?? defaultSpaceId)}
           onClose={() => setShowBillSplitter(false)}
           onApplySplit={handleApplySplit}
+          onApplyProrate={handleApplyProrate}
         />
       )}
 

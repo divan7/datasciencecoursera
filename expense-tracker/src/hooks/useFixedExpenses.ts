@@ -38,15 +38,43 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveTemplates(merged, spaceId);
     }).catch((err) => console.error('No se leyeron plantillas remotas, se mantienen las locales:', err));
 
-    // Checks — non-destructive merge
+    // Checks — status-aware merge: confirmado > omitido > pendiente
     fixedDb.listChecks(spaceId).then((remote) => {
-      const remoteIds = new Set(remote.map((c) => c.id));
-      const localOnly = localChecks.filter((c) => !remoteIds.has(c.id));
-      if (localOnly.length > 0) {
-        fixedDb.upsertChecks(spaceId, localOnly)
-          .catch((err) => console.error('Re-sync checks locales fallido:', err));
+      const STATUS_PRIORITY: Record<string, number> = { confirmado: 2, omitido: 1, pendiente: 0 };
+      const mergeKey = (c: MonthlyCheck) => `${c.templateId}_${c.month}`;
+
+      // Build a map keyed by template+month, keeping the "best" status across local and remote
+      const byKey = new Map<string, MonthlyCheck>();
+      const prefer = (a: MonthlyCheck, b: MonthlyCheck) =>
+        (STATUS_PRIORITY[a.status] ?? 0) >= (STATUS_PRIORITY[b.status] ?? 0) ? a : b;
+
+      for (const c of [...remote, ...localChecks]) {
+        const key = mergeKey(c);
+        byKey.set(key, byKey.has(key) ? prefer(byKey.get(key)!, c) : c);
       }
-      const merged = [...remote, ...localOnly];
+      const merged = Array.from(byKey.values());
+
+      // Upload checks that "won" the merge but differ from remote (fix Supabase state)
+      const remoteByKey = new Map(remote.map((c) => [mergeKey(c), c]));
+      const toUpload = merged.filter((c) => {
+        const rem = remoteByKey.get(mergeKey(c));
+        if (!rem) return true; // not in remote at all
+        // Different status OR different ID (local won by status priority) → fix remote
+        return rem.status !== c.status || rem.id !== c.id;
+      });
+      const pendingOnly = toUpload.filter((c) => c.status === 'pendiente');
+      const confirmedOrSkipped = toUpload.filter((c) => c.status !== 'pendiente');
+      // New pendiente checks: insert only, never overwrite a confirmed row
+      if (pendingOnly.length > 0) {
+        fixedDb.insertChecksIfNew(spaceId, pendingOnly)
+          .catch((err) => console.error('Re-sync checks pendientes fallido:', err));
+      }
+      // Confirmed/skipped local wins: push the update to remote
+      if (confirmedOrSkipped.length > 0) {
+        fixedDb.upsertChecks(spaceId, confirmedOrSkipped)
+          .catch((err) => console.error('Re-sync checks confirmados fallido:', err));
+      }
+
       setChecks(merged);
       saveChecks(merged, spaceId);
     }).catch((err) => console.error('No se leyeron checks remotos, se mantienen los locales:', err));
@@ -122,7 +150,9 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       const updated = [...prev, ...newChecks];
       saveChecks(updated, spaceId);
       if (isSupabaseConfigured) {
-        fixedDb.upsertChecks(spaceId, newChecks).catch(console.error);
+        // Use insertChecksIfNew so we never overwrite a confirmed/skipped check in Supabase
+        // that was created on another device but hasn't synced to local yet.
+        fixedDb.insertChecksIfNew(spaceId, newChecks).catch(console.error);
       }
       return updated;
     });

@@ -414,6 +414,22 @@ export const fixedDb = {
     );
   },
 
+  // Inserts new pendiente checks only — does NOT overwrite an existing confirmed/skipped row.
+  async insertChecksIfNew(spaceId: string, checks: MonthlyCheck[]): Promise<void> {
+    if (!supabase || !checks.length) return;
+    await supabase.from('fixed_expense_checks').upsert(
+      checks.map((c) => ({
+        id: c.id, space_id: spaceId, template_id: c.templateId,
+        month: c.month, status: c.status,
+        expense_id: c.expenseId ?? null,
+        actual_amount: c.actualAmount ?? null,
+        confirmed_at: c.confirmedAt ?? null,
+        notes: c.notes ?? null,
+      })),
+      { onConflict: 'template_id,month', ignoreDuplicates: true }
+    );
+  },
+
   async updateCheck(check: MonthlyCheck, spaceId: string): Promise<void> {
     if (!supabase) return;
     await supabase.from('fixed_expense_checks').upsert({

@@ -7,37 +7,46 @@ import { IntakeTimeline } from './IntakeTimeline';
 import { ReminderCard } from './ReminderCard';
 import { HabitCard } from './HabitCard';
 import { DailyMessage } from './DailyMessage';
+import { PlanCard } from './PlanCard';
 import { useIntake } from '../hooks/useIntake';
 import { useReminder } from '../hooks/useReminder';
 import { useStreak } from '../hooks/useStreak';
 import type { UserProfile } from '../types';
+import type { usePlan } from '../hooks/usePlan';
+
+type PlanHook = ReturnType<typeof usePlan>;
 
 interface Props {
   profile: UserProfile;
+  plan: PlanHook;
   userId: string | null;
   onEditProfile: () => void;
   onLogout: () => void;
 }
 
-export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
+export function Dashboard({ profile, plan, userId, onEditProfile, onLogout }: Props) {
   const { logs, totalMl, addIntake, removeIntake } = useIntake(userId);
-  const reminder = useReminder(profile, totalMl);
-  const streak = useStreak(totalMl, profile.daily_goal_ml);
 
-  const pct = Math.min(100, (totalMl / profile.daily_goal_ml) * 100);
+  // Use the current week's goal from the plan (not the final profile goal)
+  const effectiveGoalMl = plan.currentGoalMl;
+
+  const reminder = useReminder(profile, totalMl, effectiveGoalMl);
+  const streak   = useStreak(totalMl, effectiveGoalMl);
+
+  const pct   = effectiveGoalMl > 0 ? Math.min(100, (totalMl / effectiveGoalMl) * 100) : 0;
   const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
 
   async function handleLogPastDrink(amountMl: number, timeStr: string) {
     const [h, m] = timeStr.split(':').map(Number);
     const past = new Date();
     past.setHours(h, m, 0, 0);
-    // Sanity check: don't allow future times
     if (past > new Date()) past.setTime(new Date().getTime() - 60_000);
     await addIntake(amountMl, past);
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-sky-950 flex flex-col">
+
       {/* Header */}
       <header className="flex items-center justify-between px-4 pt-6 pb-2 flex-shrink-0">
         <div>
@@ -68,11 +77,9 @@ export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
       </header>
 
       {/* Scrollable content */}
-      <div
-        className="flex-1 overflow-y-auto px-4 pb-10 space-y-4"
-        style={{ scrollbarWidth: 'none' }}
-      >
-        {/* Daily motivational message (dismissible) */}
+      <div className="flex-1 overflow-y-auto px-4 pb-10 space-y-4" style={{ scrollbarWidth: 'none' }}>
+
+        {/* Daily motivational message */}
         <DailyMessage />
 
         {/* Water progress circle */}
@@ -80,11 +87,11 @@ export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
           <WaterCircle
             percentage={pct}
             consumedMl={totalMl}
-            goalMl={profile.daily_goal_ml}
+            goalMl={effectiveGoalMl}
           />
         </div>
 
-        {/* Reminder + deficit/catch-up */}
+        {/* Reminder + deficit / catch-up */}
         <ReminderCard
           nextTime={reminder.nextTime}
           countdown={reminder.countdown}
@@ -103,13 +110,26 @@ export function Dashboard({ profile, userId, onEditProfile, onLogout }: Props) {
         {/* Quick add */}
         <QuickAdd glassSizeMl={profile.glass_size_ml} onAdd={addIntake} />
 
-        {/* Schedule / timeline */}
+        {/* Scheduled intake timeline */}
         <IntakeTimeline
           logs={logs}
           schedule={reminder.schedule}
           glassSizeMl={profile.glass_size_ml}
           onRemove={removeIntake}
         />
+
+        {/* Gradual plan progress */}
+        {plan.currentWeek && (
+          <PlanCard
+            currentWeekNumber={plan.currentWeekNumber}
+            totalWeeks={plan.totalWeeks}
+            currentWeek={plan.currentWeek}
+            nextWeek={plan.nextWeek}
+            isOnFinalGoal={plan.isOnFinalGoal}
+            daysIntoWeek={plan.daysIntoWeek}
+            glassSizeMl={profile.glass_size_ml}
+          />
+        )}
 
         {/* Habit streak tracker */}
         <HabitCard

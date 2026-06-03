@@ -4,7 +4,7 @@ import type { UserProfile } from '../types';
 
 const isNotifSupported = typeof Notification !== 'undefined';
 
-export function useReminder(profile: UserProfile | null, totalMl: number) {
+export function useReminder(profile: UserProfile | null, totalMl: number, effectiveGoalMl: number) {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     isNotifSupported ? Notification.permission : 'denied',
   );
@@ -17,11 +17,11 @@ export function useReminder(profile: UserProfile | null, totalMl: number) {
   }, []);
 
   const schedule = profile
-    ? buildSchedule(profile.daily_goal_ml, profile.glass_size_ml, profile.wake_time, profile.sleep_time)
+    ? buildSchedule(effectiveGoalMl, profile.glass_size_ml, profile.wake_time, profile.sleep_time)
     : [];
 
   const completedGlasses = profile ? Math.floor(totalMl / profile.glass_size_ml) : 0;
-  const totalGlasses = profile ? dailyGlasses(profile.daily_goal_ml, profile.glass_size_ml) : 0;
+  const totalGlasses = profile ? dailyGlasses(effectiveGoalMl, profile.glass_size_ml) : 0;
   const status = getScheduleStatus(schedule, completedGlasses);
 
   // Glasses whose scheduled time has passed but haven't been consumed yet

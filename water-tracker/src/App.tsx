@@ -3,9 +3,11 @@ import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { useProfile } from './hooks/useProfile';
 import { usePlan } from './hooks/usePlan';
+import { useJournal } from './hooks/useJournal';
 import { Auth } from './components/Auth';
 import { Setup } from './components/Setup';
 import { WaterAssessment } from './components/WaterAssessment';
+import { JournalEntryPage } from './components/JournalEntryPage';
 import { Dashboard } from './components/Dashboard';
 
 export default function App() {
@@ -16,6 +18,7 @@ export default function App() {
   const userId = user?.id ?? null;
   const { profile, loading: profileLoading, saveProfile, clearProfile } = useProfile(userId);
   const plan = usePlan(profile, userId);
+  const journal = useJournal(userId);
 
   // Supabase auth listener
   useEffect(() => {
@@ -83,11 +86,37 @@ export default function App() {
     );
   }
 
-  // Step 3 — Main dashboard
+  // Step 3a — Expectation journal (once, right after plan starts)
+  if (plan.hasPlan && !journal.hasSeenExpectation) {
+    return (
+      <JournalEntryPage
+        type="expectation"
+        weekNumber={1}
+        onSave={async (content) => { await journal.addEntry(1, 'expectation', content); }}
+        onSkip={() => journal.markSeen('expectation')}
+      />
+    );
+  }
+
+  // Step 3b — Weekly reflection (once per completed week)
+  const completedWeek = plan.currentWeekNumber > 1 ? plan.currentWeekNumber - 1 : null;
+  if (completedWeek && !journal.hasSeenWeekPrompt(completedWeek)) {
+    return (
+      <JournalEntryPage
+        type="weekly_reflection"
+        weekNumber={completedWeek}
+        onSave={async (content) => { await journal.addEntry(completedWeek, 'weekly_reflection', content); }}
+        onSkip={() => journal.markSeen(`week-${completedWeek}`)}
+      />
+    );
+  }
+
+  // Step 4 — Main dashboard
   return (
     <Dashboard
       profile={profile}
       plan={plan}
+      journal={journal}
       userId={user?.id ?? null}
       onEditProfile={() => setShowSetup(true)}
       onLogout={handleLogout}

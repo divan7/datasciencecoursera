@@ -1,4 +1,5 @@
-import { Settings, LogOut, Droplets } from 'lucide-react';
+import { useState } from 'react';
+import { Settings, LogOut, Droplets, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { WaterCircle } from './WaterCircle';
@@ -13,18 +14,22 @@ import { useReminder } from '../hooks/useReminder';
 import { useStreak } from '../hooks/useStreak';
 import type { UserProfile } from '../types';
 import type { usePlan } from '../hooks/usePlan';
+import type { useJournal } from '../hooks/useJournal';
 
 type PlanHook = ReturnType<typeof usePlan>;
+type JournalHook = ReturnType<typeof useJournal>;
 
 interface Props {
   profile: UserProfile;
   plan: PlanHook;
+  journal: JournalHook;
   userId: string | null;
   onEditProfile: () => void;
   onLogout: () => void;
 }
 
-export function Dashboard({ profile, plan, userId, onEditProfile, onLogout }: Props) {
+export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLogout }: Props) {
+  const [showJournal, setShowJournal] = useState(false);
   const { logs, totalMl, addIntake, removeIntake } = useIntake(userId);
 
   // Use the current week's goal from the plan (not the final profile goal)
@@ -149,6 +154,47 @@ export function Dashboard({ profile, plan, userId, onEditProfile, onLogout }: Pr
           milestoneProgress={streak.milestoneProgress}
           level={streak.level}
         />
+
+        {/* Journal history */}
+        {journal.entries.length > 0 && (
+          <div className="bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+            <button
+              onClick={() => setShowJournal((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-white/5 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <BookOpen size={15} className="text-sky-400" />
+                <span className="text-white/70 text-sm font-medium">Mi diario</span>
+                <span className="bg-sky-500/20 text-sky-300 text-xs rounded-full px-2 py-0.5">
+                  {journal.entries.length}
+                </span>
+              </div>
+              {showJournal ? <ChevronUp size={15} className="text-white/30" /> : <ChevronDown size={15} className="text-white/30" />}
+            </button>
+
+            {showJournal && (
+              <div className="border-t border-white/8 divide-y divide-white/5">
+                {[...journal.entries].reverse().map((entry, i) => (
+                  <div key={i} className="px-4 py-3 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-sky-300/80">
+                        {entry.entry_type === 'expectation'
+                          ? '🌱 Expectativa inicial'
+                          : `📝 Reflexión — Semana ${entry.week_number}`}
+                      </span>
+                      <span className="text-white/20 text-xs ml-auto">
+                        {format(new Date(entry.created_at), "d MMM yyyy", { locale: es })}
+                      </span>
+                    </div>
+                    <p className="text-white/55 text-xs leading-relaxed whitespace-pre-wrap">
+                      {entry.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -37,6 +37,7 @@ export function ReminderCard({
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [icsDownloaded, setIcsDownloaded] = useState(false);
   const [catchUpTime, setCatchUpTime] = useState(firstOverdueTime ?? '');
   const [catchUpAmount, setCatchUpAmount] = useState(String(glassSizeMl));
 
@@ -209,7 +210,7 @@ export function ReminderCard({
               {/* Primary action */}
               {calendarPlan ? (
                 <button
-                  onClick={() => openCalendar(calendarPlan)}
+                  onClick={() => { openCalendar(calendarPlan); setIcsDownloaded(true); }}
                   className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
                 >
                   <CalendarDays size={15} />
@@ -217,12 +218,24 @@ export function ReminderCard({
                 </button>
               ) : (
                 <button
-                  onClick={() => downloadICS(schedule, glassSizeMl)}
+                  onClick={() => { downloadICS(schedule, glassSizeMl); setIcsDownloaded(true); }}
                   className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
                 >
                   <Download size={15} />
                   Descargar recordatorios
                 </button>
+              )}
+
+              {/* Post-download instructions for Android */}
+              {icsDownloaded && (
+                <div className="bg-amber-500/10 border border-amber-400/25 rounded-xl px-3 py-2.5 space-y-1.5">
+                  <p className="text-amber-200 text-xs font-semibold">📂 Archivo descargado</p>
+                  <p className="text-amber-200/70 text-xs leading-relaxed">
+                    En Android: abre la app <strong className="text-amber-200/90">Archivos</strong> (o Descargas),
+                    toca el archivo <strong className="text-amber-200/90">aquavital.ics</strong> y selecciona
+                    <strong className="text-amber-200/90"> Google Calendar</strong> para importar todos los recordatorios.
+                  </p>
+                </div>
               )}
 
               <div className="space-y-1">
@@ -236,7 +249,7 @@ export function ReminderCard({
 
               {calendarPlan && (
                 <button
-                  onClick={() => downloadICS(schedule, glassSizeMl)}
+                  onClick={() => { downloadICS(schedule, glassSizeMl); setIcsDownloaded(true); }}
                   className="flex items-center justify-center gap-1.5 w-full text-white/30 hover:text-white/55 text-xs transition-colors py-1"
                 >
                   <Download size={11} />

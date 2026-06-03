@@ -93,7 +93,7 @@ export function Auth() {
         </form>
 
         <p className="text-center text-white/25 text-xs mt-5">
-          Basado en la fórmula de Frank Suarez · MetabolismoTV
+          Basado en ciencia de la hidratación
         </p>
       </div>
     </div>

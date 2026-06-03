@@ -1,9 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { differenceInDays, parseISO } from 'date-fns';
 import { buildHydrationPlan, type PlanWeek } from '../data/plan';
 import type { UserProfile } from '../types';
-
-const PLAN_KEY = 'aquavital-plan';
 
 interface StoredPlan {
   startDate: string; // "YYYY-MM-DD"
@@ -12,11 +10,25 @@ interface StoredPlan {
   glassSizeMl: number;
 }
 
-export function usePlan(profile: UserProfile | null) {
+function planKey(userId: string | null) {
+  return `aquavital-plan-${userId ?? 'local'}`;
+}
+
+export function usePlan(profile: UserProfile | null, userId: string | null) {
   const [stored, setStored] = useState<StoredPlan | null>(() => {
-    try { return JSON.parse(localStorage.getItem(PLAN_KEY) ?? 'null'); }
+    try { return JSON.parse(localStorage.getItem(planKey(userId)) ?? 'null'); }
     catch { return null; }
   });
+
+  // Re-read from localStorage when the user changes (e.g. after login)
+  useEffect(() => {
+    try {
+      const data = JSON.parse(localStorage.getItem(planKey(userId)) ?? 'null') as StoredPlan | null;
+      setStored(data);
+    } catch {
+      setStored(null);
+    }
+  }, [userId]);
 
   const weeks: PlanWeek[] = stored && profile
     ? buildHydrationPlan(stored.initialGlasses, stored.finalGoalMl, stored.glassSizeMl)
@@ -45,12 +57,12 @@ export function usePlan(profile: UserProfile | null) {
       glassSizeMl: profile.glass_size_ml,
     };
     setStored(data);
-    localStorage.setItem(PLAN_KEY, JSON.stringify(data));
+    localStorage.setItem(planKey(userId), JSON.stringify(data));
   }
 
   function resetPlan() {
     setStored(null);
-    localStorage.removeItem(PLAN_KEY);
+    localStorage.removeItem(planKey(userId));
   }
 
   return {
@@ -63,6 +75,8 @@ export function usePlan(profile: UserProfile | null) {
     currentGoalMl,
     isOnFinalGoal: weekIndex >= weeks.length - 1,
     daysIntoWeek: daysSinceStart % 7,
+    planStartDate: stored?.startDate ?? null,
+    planInitialGlasses: stored?.initialGlasses ?? 0,
     startPlan,
     resetPlan,
   };

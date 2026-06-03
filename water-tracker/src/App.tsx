@@ -3,9 +3,11 @@ import type { User } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { useProfile } from './hooks/useProfile';
 import { usePlan } from './hooks/usePlan';
+import { useJournal } from './hooks/useJournal';
 import { Auth } from './components/Auth';
 import { Setup } from './components/Setup';
 import { WaterAssessment } from './components/WaterAssessment';
+import { JournalEntryPage } from './components/JournalEntryPage';
 import { Dashboard } from './components/Dashboard';
 
 export default function App() {
@@ -13,8 +15,10 @@ export default function App() {
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
   const [showSetup, setShowSetup] = useState(false);
 
-  const { profile, loading: profileLoading, saveProfile, clearProfile } = useProfile(user?.id ?? null);
-  const plan = usePlan(profile);
+  const userId = user?.id ?? null;
+  const { profile, loading: profileLoading, saveProfile, clearProfile } = useProfile(userId);
+  const plan = usePlan(profile, userId);
+  const journal = useJournal(userId);
 
   // Supabase auth listener
   useEffect(() => {
@@ -36,7 +40,7 @@ export default function App() {
     if (supabase) await supabase.auth.signOut();
     setUser(null);
     clearProfile();
-    plan.resetPlan();
+    // Plan is keyed by userId — preserved in localStorage for when they log back in
   }
 
   // Loading splash
@@ -56,6 +60,13 @@ export default function App() {
     return (
       <Setup
         isEditing={showSetup && Boolean(profile)}
+        initialData={showSetup && profile ? {
+          weight_kg:     profile.weight_kg,
+          activity_level: profile.activity_level,
+          wake_time:     profile.wake_time,
+          sleep_time:    profile.sleep_time,
+          glass_size_ml: profile.glass_size_ml,
+        } : undefined}
         onSave={async (data) => {
           await saveProfile(data);
           plan.resetPlan(); // reset assessment when profile changes
@@ -75,11 +86,37 @@ export default function App() {
     );
   }
 
-  // Step 3 — Main dashboard
+  // Step 3a — Expectation journal (once, right after plan starts)
+  if (plan.hasPlan && !journal.hasSeenExpectation) {
+    return (
+      <JournalEntryPage
+        type="expectation"
+        weekNumber={1}
+        onSave={async (content) => { await journal.addEntry(1, 'expectation', content); }}
+        onSkip={() => journal.markSeen('expectation')}
+      />
+    );
+  }
+
+  // Step 3b — Weekly reflection (once per completed week)
+  const completedWeek = plan.currentWeekNumber > 1 ? plan.currentWeekNumber - 1 : null;
+  if (completedWeek && !journal.hasSeenWeekPrompt(completedWeek)) {
+    return (
+      <JournalEntryPage
+        type="weekly_reflection"
+        weekNumber={completedWeek}
+        onSave={async (content) => { await journal.addEntry(completedWeek, 'weekly_reflection', content); }}
+        onSkip={() => journal.markSeen(`week-${completedWeek}`)}
+      />
+    );
+  }
+
+  // Step 4 — Main dashboard
   return (
     <Dashboard
       profile={profile}
       plan={plan}
+      journal={journal}
       userId={user?.id ?? null}
       onEditProfile={() => setShowSetup(true)}
       onLogout={handleLogout}

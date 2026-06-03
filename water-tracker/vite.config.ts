@@ -13,7 +13,7 @@ export default defineConfig({
       manifest: {
         name: 'AquaVital – Hidratación Diaria',
         short_name: 'AquaVital',
-        description: 'Seguimiento de consumo de agua basado en la fórmula de Frank Suarez',
+        description: 'Seguimiento diario de consumo de agua basado en ciencia de la hidratación',
         theme_color: '#0c4a6e',
         background_color: '#0f172a',
         display: 'standalone',

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download } from 'lucide-react';
+import { openCalendar, downloadICS, type CalendarPlanParams } from '../utils/calendar';
 
 interface Props {
   nextTime: string | null;
@@ -12,6 +13,8 @@ interface Props {
   overdueGlasses: number;
   firstOverdueTime: string | null;
   glassSizeMl: number;
+  schedule: string[];
+  calendarPlan: CalendarPlanParams | null;
   onRequestPermission: () => void;
   onLogPastDrink: (amountMl: number, time: string) => void;
 }
@@ -27,10 +30,14 @@ export function ReminderCard({
   overdueGlasses,
   firstOverdueTime,
   glassSizeMl,
+  schedule,
+  calendarPlan,
   onRequestPermission,
   onLogPastDrink,
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [icsDownloaded, setIcsDownloaded] = useState(false);
   const [catchUpTime, setCatchUpTime] = useState(firstOverdueTime ?? '');
   const [catchUpAmount, setCatchUpAmount] = useState(String(glassSizeMl));
 
@@ -176,6 +183,81 @@ export function ReminderCard({
           >
             Registrar toma
           </button>
+        </div>
+      )}
+
+      {/* Calendar integration */}
+      {schedule.length > 0 && (
+        <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+          <button
+            onClick={() => setShowCalendar((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <CalendarDays size={15} className="text-sky-400" />
+              <span className="text-white/70 text-sm">Añadir al calendario</span>
+            </div>
+            <span className="text-white/30 text-xs">{showCalendar ? '▲' : '▼'}</span>
+          </button>
+
+          {showCalendar && (
+            <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
+              <p className="text-white/40 text-xs leading-relaxed">
+                Guarda <strong className="text-white/60">todo tu plan de hidratación</strong> en tu calendario —
+                cubre cada semana con el número correcto de recordatorios hasta alcanzar tu meta.
+              </p>
+
+              {/* Primary action */}
+              {calendarPlan ? (
+                <button
+                  onClick={() => { openCalendar(calendarPlan); setIcsDownloaded(true); }}
+                  className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
+                >
+                  <CalendarDays size={15} />
+                  Guardar plan en mi calendario
+                </button>
+              ) : (
+                <button
+                  onClick={() => { downloadICS(schedule, glassSizeMl); setIcsDownloaded(true); }}
+                  className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
+                >
+                  <Download size={15} />
+                  Descargar recordatorios
+                </button>
+              )}
+
+              {/* Post-download instructions for Android */}
+              {icsDownloaded && (
+                <div className="bg-amber-500/10 border border-amber-400/25 rounded-xl px-3 py-2.5 space-y-1.5">
+                  <p className="text-amber-200 text-xs font-semibold">📂 Archivo descargado</p>
+                  <p className="text-amber-200/70 text-xs leading-relaxed">
+                    En Android: abre la app <strong className="text-amber-200/90">Archivos</strong> (o Descargas),
+                    toca el archivo <strong className="text-amber-200/90">aquavital.ics</strong> y selecciona
+                    <strong className="text-amber-200/90"> Google Calendar</strong> para importar todos los recordatorios.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <p className="text-white/25 text-xs text-center">
+                  📱 iOS — se abre Calendar para confirmar
+                </p>
+                <p className="text-white/25 text-xs text-center">
+                  🤖 Android — descarga el archivo, ábrelo para importar en Google Calendar
+                </p>
+              </div>
+
+              {calendarPlan && (
+                <button
+                  onClick={() => { downloadICS(schedule, glassSizeMl); setIcsDownloaded(true); }}
+                  className="flex items-center justify-center gap-1.5 w-full text-white/30 hover:text-white/55 text-xs transition-colors py-1"
+                >
+                  <Download size={11} />
+                  Solo descargar esta semana (.ics)
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -59,7 +59,7 @@ export function PlanCard({
         {isOnFinalGoal ? (
           <div className="text-right">
             <div className="text-3xl">🏆</div>
-            <p className="text-sky-300 text-xs font-semibold mt-0.5">¡Meta Frank Suarez!</p>
+            <p className="text-sky-300 text-xs font-semibold mt-0.5">¡Meta de hidratación alcanzada!</p>
           </div>
         ) : nextWeek ? (
           <div className="text-right bg-white/5 rounded-xl px-3 py-2 border border-white/8">

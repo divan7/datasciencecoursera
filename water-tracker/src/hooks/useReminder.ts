@@ -34,22 +34,30 @@ export function useReminder(profile: UserProfile | null, totalMl: number, effect
   const firstOverdueTime: string | null =
     overdueGlasses > 0 ? (schedule[completedGlasses] ?? null) : null;
 
-  // Schedule browser notification for next glass
+  // Schedule browser notifications for ALL remaining glasses today
   useEffect(() => {
-    if (!status.nextTime || notifPermission !== 'granted' || status.isOverdue) return;
-    const msUntil = status.minutesUntil * 60_000;
-    if (msUntil <= 0) return;
+    if (notifPermission !== 'granted' || !profile) return;
 
-    const timer = setTimeout(() => {
-      new Notification('💧 Hora de tomar agua — AquaVital', {
-        body: `Toma tu vaso de ${profile?.glass_size_ml ?? 250} ml ahora`,
-        icon: '/icons/icon-192.png',
-        tag: 'water-reminder',
-      });
-    }, msUntil);
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    const timers: ReturnType<typeof setTimeout>[] = [];
 
-    return () => clearTimeout(timer);
-  }, [status.nextTime, status.minutesUntil, status.isOverdue, notifPermission, profile]);
+    schedule.forEach((time, index) => {
+      if (index < completedGlasses) return;
+      const [h, m] = time.split(':').map(Number);
+      const msUntil = (h * 60 + m - nowMin) * 60_000;
+      if (msUntil <= 0) return;
+
+      timers.push(setTimeout(() => {
+        new Notification('💧 Hora de tomar agua — AquaVital', {
+          body: `Toma ${index + 1} de ${schedule.length} · ${profile.glass_size_ml} ml`,
+          icon: '/icons/icon-192.png',
+          tag: `water-reminder-${time}`,
+        });
+      }, msUntil));
+    });
+
+    return () => timers.forEach(clearTimeout);
+  }, [notifPermission, profile, schedule, completedGlasses]);
 
   const requestPermission = useCallback(async () => {
     if (!isNotifSupported) return 'denied' as NotificationPermission;

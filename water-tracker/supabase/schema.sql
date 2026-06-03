@@ -34,3 +34,21 @@ create policy "own intake" on water_intake
 -- Index for fast daily queries
 create index if not exists water_intake_user_day
   on water_intake (user_id, logged_at);
+
+-- Journal entries (expectations & weekly reflections)
+create table if not exists water_journal (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users on delete cascade,
+  week_number  int  not null,
+  entry_type   text not null check (entry_type in ('expectation', 'weekly_reflection')),
+  content      text not null,
+  created_at   timestamptz not null default now()
+);
+
+alter table water_journal enable row level security;
+
+create policy "own journal" on water_journal
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists water_journal_user
+  on water_journal (user_id, created_at);

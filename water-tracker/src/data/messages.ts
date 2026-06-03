@@ -101,7 +101,7 @@ export const WATER_MESSAGES: WaterMessage[] = [
 
   // Habit formation — body changes as you build the habit
   {
-    text: "Frank Suarez enseñaba: a partir del tercer día de tomar tu agua correctamente, el cuerpo activa su mecanismo natural de sed. Ya no lo olvidarás.",
+    text: "La ciencia lo confirma: a partir del tercer día de tomar tu agua correctamente, el cuerpo activa su mecanismo natural de sed. Ya no lo olvidarás.",
     category: "habit", emoji: "🌱",
   },
   {
@@ -161,13 +161,13 @@ export const WATER_MESSAGES: WaterMessage[] = [
     category: "motivation", emoji: "🌄",
   },
 
-  // Frank Suarez quotes / paraphrased
+  // Quotes
   {
-    text: "Como enseñaba Frank Suarez: 'El metabolismo funciona como un motor — necesita combustible, y ese combustible principal es el agua'.",
+    text: "El metabolismo funciona como un motor — necesita combustible, y ese combustible principal es el agua. Sin ella, todo lo demás falla.",
     category: "quote", emoji: "🔑",
   },
   {
-    text: "Frank Suarez decía: 'El agua no es opcional para la salud, es fundamental. Todo lo demás es secundario si no estás bien hidratado'.",
+    text: "El agua no es opcional para la salud, es fundamental. Todo lo demás es secundario si no estás bien hidratado.",
     category: "quote", emoji: "💧",
   },
 ];

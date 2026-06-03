@@ -10,25 +10,28 @@ const ACTIVITIES: { value: ActivityLevel; label: string; desc: string; emoji: st
   { value: 'active',    label: 'Activo',     desc: 'Entrenamiento intenso 5+x/sem', emoji: '💪' },
 ];
 
-interface Props {
-  onSave: (data: {
-    weight_kg: number;
-    activity_level: ActivityLevel;
-    wake_time: string;
-    sleep_time: string;
-    glass_size_ml: number;
-  }) => void;
-  loading?: boolean;
-  isEditing?: boolean;
+interface ProfileData {
+  weight_kg: number;
+  activity_level: ActivityLevel;
+  wake_time: string;
+  sleep_time: string;
+  glass_size_ml: number;
 }
 
-export function Setup({ onSave, loading, isEditing }: Props) {
-  const [weight, setWeight]       = useState('');
+interface Props {
+  onSave: (data: ProfileData) => void;
+  loading?: boolean;
+  isEditing?: boolean;
+  initialData?: ProfileData;
+}
+
+export function Setup({ onSave, loading, isEditing, initialData }: Props) {
+  const [weight, setWeight]       = useState(initialData ? String(initialData.weight_kg) : '');
   const [unit, setUnit]           = useState<'kg' | 'lbs'>('kg');
-  const [activity, setActivity]   = useState<ActivityLevel>('sedentary');
-  const [wakeTime, setWakeTime]   = useState('06:00');
-  const [sleepTime, setSleepTime] = useState('22:00');
-  const [glassSize, setGlassSize] = useState('250');
+  const [activity, setActivity]   = useState<ActivityLevel>(initialData?.activity_level ?? 'sedentary');
+  const [wakeTime, setWakeTime]   = useState(initialData?.wake_time   ?? '06:00');
+  const [sleepTime, setSleepTime] = useState(initialData?.sleep_time  ?? '22:00');
+  const [glassSize, setGlassSize] = useState(String(initialData?.glass_size_ml ?? 250));
   const [error, setError]         = useState('');
 
   const weightNum = parseFloat(weight);
@@ -63,7 +66,7 @@ export function Setup({ onSave, loading, isEditing }: Props) {
             {isEditing ? 'Editar perfil' : 'Configura tu perfil'}
           </h1>
           <p className="text-sky-300/50 text-xs mt-1">
-            Fórmula de Frank Suarez · MetabolismoTV
+            Basado en ciencia de la hidratación
           </p>
         </div>
 
@@ -178,7 +181,7 @@ export function Setup({ onSave, loading, isEditing }: Props) {
           {/* Preview */}
           {preview > 0 && (
             <div className="bg-sky-500/20 rounded-2xl p-4 border border-sky-400/30 text-center">
-              <p className="text-sky-300 text-sm">Tu meta diaria (Frank Suarez)</p>
+              <p className="text-sky-300 text-sm">Tu meta diaria recomendada</p>
               <p className="text-white text-4xl font-black mt-1">
                 {preview.toLocaleString('es')} ml
               </p>

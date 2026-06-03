@@ -10,7 +10,7 @@ interface Props {
 }
 
 const MILESTONE_LABELS: Record<number, string> = {
-  3:  'Frank Suarez: el cuerpo activa su mecanismo de sed',
+  3:  'Día 3: el cuerpo reactiva su mecanismo natural de sed',
   21: 'Psicología: el hábito empieza a arraigarse',
   66: 'Neurociencia: hábito profundamente consolidado',
 };

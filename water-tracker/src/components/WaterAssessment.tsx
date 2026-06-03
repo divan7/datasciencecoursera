@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Droplets, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Droplets, ChevronRight, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { buildHydrationPlan, INTAKE_OPTIONS, type CurrentIntakeOption } from '../data/plan';
 import type { UserProfile } from '../types';
 
@@ -10,6 +10,7 @@ interface Props {
 
 export function WaterAssessment({ profile, onStart }: Props) {
   const [selected, setSelected] = useState<CurrentIntakeOption | null>(null);
+  const [showIntro, setShowIntro] = useState(true);
 
   const plan = selected
     ? buildHydrationPlan(selected.glasses, profile.daily_goal_ml, profile.glass_size_ml)
@@ -37,62 +38,74 @@ export function WaterAssessment({ profile, onStart }: Props) {
             <Droplets size={28} className="text-sky-400" />
           </div>
           <h1 className="text-2xl font-black text-white">Tu plan de hidratación</h1>
-          <p className="text-sky-300/50 text-xs mt-1">Método Frank Suarez · MetabolismoTV</p>
+          <p className="text-sky-300/50 text-xs mt-1">Método científico de hidratación</p>
         </div>
 
         {/* ── INTRO TEXT ─────────────────────────────────────────── */}
-        <div className="bg-white/6 rounded-2xl p-5 border border-white/10 space-y-4">
-
-          <p className="text-sky-300 font-semibold text-sm">
-            El agua: el suplemento más poderoso que existe
-          </p>
-
-          <p className="text-white/75 text-sm leading-relaxed">
-            Frank Suarez lo repetía siempre:{' '}
-            <em className="text-sky-200 not-italic font-medium">
-              "El metabolismo lento casi siempre tiene detrás un cuerpo deshidratado."
-            </em>{' '}
-            Y la solución no está en ningún suplemento caro — está en el grifo de tu casa.
-          </p>
-
-          <p className="text-white/65 text-sm leading-relaxed">
-            Ya calculamos la cantidad exacta que tu cuerpo necesita según tu peso y nivel
-            de actividad. Pero si llevas tiempo sin tomarla, ir directo a esa cantidad
-            es difícil de sostener y muchas personas abandonan a los pocos días.
-          </p>
-
-          <div className="border-t border-white/8 pt-4 space-y-2">
-            <p className="text-white/85 text-sm font-semibold">
-              Por eso seguiremos el enfoque que Frank recomendaba:
+        <div className="bg-white/6 rounded-2xl border border-white/10 overflow-hidden">
+          <button
+            onClick={() => setShowIntro((v) => !v)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/5 transition-colors"
+          >
+            <p className="text-sky-300 font-semibold text-sm text-left">
+              El agua: el suplemento más poderoso que existe
             </p>
-            <p className="text-sky-200/80 text-sm leading-relaxed">
-              Sumar <strong className="text-sky-300">2 vasos por semana</strong> hasta llegar
-              a tu meta. El cuerpo reactiva su mecanismo natural de sed en apenas{' '}
-              <strong className="text-sky-300">3 días</strong> — después de eso, ya no lo
-              olvidarás.
-            </p>
-          </div>
+            {showIntro
+              ? <ChevronUp size={15} className="text-white/30 flex-shrink-0 ml-2" />
+              : <ChevronDown size={15} className="text-white/30 flex-shrink-0 ml-2" />}
+          </button>
 
-          {/* Quick benefits grid */}
-          <div className="grid grid-cols-2 gap-y-2 gap-x-3 pt-1">
-            {[
-              { emoji: '⚡', text: 'Más energía en días' },
-              { emoji: '✨', text: 'Piel clara en 2 semanas' },
-              { emoji: '🔥', text: 'Metabolismo activo' },
-              { emoji: '🏆', text: 'Hábito de por vida' },
-            ].map((item) => (
-              <div key={item.text} className="flex items-center gap-1.5 text-xs text-white/45">
-                <span>{item.emoji}</span>
-                <span>{item.text}</span>
+          {showIntro && (
+            <div className="px-5 pb-5 space-y-4 border-t border-white/8">
+              <div className="pt-4 space-y-3">
+                <p className="text-white/75 text-sm leading-relaxed">
+                  La ciencia es clara:{' '}
+                  <em className="text-sky-200 not-italic font-medium">
+                    "El metabolismo lento casi siempre tiene detrás un cuerpo deshidratado."
+                  </em>{' '}
+                  Y la solución no está en ningún suplemento caro — está en el grifo de tu casa.
+                </p>
+
+                <p className="text-white/65 text-sm leading-relaxed">
+                  Ya calculamos la cantidad exacta que tu cuerpo necesita según tu peso y nivel
+                  de actividad. Pero si llevas tiempo sin tomarla, ir directo a esa cantidad
+                  es difícil de sostener y muchas personas abandonan a los pocos días.
+                </p>
+
+                <div className="border-t border-white/8 pt-3 space-y-2">
+                  <p className="text-white/85 text-sm font-semibold">
+                    Por eso seguiremos un enfoque gradual y sostenible:
+                  </p>
+                  <p className="text-sky-200/80 text-sm leading-relaxed">
+                    Sumar <strong className="text-sky-300">2 vasos por semana</strong> hasta llegar
+                    a tu meta. El cuerpo reactiva su mecanismo natural de sed en apenas{' '}
+                    <strong className="text-sky-300">3 días</strong> — después de eso, ya no lo
+                    olvidarás.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-2 gap-x-3">
+                  {[
+                    { emoji: '⚡', text: 'Más energía en días' },
+                    { emoji: '✨', text: 'Piel clara en 2 semanas' },
+                    { emoji: '🔥', text: 'Metabolismo activo' },
+                    { emoji: '🏆', text: 'Hábito de por vida' },
+                  ].map((item) => (
+                    <div key={item.text} className="flex items-center gap-1.5 text-xs text-white/45">
+                      <span>{item.emoji}</span>
+                      <span>{item.text}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-white/40 text-xs border-t border-white/8 pt-3 leading-snug">
+                  Tu meta final: <strong className="text-white/60">{formatMl(profile.daily_goal_ml)}/día</strong>{' '}
+                  ({Math.ceil(profile.daily_goal_ml / profile.glass_size_ml)} vasos de {profile.glass_size_ml} ml)
+                  — calculada según tu peso y nivel de actividad para {profile.weight_kg} kg.
+                </p>
               </div>
-            ))}
-          </div>
-
-          <p className="text-white/40 text-xs border-t border-white/8 pt-3 leading-snug">
-            Tu meta final: <strong className="text-white/60">{formatMl(profile.daily_goal_ml)}/día</strong>{' '}
-            ({Math.ceil(profile.daily_goal_ml / profile.glass_size_ml)} vasos de {profile.glass_size_ml} ml)
-            — calculada con la fórmula de Frank Suarez para {profile.weight_kg} kg.
-          </p>
+            </div>
+          )}
         </div>
 
         {/* ── ASSESSMENT ─────────────────────────────────────────── */}

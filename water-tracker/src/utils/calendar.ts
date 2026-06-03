@@ -20,13 +20,22 @@ function buildSearch(p: CalendarPlanParams): string {
 
 /** Open the plan calendar.
  *  - iOS: webcal:// → Calendar.app opens and asks to subscribe (includes all plan weeks)
- *  - Android/Desktop: downloads the .ics → open to import into any calendar app */
+ *  - Android: opens Google Calendar subscribe URL directly (no file download)
+ *  - Desktop: downloads the .ics */
 export function openCalendar(p: CalendarPlanParams): void {
   const search = buildSearch(p);
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
 
   if (isIOS) {
     window.location.href = `webcal://${window.location.host}/api/calendar?${search}`;
+  } else if (isAndroid) {
+    // Google Calendar subscribe URL — opens GCal and asks "Add calendar?"
+    const webcalUrl = `webcal://${window.location.host}/api/calendar?${search}`;
+    window.open(
+      `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`,
+      '_blank',
+    );
   } else {
     const a = document.createElement('a');
     a.href = `/api/calendar?${search}`;

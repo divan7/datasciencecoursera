@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download } from 'lucide-react';
+import { downloadICS, getGoogleCalendarUrl } from '../utils/calendar';
 
 interface Props {
   nextTime: string | null;
@@ -12,6 +13,7 @@ interface Props {
   overdueGlasses: number;
   firstOverdueTime: string | null;
   glassSizeMl: number;
+  schedule: string[];
   onRequestPermission: () => void;
   onLogPastDrink: (amountMl: number, time: string) => void;
 }
@@ -27,10 +29,12 @@ export function ReminderCard({
   overdueGlasses,
   firstOverdueTime,
   glassSizeMl,
+  schedule,
   onRequestPermission,
   onLogPastDrink,
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [catchUpTime, setCatchUpTime] = useState(firstOverdueTime ?? '');
   const [catchUpAmount, setCatchUpAmount] = useState(String(glassSizeMl));
 
@@ -176,6 +180,50 @@ export function ReminderCard({
           >
             Registrar toma
           </button>
+        </div>
+      )}
+
+      {/* Calendar integration */}
+      {schedule.length > 0 && (
+        <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
+          <button
+            onClick={() => setShowCalendar((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <CalendarDays size={15} className="text-sky-400" />
+              <span className="text-white/70 text-sm">Añadir al calendario</span>
+            </div>
+            <span className="text-white/30 text-xs">{showCalendar ? '▲' : '▼'}</span>
+          </button>
+
+          {showCalendar && (
+            <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
+              <p className="text-white/40 text-xs leading-relaxed">
+                Exporta tus {schedule.length} recordatorios diarios de agua — se repetirán cada día automáticamente.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => downloadICS(schedule, glassSizeMl)}
+                  className="flex items-center justify-center gap-1.5 bg-white/8 hover:bg-white/15 text-white/70 hover:text-white border border-white/15 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors"
+                >
+                  <Download size={13} />
+                  Apple / Outlook
+                </button>
+                {nextTime && (
+                  <a
+                    href={getGoogleCalendarUrl(nextTime, glassSizeMl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-1.5 bg-white/8 hover:bg-white/15 text-white/70 hover:text-white border border-white/15 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors"
+                  >
+                    <CalendarDays size={13} />
+                    Google Calendar
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

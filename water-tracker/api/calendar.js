@@ -1,4 +1,4 @@
-export function generateICS(schedule: string[], glassSizeMl: number): string {
+function generateICS(schedule, glassSizeMl) {
   const today = new Date();
   const yyyy = today.getFullYear();
   const MM = String(today.getMonth() + 1).padStart(2, '0');
@@ -40,26 +40,20 @@ export function generateICS(schedule: string[], glassSizeMl: number): string {
   ].join('\r\n');
 }
 
-/** URL to the Vercel API endpoint that serves the ICS with proper Content-Type.
- *  Mobile browsers (iOS/Android) will open this directly in the native calendar app. */
-export function getCalendarApiUrl(schedule: string[], glassSizeMl: number): string {
-  const params = new URLSearchParams({
-    schedule: schedule.join(','),
-    ml: String(glassSizeMl),
-  });
-  return `/api/calendar?${params.toString()}`;
-}
+export default function handler(req, res) {
+  const schedule = String(req.query.schedule ?? '').split(',').filter(Boolean);
+  const glassSizeMl = parseInt(String(req.query.ml ?? '250'), 10) || 250;
 
-/** Fallback: download ICS client-side (works on desktop, requires manual import on mobile). */
-export function downloadICS(schedule: string[], glassSizeMl: number): void {
-  const content = generateICS(schedule, glassSizeMl);
-  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'aquavital-recordatorios.ics';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  if (schedule.length === 0) {
+    res.status(400).json({ error: 'schedule param required (comma-separated HH:MM times)' });
+    return;
+  }
+
+  const ics = generateICS(schedule, glassSizeMl);
+
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="aquavital-recordatorios.ics"');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.status(200).send(ics);
 }

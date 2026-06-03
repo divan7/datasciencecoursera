@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download } from 'lucide-react';
-import { downloadICS, getGoogleCalendarUrl } from '../utils/calendar';
+import { downloadICS, getCalendarApiUrl } from '../utils/calendar';
 
 interface Props {
   nextTime: string | null;
@@ -200,28 +200,32 @@ export function ReminderCard({
           {showCalendar && (
             <div className="px-4 pb-4 space-y-3 border-t border-white/8 pt-3">
               <p className="text-white/40 text-xs leading-relaxed">
-                Exporta tus {schedule.length} recordatorios diarios de agua — se repetirán cada día automáticamente.
+                Guarda los <strong className="text-white/60">{schedule.length} recordatorios</strong> de hoy en tu calendario — se repiten cada día automáticamente.
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => downloadICS(schedule, glassSizeMl)}
-                  className="flex items-center justify-center gap-1.5 bg-white/8 hover:bg-white/15 text-white/70 hover:text-white border border-white/15 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors"
-                >
-                  <Download size={13} />
-                  Apple / Outlook
-                </button>
-                {nextTime && (
-                  <a
-                    href={getGoogleCalendarUrl(nextTime, glassSizeMl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 bg-white/8 hover:bg-white/15 text-white/70 hover:text-white border border-white/15 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors"
-                  >
-                    <CalendarDays size={13} />
-                    Google Calendar
-                  </a>
-                )}
-              </div>
+
+              {/* Primary: open via API URL so mobile handles it natively */}
+              <a
+                href={getCalendarApiUrl(schedule, glassSizeMl)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
+              >
+                <CalendarDays size={15} />
+                Guardar en mi calendario
+              </a>
+
+              <p className="text-white/25 text-xs text-center leading-relaxed">
+                iOS abre Calendar automáticamente · Android abre Google Calendar · Desktop descarga el archivo
+              </p>
+
+              {/* Fallback manual download */}
+              <button
+                onClick={() => downloadICS(schedule, glassSizeMl)}
+                className="flex items-center justify-center gap-1.5 w-full text-white/35 hover:text-white/60 text-xs transition-colors py-1"
+              >
+                <Download size={12} />
+                Descargar archivo .ics manualmente
+              </button>
             </div>
           )}
         </div>

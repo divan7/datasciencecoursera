@@ -12,6 +12,7 @@ import { PlanCard } from './PlanCard';
 import { useIntake } from '../hooks/useIntake';
 import { useReminder } from '../hooks/useReminder';
 import { useStreak } from '../hooks/useStreak';
+import { useNotificationPrefs } from '../hooks/useNotificationPrefs';
 import type { UserProfile } from '../types';
 import type { usePlan } from '../hooks/usePlan';
 import type { useJournal } from '../hooks/useJournal';
@@ -31,11 +32,12 @@ interface Props {
 export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLogout }: Props) {
   const [showJournal, setShowJournal] = useState(false);
   const { logs, totalMl, addIntake, removeIntake } = useIntake(userId);
+  const notifPrefs = useNotificationPrefs(userId);
 
   // Use the current week's goal from the plan (not the final profile goal)
   const effectiveGoalMl = plan.currentGoalMl;
 
-  const reminder = useReminder(profile, totalMl, effectiveGoalMl);
+  const reminder = useReminder(profile, totalMl, effectiveGoalMl, notifPrefs.disabledTimes);
   const streak   = useStreak(totalMl, effectiveGoalMl);
 
   const pct   = effectiveGoalMl > 0 ? Math.min(100, (totalMl / effectiveGoalMl) * 100) : 0;
@@ -129,7 +131,12 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
           logs={logs}
           schedule={reminder.schedule}
           glassSizeMl={profile.glass_size_ml}
+          disabledTimes={notifPrefs.disabledTimes}
+          notifPermission={reminder.notifPermission}
           onRemove={removeIntake}
+          onToggleTime={notifPrefs.toggleTime}
+          onEnableAll={() => notifPrefs.enableAll(reminder.schedule)}
+          onDisableAll={() => notifPrefs.disableAll(reminder.schedule)}
         />
 
         {/* Gradual plan progress */}

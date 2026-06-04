@@ -4,7 +4,12 @@ import type { UserProfile } from '../types';
 
 const isNotifSupported = typeof Notification !== 'undefined';
 
-export function useReminder(profile: UserProfile | null, totalMl: number, effectiveGoalMl: number) {
+export function useReminder(
+  profile: UserProfile | null,
+  totalMl: number,
+  effectiveGoalMl: number,
+  disabledTimes: string[] = [],
+) {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     isNotifSupported ? Notification.permission : 'denied',
   );
@@ -20,28 +25,31 @@ export function useReminder(profile: UserProfile | null, totalMl: number, effect
     ? buildSchedule(effectiveGoalMl, profile.glass_size_ml, profile.wake_time, profile.sleep_time)
     : [];
 
+  // Active slots = schedule minus times the user has disabled
+  const activeSchedule = schedule.filter((t) => !disabledTimes.includes(t));
+
   const completedGlasses = profile ? Math.floor(totalMl / profile.glass_size_ml) : 0;
   const totalGlasses = profile ? dailyGlasses(effectiveGoalMl, profile.glass_size_ml) : 0;
-  const status = getScheduleStatus(schedule, completedGlasses);
 
-  // Glasses whose scheduled time has passed but haven't been consumed yet
+  // nextTime / overdue based on active (enabled) slots only
+  const status = getScheduleStatus(activeSchedule, completedGlasses);
+
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const scheduledBeforeNow = schedule.filter((t) => timeToMinutes(t) <= nowMin).length;
-  const overdueGlasses = Math.max(0, scheduledBeforeNow - completedGlasses);
+  const activeBeforeNow = activeSchedule.filter((t) => timeToMinutes(t) <= nowMin).length;
+  const overdueGlasses = Math.max(0, activeBeforeNow - completedGlasses);
 
-  // Time slot of the first overdue glass (for pre-filling "log past drink")
   const firstOverdueTime: string | null =
-    overdueGlasses > 0 ? (schedule[completedGlasses] ?? null) : null;
+    overdueGlasses > 0 ? (activeSchedule[completedGlasses] ?? null) : null;
 
-  // Schedule browser notifications for ALL remaining glasses today
+  // Schedule browser notifications only for enabled slots
   useEffect(() => {
     if (notifPermission !== 'granted' || !profile) return;
 
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    schedule.forEach((time, index) => {
+    activeSchedule.forEach((time, index) => {
       if (index < completedGlasses) return;
       const [h, m] = time.split(':').map(Number);
       const msUntil = (h * 60 + m - nowMin) * 60_000;
@@ -49,7 +57,7 @@ export function useReminder(profile: UserProfile | null, totalMl: number, effect
 
       timers.push(setTimeout(() => {
         new Notification('💧 Hora de tomar agua — AquaVital', {
-          body: `Toma ${index + 1} de ${schedule.length} · ${profile.glass_size_ml} ml`,
+          body: `Toma ${index + 1} de ${activeSchedule.length} · ${profile.glass_size_ml} ml`,
           icon: '/icons/icon-192.png',
           tag: `water-reminder-${time}`,
         });
@@ -57,7 +65,8 @@ export function useReminder(profile: UserProfile | null, totalMl: number, effect
     });
 
     return () => timers.forEach(clearTimeout);
-  }, [notifPermission, profile, schedule, completedGlasses]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifPermission, profile, disabledTimes, completedGlasses]);
 
   const requestPermission = useCallback(async () => {
     if (!isNotifSupported) return 'denied' as NotificationPermission;

@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="theme-color" content="#006847">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>FacturaMéxico</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root { --mx-green: #006847; --mx-red: #ce1126; }
+    body { background: #f8f9fa; padding-bottom: 72px; font-size: 15px; }
+    .top-bar { background: var(--mx-green); color: white; padding: 12px 16px;
+               position: sticky; top: 0; z-index: 100; }
+    .top-bar h1 { font-size: 1.1rem; margin: 0; font-weight: 700; }
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 64px;
+                  background: white; border-top: 1px solid #dee2e6;
+                  display: flex; z-index: 100; }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center;
+                justify-content: center; border: none; background: none;
+                font-size: 11px; color: #888; cursor: pointer; padding: 4px 0;
+                transition: color .2s; }
+    .nav-item.active { color: var(--mx-green); font-weight: 600; }
+    .nav-item .icon { font-size: 22px; line-height: 1; }
+    .section { display: none; padding: 16px; }
+    .section.active { display: block; }
+    .card { border: none; border-radius: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+    .stat-card { text-align: center; padding: 16px; }
+    .stat-num { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .btn-green { background: var(--mx-green); color: white; border: none; }
+    .btn-green:hover, .btn-green:focus { background: #004d35; color: white; }
+    .upload-area { border: 2px dashed #ccc; border-radius: 12px; padding: 32px 16px;
+                   text-align: center; cursor: pointer; background: #fafafa;
+                   transition: border-color .2s; }
+    .upload-area:hover, .upload-area.drag-over { border-color: var(--mx-green); background: #f0faf5; }
+    .upload-area img { max-height: 200px; max-width: 100%; border-radius: 8px; }
+    .copy-btn { background: none; border: 1px solid #ced4da; border-radius: 6px;
+                padding: 2px 8px; font-size: 13px; cursor: pointer; }
+    .copy-btn:hover { background: #e9ecef; }
+    .guide-field { background: white; border-radius: 8px; padding: 10px 12px;
+                   margin-bottom: 8px; border: 1px solid #e9ecef; }
+    .guide-label { font-size: 11px; color: #888; text-transform: uppercase;
+                   letter-spacing: .5px; margin-bottom: 2px; }
+    .guide-value { font-size: 15px; font-weight: 600; word-break: break-all; }
+    .badge-estado { font-size: 12px; padding: 3px 8px; border-radius: 20px; }
+    .estado-completada { background: #d4edda; color: #155724; }
+    .estado-pendiente { background: #fff3cd; color: #856404; }
+    .estado-procesando { background: #cce5ff; color: #004085; }
+    .estado-fallida { background: #f8d7da; color: #721c24; }
+    .estado-requiere_usuario { background: #fde8d8; color: #7d3900; }
+    .factura-row { cursor: pointer; }
+    .factura-row:hover { background: #f8f9fa; }
+    .step-badge { background: var(--mx-green); color: white; width: 28px; height: 28px;
+                  border-radius: 50%; display: inline-flex; align-items: center;
+                  justify-content: center; font-weight: 700; font-size: 13px;
+                  flex-shrink: 0; }
+    .spinner-overlay { position: fixed; inset: 0; background: rgba(255,255,255,.8);
+                       display: flex; align-items: center; justify-content: center;
+                       z-index: 9999; flex-direction: column; gap: 12px; }
+    .tree-mes { background: #e8f5e9; font-weight: 700; }
+    .tree-cuenta { background: #f1f8e9; font-weight: 600; }
+    select, input[type=text], input[type=email], input[type=number], input[type=date] {
+      font-size: 16px !important; /* Evita zoom en iOS */
+    }
+    @media (min-width: 768px) {
+      body { padding-bottom: 0; }
+      .bottom-nav { display: none; }
+      .desktop-nav { display: flex !important; }
+      .section { max-width: 900px; margin: 0 auto; }
+    }
+    .desktop-nav { display: none; background: var(--mx-green); padding: 0 16px; }
+    .desktop-nav a { color: rgba(255,255,255,.75); padding: 12px 16px;
+                     text-decoration: none; font-size: 14px; }
+    .desktop-nav a.active, .desktop-nav a:hover { color: white; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="top-bar">
+  <h1>🇲🇽 FacturaMéxico &nbsp;·&nbsp; CFDI 4.0</h1>
+</div>
+<!-- Desktop nav -->
+<nav class="desktop-nav">
+  <a href="#" onclick="showSection('dashboard')" id="dnav-dashboard" class="active">📊 Inicio</a>
+  <a href="#" onclick="showSection('ticket')" id="dnav-ticket">🧾 Nuevo Ticket</a>
+  <a href="#" onclick="showSection('registro')" id="dnav-registro">📋 Registro</a>
+  <a href="#" onclick="showSection('perfiles')" id="dnav-perfiles">👤 Perfiles</a>
+  <a href="#" onclick="showSection('config')" id="dnav-config">⚙ Config</a>
+</nav>
+
+<!-- Loading overlay -->
+<div class="spinner-overlay d-none" id="loadingOverlay">
+  <div class="spinner-border text-success" style="width:3rem;height:3rem;"></div>
+  <div id="loadingMsg" class="text-muted">Analizando ticket con IA...</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ DASHBOARD ══ -->
+<div class="section active" id="section-dashboard">
+  <div class="row g-3 mb-3" id="statsCards">
+    <div class="col-6"><div class="card stat-card">
+      <div class="stat-num text-success" id="stat-completadas">—</div>
+      <div class="text-muted small">Completadas</div>
+    </div></div>
+    <div class="col-6"><div class="card stat-card">
+      <div class="stat-num text-warning" id="stat-pendientes">—</div>
+      <div class="text-muted small">Pendientes</div>
+    </div></div>
+    <div class="col-6"><div class="card stat-card">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="text-muted small">Total facturas</div>
+    </div></div>
+    <div class="col-6"><div class="card stat-card">
+      <div class="stat-num text-primary" id="stat-monto">—</div>
+      <div class="text-muted small">Monto completadas</div>
+    </div></div>
+  </div>
+
+  <div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="mb-0 fw-bold">Facturas recientes</h6>
+      <a href="#" onclick="showSection('ticket')" class="btn btn-green btn-sm rounded-pill px-3">+ Nuevo ticket</a>
+    </div>
+    <div id="recentList"><div class="text-muted text-center py-3">Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TICKET ═════ -->
+<div class="section" id="section-ticket">
+
+  <!-- Paso 1: Subir imagen -->
+  <div id="step-upload">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="step-badge">1</span>
+      <span class="fw-semibold">Foto del ticket / recibo</span>
+    </div>
+    <div class="upload-area mb-3" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+      <div id="uploadPlaceholder">
+        <div style="font-size:3rem">📷</div>
+        <p class="mb-1 fw-semibold">Toca para tomar foto o seleccionar imagen</p>
+        <p class="text-muted small mb-0">JPG, PNG o WEBP</p>
+      </div>
+      <img id="previewImg" class="d-none" alt="Vista previa">
+    </div>
+    <input type="file" id="fileInput" accept="image/*" capture="environment" class="d-none" onchange="onFileSelected(this)">
+    <button class="btn btn-green w-100 py-2 mb-2" id="btnAnalizar" onclick="analizarTicket()" disabled>
+      🔍 Analizar con IA
+    </button>
+  </div>
+
+  <!-- Paso 2: Revisar datos extraídos -->
+  <div id="step-datos" class="d-none">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="step-badge">2</span>
+      <span class="fw-semibold">Datos del ticket (edita si es necesario)</span>
+    </div>
+    <div class="card p-3 mb-3">
+      <div class="row g-2">
+        <div class="col-12">
+          <label class="form-label small fw-semibold">Nombre del emisor</label>
+          <input type="text" class="form-control" id="t_emisor" placeholder="OXXO, Walmart, etc.">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-semibold">RFC Emisor</label>
+          <input type="text" class="form-control text-uppercase" id="t_rfc" placeholder="RFC del negocio">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-semibold">Fecha</label>
+          <input type="date" class="form-control" id="t_fecha">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-semibold">Total ($)</label>
+          <input type="number" step="0.01" class="form-control" id="t_total" placeholder="0.00">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-semibold">Folio / Ticket #</label>
+          <input type="text" class="form-control" id="t_folio">
+        </div>
+        <div class="col-12">
+          <label class="form-label small fw-semibold">URL del portal de facturación</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="t_url" placeholder="https://facturas.ejemplo.com">
+            <button class="btn btn-outline-secondary" onclick="buscarPortal()">🔍</button>
+          </div>
+          <div class="form-text">Busca automáticamente por RFC/nombre o escribe la URL.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paso 3: Seleccionar cuenta fiscal -->
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="step-badge">3</span>
+      <span class="fw-semibold">Datos del receptor (tú)</span>
+    </div>
+    <div class="card p-3 mb-3">
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Cuenta fiscal</label>
+        <select class="form-select" id="sel_cuenta" onchange="onCuentaChange()">
+          <option value="">— Selecciona una cuenta —</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Régimen fiscal</label>
+        <select class="form-select" id="sel_regimen" onchange="onRegimenChange()"></select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Uso CFDI</label>
+        <select class="form-select" id="sel_uso"></select>
+      </div>
+    </div>
+
+    <!-- Paso 4: Guía de facturación -->
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <span class="step-badge">4</span>
+      <span class="fw-semibold">Facturar en el portal</span>
+    </div>
+    <div id="guiaFacturacion" class="d-none">
+      <a id="btnPortal" href="#" target="_blank" class="btn btn-success w-100 py-2 mb-3 fw-bold">
+        🌐 Abrir portal de facturación
+      </a>
+      <p class="text-muted small mb-2">Usa estos datos en el formulario del portal:</p>
+      <div id="camposGuia"></div>
+    </div>
+
+    <button class="btn btn-green w-100 py-2 mb-2" onclick="generarGuia()">
+      ✔ Preparar guía de facturación
+    </button>
+
+    <!-- Paso 5: Confirmar -->
+    <div id="step-confirmar" class="d-none">
+      <div class="d-flex align-items-center gap-2 mb-3 mt-3">
+        <span class="step-badge">5</span>
+        <span class="fw-semibold">¿Obtuviste la factura?</span>
+      </div>
+      <div class="card p-3 mb-3">
+        <label class="form-label small fw-semibold">Folio Fiscal (UUID) — opcional</label>
+        <input type="text" class="form-control mb-2" id="folio_fiscal"
+               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+        <div class="form-text mb-2">Lo encuentras en el XML o PDF de tu factura.</div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-success" onclick="confirmarFactura('completada')">✓ Sí, obtuve la factura</button>
+          <button class="btn btn-outline-danger" onclick="confirmarFactura('fallida')">✗ No pude obtenerla</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-outline-secondary w-100" onclick="resetTicket()">↩ Nuevo ticket</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ REGISTRO ═══ -->
+<div class="section" id="section-registro">
+  <h5 class="fw-bold mb-3">Registro de Facturas</h5>
+
+  <!-- Filtros -->
+  <div class="card p-3 mb-3">
+    <div class="row g-2">
+      <div class="col-6">
+        <select class="form-select form-select-sm" id="f_anio" onchange="loadFacturas()">
+          <option value="">Todos los años</option>
+        </select>
+      </div>
+      <div class="col-6">
+        <select class="form-select form-select-sm" id="f_mes" onchange="loadFacturas()">
+          <option value="">Todos los meses</option>
+        </select>
+      </div>
+      <div class="col-6">
+        <select class="form-select form-select-sm" id="f_cuenta" onchange="loadFacturas()">
+          <option value="">Todas las cuentas</option>
+        </select>
+      </div>
+      <div class="col-6">
+        <select class="form-select form-select-sm" id="f_estado" onchange="loadFacturas()">
+          <option value="">Todos los estados</option>
+          <option value="completada">✓ Completadas</option>
+          <option value="pendiente">⏳ Pendientes</option>
+          <option value="requiere_usuario">👤 Requiere acción</option>
+          <option value="fallida">✗ Fallidas</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen -->
+  <div class="row g-2 mb-3" id="registroStats"></div>
+
+  <!-- Lista -->
+  <div id="facturasList"><div class="text-center py-4 text-muted">Cargando...</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PERFILES ═══ -->
+<div class="section" id="section-perfiles">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0">Perfiles Fiscales</h5>
+    <button class="btn btn-green btn-sm" onclick="showFormCuenta()">+ Nueva cuenta</button>
+  </div>
+
+  <div id="listaCuentas"></div>
+
+  <!-- Formulario nueva/editar cuenta -->
+  <div id="formCuentaWrap" class="d-none">
+    <div class="card p-3 mb-3">
+      <h6 class="fw-bold mb-3" id="formCuentaTitulo">Nueva cuenta fiscal</h6>
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Alias / etiqueta *</label>
+        <input type="text" class="form-control" id="fc_alias" placeholder="Ej: Mi empresa, Personal, etc.">
+      </div>
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">RFC *</label>
+        <input type="text" class="form-control text-uppercase" id="fc_rfc"
+               placeholder="XAXX010101000" maxlength="13">
+        <div class="form-text">3-4 letras + 6 dígitos + 3 alfanumérico</div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Nombre o Razón Social *</label>
+        <input type="text" class="form-control text-uppercase" id="fc_nombre">
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6">
+          <label class="form-label small fw-semibold">Código Postal *</label>
+          <input type="text" class="form-control" id="fc_cp" maxlength="5" placeholder="06600">
+        </div>
+        <div class="col-6">
+          <label class="form-label small fw-semibold">Email</label>
+          <input type="email" class="form-control" id="fc_email">
+        </div>
+      </div>
+
+      <!-- Regímenes -->
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Regímenes fiscales *</label>
+        <div id="listaRegimenes" class="mb-2"></div>
+        <div class="row g-1">
+          <div class="col-12 col-md-5">
+            <select class="form-select form-select-sm" id="new_reg_codigo">
+              <option value="">— Régimen —</option>
+            </select>
+          </div>
+          <div class="col-12 col-md-4">
+            <select class="form-select form-select-sm" id="new_reg_uso">
+              <option value="">— Uso CFDI —</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2 d-flex align-items-center">
+            <div class="form-check mb-0">
+              <input type="checkbox" class="form-check-input" id="new_reg_principal">
+              <label class="form-check-label small" for="new_reg_principal">Principal</label>
+            </div>
+          </div>
+          <div class="col-6 col-md-1">
+            <button class="btn btn-outline-secondary btn-sm w-100" onclick="addRegimen()">+</button>
+          </div>
+        </div>
+      </div>
+
+      <input type="hidden" id="fc_id">
+      <div class="d-grid gap-2 mt-3">
+        <button class="btn btn-green" onclick="saveCuenta()">💾 Guardar cuenta</button>
+        <button class="btn btn-outline-secondary" onclick="cancelFormCuenta()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ CONFIG ═════ -->
+<div class="section" id="section-config">
+  <h5 class="fw-bold mb-3">Configuración</h5>
+
+  <div class="card p-3 mb-3">
+    <h6 class="fw-semibold mb-1">API Key de Anthropic</h6>
+    <p class="text-muted small mb-2">Necesaria para analizar tickets con IA.</p>
+    <div id="apiKeyStatus" class="alert alert-warning py-2 small">Verificando...</div>
+    <div class="input-group mb-2">
+      <input type="password" class="form-control" id="cfg_apikey" placeholder="sk-ant-...">
+      <button class="btn btn-outline-secondary" onclick="toggleApiKey()">👁</button>
+    </div>
+    <button class="btn btn-green" onclick="saveApiKey()">Guardar API Key</button>
+    <div class="mt-2">
+      <a href="https://console.anthropic.com" target="_blank" class="text-decoration-none small">
+        🔗 Obtener API Key en console.anthropic.com
+      </a>
+    </div>
+  </div>
+
+  <div class="card p-3 mb-3">
+    <h6 class="fw-semibold mb-2">Acceso desde celular</h6>
+    <p class="text-muted small mb-1">
+      Para usar desde tu celular, conecta ambos dispositivos a la misma WiFi y abre:
+    </p>
+    <div class="bg-light rounded p-2 font-monospace small" id="urlCelular">Cargando...</div>
+    <div class="form-text">Tu celular y tu computadora deben estar en la misma red.</div>
+  </div>
+
+  <div class="card p-3">
+    <h6 class="fw-semibold mb-2">Sobre esta aplicación</h6>
+    <ul class="list-unstyled small text-muted mb-0">
+      <li>• CFDI versión 4.0 (vigente desde enero 2022)</li>
+      <li>• Marco legal: Miscelánea Fiscal 2024 (RMF 2024)</li>
+      <li>• Catálogos SAT actualizados</li>
+      <li>• Base de datos: local en tu computadora</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Bottom nav (mobile) -->
+<nav class="bottom-nav">
+  <button class="nav-item active" id="nav-dashboard" onclick="showSection('dashboard')">
+    <span class="icon">📊</span>Inicio
+  </button>
+  <button class="nav-item" id="nav-ticket" onclick="showSection('ticket')">
+    <span class="icon">🧾</span>Ticket
+  </button>
+  <button class="nav-item" id="nav-registro" onclick="showSection('registro')">
+    <span class="icon">📋</span>Registro
+  </button>
+  <button class="nav-item" id="nav-perfiles" onclick="showSection('perfiles')">
+    <span class="icon">👤</span>Perfiles
+  </button>
+  <button class="nav-item" id="nav-config" onclick="showSection('config')">
+    <span class="icon">⚙</span>Config
+  </button>
+</nav>
+
+<!-- Modal de detalle de factura -->
+<div class="modal fade" id="facturaModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-bold">Detalle de Factura</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="facturaModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-success btn-sm" id="btnModalCompletar" onclick="completarDesdeModal()">
+          ✓ Marcar completada
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// Estado global
+// ═══════════════════════════════════════════════════════════════════════
+let catalogs = {};
+let cuentas = [];
+let currentFacturaId = null;
+let ticketImagenPath = null;
+let modalFacturaId = null;
+
+// ─── Navegación ──────────────────────────────────────────────────────────────
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.desktop-nav a').forEach(el => el.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  const nb = document.getElementById('nav-' + name);
+  if (nb) nb.classList.add('active');
+  const dn = document.getElementById('dnav-' + name);
+  if (dn) dn.classList.add('active');
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'registro') loadFacturas();
+  if (name === 'perfiles') loadCuentas();
+  if (name === 'config') loadConfig();
+  if (name === 'ticket') loadCuentasSelect();
+  return false;
+}
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: {'Content-Type': 'application/json'},
+    ...opts,
+    body: opts.body && typeof opts.body !== 'string' ? JSON.stringify(opts.body) : opts.body,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({detail: res.statusText}));
+    throw new Error(err.detail || 'Error en el servidor');
+  }
+  return res.json();
+}
+
+function loading(show, msg = 'Procesando...') {
+  const ol = document.getElementById('loadingOverlay');
+  document.getElementById('loadingMsg').textContent = msg;
+  ol.classList.toggle('d-none', !show);
+}
+
+function toast(msg, type = 'success') {
+  const t = document.createElement('div');
+  t.className = `alert alert-${type} position-fixed bottom-0 start-50 translate-middle-x mb-20`;
+  t.style.cssText = 'z-index:9999;min-width:250px;text-align:center;bottom:80px!important';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const s = await api('/api/stats');
+    document.getElementById('stat-completadas').textContent = s.completadas;
+    document.getElementById('stat-pendientes').textContent = s.pendientes;
+    document.getElementById('stat-total').textContent = s.total;
+    document.getElementById('stat-monto').textContent = '$' + s.monto_completadas.toLocaleString('es-MX', {minimumFractionDigits:2});
+    const list = document.getElementById('recentList');
+    if (!s.recientes.length) {
+      list.innerHTML = '<p class="text-muted text-center py-2 small">Aún no hay facturas registradas.</p>';
+    } else {
+      list.innerHTML = s.recientes.map(f => `
+        <div class="d-flex justify-content-between align-items-center py-2 border-bottom factura-row"
+             onclick="showFacturaDetail(${f.id})">
+          <div>
+            <div class="fw-semibold small">${f.emisor_nombre || '—'}</div>
+            <div class="text-muted" style="font-size:12px">${f.fecha_ticket || ''} &nbsp;${f.cuenta_alias || ''}</div>
+          </div>
+          <div class="text-end">
+            <div class="small fw-semibold">${f.total_ticket ? '$'+f.total_ticket.toLocaleString('es-MX',{minimumFractionDigits:2}) : ''}</div>
+            <span class="badge-estado estado-${f.estado}">${f.estado_label}</span>
+          </div>
+        </div>`).join('');
+    }
+  } catch(e) { console.error(e); }
+}
+
+// ─── Ticket ───────────────────────────────────────────────────────────────────
+function onFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('uploadPlaceholder').classList.add('d-none');
+    const img = document.getElementById('previewImg');
+    img.src = e.target.result;
+    img.classList.remove('d-none');
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('btnAnalizar').disabled = false;
+}
+
+async function analizarTicket() {
+  const fileInput = document.getElementById('fileInput');
+  if (!fileInput.files[0]) { toast('Selecciona una imagen primero', 'warning'); return; }
+  loading(true, 'Analizando ticket con IA...');
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  try {
+    const res = await fetch('/api/analizar-ticket', { method: 'POST', body: form });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+    const datos = await res.json();
+    ticketImagenPath = datos.imagen_path;
+    document.getElementById('t_emisor').value = datos.nombre_emisor || '';
+    document.getElementById('t_rfc').value = datos.rfc_emisor || '';
+    document.getElementById('t_fecha').value = datos.fecha || '';
+    document.getElementById('t_total').value = datos.total || '';
+    document.getElementById('t_folio').value = datos.folio || '';
+    document.getElementById('t_url').value = datos.url_facturacion || '';
+    document.getElementById('step-upload').classList.add('d-none');
+    document.getElementById('step-datos').classList.remove('d-none');
+    toast('Ticket analizado correctamente', 'success');
+  } catch(e) {
+    toast('Error: ' + e.message, 'danger');
+  } finally { loading(false); }
+}
+
+function resetTicket() {
+  document.getElementById('step-upload').classList.remove('d-none');
+  document.getElementById('step-datos').classList.add('d-none');
+  document.getElementById('step-confirmar').classList.add('d-none');
+  document.getElementById('guiaFacturacion').classList.add('d-none');
+  document.getElementById('fileInput').value = '';
+  document.getElementById('previewImg').classList.add('d-none');
+  document.getElementById('uploadPlaceholder').classList.remove('d-none');
+  document.getElementById('btnAnalizar').disabled = true;
+  ticketImagenPath = null;
+  currentFacturaId = null;
+}
+
+async function buscarPortal() {
+  const rfc = document.getElementById('t_rfc').value.trim();
+  const nombre = document.getElementById('t_emisor').value.trim();
+  if (!rfc && !nombre) { toast('Ingresa el RFC o nombre del emisor', 'warning'); return; }
+  // Buscar en portales conocidos
+  const cats = await api('/api/catalogos').catch(() => null);
+  // Búsqueda client-side en catálogos (la búsqueda real la hace el servicio OCR)
+  toast('Busca manualmente el portal o la URL aparecerá al analizar el ticket', 'info');
+}
+
+async function loadCuentasSelect() {
+  cuentas = await api('/api/cuentas');
+  const sel = document.getElementById('sel_cuenta');
+  sel.innerHTML = '<option value="">— Selecciona una cuenta —</option>' +
+    cuentas.map(c => `<option value="${c.id}">${c.alias} [${c.rfc}]</option>`).join('');
+  if (!catalogs.usos_cfdi) { catalogs = await api('/api/catalogos'); }
+  const selUso = document.getElementById('sel_uso');
+  selUso.innerHTML = catalogs.usos_cfdi.map(u =>
+    `<option value="${u.codigo}" ${u.codigo==='G03'?'selected':''}>${u.codigo} - ${u.descripcion}</option>`
+  ).join('');
+}
+
+function onCuentaChange() {
+  const cid = +document.getElementById('sel_cuenta').value;
+  const cuenta = cuentas.find(c => c.id === cid);
+  const sel = document.getElementById('sel_regimen');
+  if (!cuenta) { sel.innerHTML = ''; return; }
+  sel.innerHTML = cuenta.regimenes.map(r =>
+    `<option value="${r.id}" data-uso="${r.uso_cfdi_default}" ${r.es_principal?'selected':''}>${r.etiqueta}</option>`
+  ).join('');
+  onRegimenChange();
+}
+
+function onRegimenChange() {
+  const opt = document.querySelector('#sel_regimen option:checked');
+  if (opt) {
+    const uso = opt.dataset.uso || 'G03';
+    const selUso = document.getElementById('sel_uso');
+    for (let o of selUso.options) { if (o.value === uso) { o.selected = true; break; } }
+  }
+}
+
+async function generarGuia() {
+  const url = document.getElementById('t_url').value.trim();
+  const cid = +document.getElementById('sel_cuenta').value;
+  const rid = +document.getElementById('sel_regimen').value;
+  if (!cid || !rid) { toast('Selecciona cuenta y régimen fiscal', 'warning'); return; }
+  const cuenta = cuentas.find(c => c.id === cid);
+  const regimen = cuenta.regimenes.find(r => r.id === rid);
+  const uso = document.getElementById('sel_uso').value;
+  // Guardar factura en BD
+  try {
+    const res = await api('/api/facturas', {
+      method: 'POST',
+      body: {
+        fecha_ticket: document.getElementById('t_fecha').value || null,
+        emisor_nombre: document.getElementById('t_emisor').value || null,
+        emisor_rfc: document.getElementById('t_rfc').value || null,
+        portal_url: url || null,
+        total_ticket: parseFloat(document.getElementById('t_total').value) || null,
+        folio_ticket: document.getElementById('t_folio').value || null,
+        cuenta_id: cid, regimen_id: rid, uso_cfdi: uso,
+        estado: 'procesando', imagen_path: ticketImagenPath,
+      }
+    });
+    currentFacturaId = res.id;
+  } catch(e) { toast('Error guardando factura: ' + e.message, 'danger'); return; }
+  // Mostrar guía
+  const campos = [
+    { label: 'RFC', value: cuenta.rfc },
+    { label: 'Nombre / Razón Social', value: cuenta.nombre_razon_social },
+    { label: 'Código Postal', value: cuenta.codigo_postal },
+    { label: 'Régimen Fiscal', value: regimen.codigo + ' - ' + regimen.descripcion },
+    { label: 'Código Régimen (solo número)', value: regimen.codigo },
+    { label: 'Uso CFDI', value: uso + ' - ' + (document.querySelector(`#sel_uso option[value="${uso}"]`)?.text.split(' - ')[1] || '') },
+    { label: 'Código Uso CFDI (solo)', value: uso },
+    { label: 'Email', value: cuenta.email || '' },
+    { label: 'Folio / Ticket #', value: document.getElementById('t_folio').value || '' },
+  ].filter(c => c.value);
+  const guiaEl = document.getElementById('camposGuia');
+  guiaEl.innerHTML = campos.map(c => `
+    <div class="guide-field">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="guide-label">${c.label}</div>
+          <div class="guide-value">${c.value}</div>
+        </div>
+        <button class="copy-btn" onclick="copyText('${escHtml(c.value)}', this)">📋</button>
+      </div>
+    </div>`).join('');
+  if (url) {
+    const portalURL = url.startsWith('http') ? url : 'https://' + url;
+    document.getElementById('btnPortal').href = portalURL;
+    document.getElementById('guiaFacturacion').classList.remove('d-none');
+  } else {
+    document.getElementById('guiaFacturacion').innerHTML =
+      '<div class="alert alert-warning">No se encontró portal de facturación. Búscalo manualmente.</div>';
+    document.getElementById('guiaFacturacion').classList.remove('d-none');
+  }
+  document.getElementById('step-confirmar').classList.remove('d-none');
+  document.getElementById('step-confirmar').scrollIntoView({behavior:'smooth'});
+}
+
+function escHtml(s) { return (s||'').replace(/'/g, "\\'"); }
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = orig, 1500);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋', 1500);
+  });
+}
+
+async function confirmarFactura(estado) {
+  if (!currentFacturaId) return;
+  const folio = document.getElementById('folio_fiscal').value.trim() || null;
+  try {
+    await api(`/api/facturas/${currentFacturaId}`, {
+      method: 'PATCH', body: { estado, folio_fiscal: folio }
+    });
+    toast(estado === 'completada' ? '✓ Factura registrada como completada' : '✗ Registrada como fallida',
+          estado === 'completada' ? 'success' : 'warning');
+    resetTicket();
+    showSection('registro');
+  } catch(e) { toast('Error: ' + e.message, 'danger'); }
+}
+
+// ─── Registro ─────────────────────────────────────────────────────────────────
+async function loadFacturas() {
+  if (!catalogs.meses) catalogs = await api('/api/catalogos');
+  // Poblar filtros de año/mes
+  const selAnio = document.getElementById('f_anio');
+  const selMes = document.getElementById('f_mes');
+  const selCuenta = document.getElementById('f_cuenta');
+  if (selAnio.options.length <= 1) {
+    catalogs.anios.forEach(y => { const o = new Option(y, y); selAnio.add(o); });
+    catalogs.meses.forEach(m => { const o = new Option(m.nombre, m.num); selMes.add(o); });
+  }
+  if (selCuenta.options.length <= 1) {
+    const cs = await api('/api/cuentas');
+    cs.forEach(c => { selCuenta.add(new Option(`${c.alias} [${c.rfc}]`, c.id)); });
+  }
+  const params = new URLSearchParams();
+  if (selAnio.value) params.set('anio', selAnio.value);
+  if (selMes.value) params.set('mes', selMes.value);
+  if (selCuenta.value) params.set('cuenta_id', selCuenta.value);
+  if (document.getElementById('f_estado').value) params.set('estado', document.getElementById('f_estado').value);
+  const facturas = await api('/api/facturas?' + params);
+  renderFacturas(facturas);
+}
+
+function renderFacturas(facturas) {
+  const total = facturas.length;
+  const comp = facturas.filter(f => f.estado === 'completada').length;
+  const monto = facturas.reduce((s, f) => s + (f.total_ticket || 0), 0);
+  document.getElementById('registroStats').innerHTML = `
+    <div class="col-4"><div class="card stat-card p-2">
+      <div class="stat-num" style="font-size:1.5rem">${total}</div><div class="text-muted" style="font-size:11px">Total</div>
+    </div></div>
+    <div class="col-4"><div class="card stat-card p-2">
+      <div class="stat-num text-success" style="font-size:1.5rem">${comp}</div><div class="text-muted" style="font-size:11px">Completadas</div>
+    </div></div>
+    <div class="col-4"><div class="card stat-card p-2">
+      <div class="stat-num text-primary" style="font-size:1.1rem">$${monto.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+      <div class="text-muted" style="font-size:11px">Monto total</div>
+    </div></div>`;
+  if (!facturas.length) {
+    document.getElementById('facturasList').innerHTML =
+      '<div class="text-center py-4 text-muted">No hay facturas con los filtros seleccionados.</div>';
+    return;
+  }
+  // Agrupar por mes → cuenta
+  const grupos = {};
+  facturas.forEach(f => {
+    const mes = f.fecha_ticket ? f.fecha_ticket.slice(0,7) : 'Sin fecha';
+    const mesLabel = f.fecha_ticket ? formatMes(f.fecha_ticket) : 'Sin fecha';
+    const cta = f.cuenta_alias || 'Sin cuenta';
+    const key = mes + '|' + cta;
+    if (!grupos[key]) grupos[key] = { mes, mesLabel, cta, facturas: [] };
+    grupos[key].facturas.push(f);
+  });
+  const html = Object.values(grupos)
+    .sort((a,b) => b.mes.localeCompare(a.mes))
+    .map(g => `
+      <div class="card mb-2">
+        <div class="card-header tree-mes py-2 px-3">
+          📅 ${g.mesLabel} &nbsp;·&nbsp; <span class="fw-normal">${g.cta}</span>
+          <span class="float-end text-muted small">${g.facturas.length} factura(s)</span>
+        </div>
+        <div class="list-group list-group-flush">
+          ${g.facturas.map(f => `
+            <div class="list-group-item list-group-item-action factura-row px-3 py-2"
+                 onclick="showFacturaDetail(${f.id})">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <div class="fw-semibold small">${f.emisor_nombre || '—'}</div>
+                  <div class="text-muted" style="font-size:12px">
+                    ${f.fecha_ticket || ''} &nbsp;
+                    ${f.regimen_codigo ? f.regimen_codigo + ' - ' + (f.regimen_descripcion||'').substring(0,20) : ''}
+                  </div>
+                </div>
+                <div class="text-end">
+                  <div class="small fw-semibold">${f.total_ticket ? '$'+f.total_ticket.toLocaleString('es-MX',{minimumFractionDigits:2}) : ''}</div>
+                  <span class="badge-estado estado-${f.estado}">${f.estado_label}</span>
+                </div>
+              </div>
+              ${f.folio_fiscal ? `<div class="text-muted mt-1" style="font-size:11px">Folio: ${f.folio_fiscal}</div>` : ''}
+            </div>`).join('')}
+        </div>
+      </div>`).join('');
+  document.getElementById('facturasList').innerHTML = html;
+}
+
+function formatMes(dateStr) {
+  const [y, m] = dateStr.split('-');
+  const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                 'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return `${meses[+m] || m} ${y}`;
+}
+
+async function showFacturaDetail(id) {
+  modalFacturaId = id;
+  const f = await api(`/api/facturas/${id}`);
+  document.getElementById('facturaModalBody').innerHTML = `
+    <table class="table table-sm table-borderless">
+      <tbody>
+        ${row('Emisor', f.emisor_nombre)}
+        ${row('RFC Emisor', f.emisor_rfc)}
+        ${row('Fecha', f.fecha_ticket)}
+        ${row('Total', f.total_ticket ? '$'+f.total_ticket.toLocaleString('es-MX',{minimumFractionDigits:2}) : '')}
+        ${row('Folio ticket', f.folio_ticket)}
+        ${row('Portal', f.portal_url ? `<a href="${f.portal_url}" target="_blank">${f.portal_url}</a>` : '')}
+        <tr><td colspan="2"><hr class="my-1"></td></tr>
+        ${row('Cuenta', (f.cuenta_alias||'') + (f.cuenta_rfc ? ' ['+f.cuenta_rfc+']' : ''))}
+        ${row('Régimen', f.regimen_codigo ? f.regimen_codigo+' - '+f.regimen_descripcion : '')}
+        ${row('Uso CFDI', f.uso_cfdi)}
+        <tr><td colspan="2"><hr class="my-1"></td></tr>
+        ${row('Estado', `<span class="badge-estado estado-${f.estado}">${f.estado_label}</span>`)}
+        ${row('Folio Fiscal (UUID)', f.folio_fiscal || '<em class="text-muted">No obtenido</em>')}
+        ${row('Notas', f.notas)}
+      </tbody>
+    </table>
+    ${f.estado !== 'completada' ? `
+      <div class="mt-2">
+        <label class="form-label small fw-semibold">Actualizar folio fiscal</label>
+        <input type="text" class="form-control form-control-sm" id="modal_folio"
+               value="${f.folio_fiscal||''}" placeholder="UUID de la factura">
+      </div>` : ''}`;
+  document.getElementById('btnModalCompletar').style.display =
+    f.estado === 'completada' ? 'none' : '';
+  new bootstrap.Modal(document.getElementById('facturaModal')).show();
+}
+
+function row(label, val) {
+  if (!val && val !== 0) return '';
+  return `<tr><td class="text-muted small pe-2 text-nowrap">${label}</td><td class="small">${val}</td></tr>`;
+}
+
+async function completarDesdeModal() {
+  if (!modalFacturaId) return;
+  const folio = document.getElementById('modal_folio')?.value.trim() || null;
+  await api(`/api/facturas/${modalFacturaId}`, {
+    method: 'PATCH', body: {estado: 'completada', folio_fiscal: folio}
+  });
+  bootstrap.Modal.getInstance(document.getElementById('facturaModal')).hide();
+  toast('✓ Factura marcada como completada', 'success');
+  loadFacturas();
+}
+
+// ─── Perfiles ─────────────────────────────────────────────────────────────────
+async function loadCuentas() {
+  if (!catalogs.regimenes) catalogs = await api('/api/catalogos');
+  cuentas = await api('/api/cuentas');
+  const lista = document.getElementById('listaCuentas');
+  if (!cuentas.length) {
+    lista.innerHTML = '<div class="card p-3 text-muted text-center mb-3">No hay cuentas registradas. Agrega una.</div>';
+    return;
+  }
+  lista.innerHTML = cuentas.map(c => `
+    <div class="card mb-2 p-3">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="fw-bold">${c.alias}</div>
+          <div class="text-muted small">${c.rfc} &nbsp;·&nbsp; CP ${c.codigo_postal}</div>
+          <div class="small mt-1">${c.nombre_razon_social}</div>
+          <div class="mt-1">
+            ${c.regimenes.map(r =>
+              `<span class="badge bg-light text-dark border me-1" style="font-size:11px">${r.etiqueta}${r.es_principal?' ★':''}</span>`
+            ).join('')}
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-shrink-0">
+          <button class="btn btn-outline-secondary btn-sm" onclick="editCuenta(${c.id})">✏</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="deleteCuenta(${c.id})">🗑</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+let formRegimenes = [];
+
+function showFormCuenta(cuenta = null) {
+  document.getElementById('formCuentaWrap').classList.remove('d-none');
+  document.getElementById('formCuentaTitulo').textContent = cuenta ? 'Editar cuenta' : 'Nueva cuenta fiscal';
+  document.getElementById('fc_id').value = cuenta?.id || '';
+  document.getElementById('fc_alias').value = cuenta?.alias || '';
+  document.getElementById('fc_rfc').value = cuenta?.rfc || '';
+  document.getElementById('fc_nombre').value = cuenta?.nombre_razon_social || '';
+  document.getElementById('fc_cp').value = cuenta?.codigo_postal || '';
+  document.getElementById('fc_email').value = cuenta?.email || '';
+  formRegimenes = cuenta ? [...cuenta.regimenes] : [];
+  renderFormRegimenes();
+  if (!catalogs.regimenes) api('/api/catalogos').then(c => { catalogs = c; poblarSelReg(); });
+  else poblarSelReg();
+  document.getElementById('formCuentaWrap').scrollIntoView({behavior:'smooth'});
+}
+
+function poblarSelReg() {
+  const sr = document.getElementById('new_reg_codigo');
+  const su = document.getElementById('new_reg_uso');
+  if (sr.options.length <= 1) {
+    catalogs.regimenes.forEach(r => sr.add(new Option(`${r.codigo} - ${r.descripcion}`, r.codigo)));
+    catalogs.usos_cfdi.forEach(u => su.add(new Option(`${u.codigo} - ${u.descripcion}`, u.codigo, u.codigo==='G03', u.codigo==='G03')));
+  }
+}
+
+function renderFormRegimenes() {
+  document.getElementById('listaRegimenes').innerHTML = formRegimenes.length
+    ? formRegimenes.map((r, i) => `
+        <div class="d-flex align-items-center gap-2 mb-1 p-2 bg-light rounded">
+          <span class="small flex-grow-1">${r.codigo} - ${r.descripcion}
+            <span class="text-muted">(${r.uso_cfdi_default})</span>
+            ${r.es_principal ? ' ★' : ''}</span>
+          <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="removeRegimen(${i})">✕</button>
+        </div>`).join('')
+    : '<p class="text-muted small">Sin regímenes — agrega al menos uno.</p>';
+}
+
+function addRegimen() {
+  const codigo = document.getElementById('new_reg_codigo').value;
+  const uso = document.getElementById('new_reg_uso').value;
+  if (!codigo || !uso) { toast('Selecciona régimen y uso CFDI', 'warning'); return; }
+  if (formRegimenes.find(r => r.codigo === codigo)) { toast('Ese régimen ya está en la lista', 'warning'); return; }
+  const desc = catalogs.regimenes.find(r => r.codigo === codigo)?.descripcion || codigo;
+  const esPrincipal = document.getElementById('new_reg_principal').checked;
+  formRegimenes.push({codigo, descripcion: desc, uso_cfdi_default: uso, es_principal: esPrincipal});
+  document.getElementById('new_reg_principal').checked = false;
+  renderFormRegimenes();
+}
+
+function removeRegimen(i) { formRegimenes.splice(i, 1); renderFormRegimenes(); }
+
+async function saveCuenta() {
+  const id = document.getElementById('fc_id').value;
+  const data = {
+    alias: document.getElementById('fc_alias').value.trim(),
+    rfc: document.getElementById('fc_rfc').value.trim().toUpperCase(),
+    nombre_razon_social: document.getElementById('fc_nombre').value.trim().toUpperCase(),
+    codigo_postal: document.getElementById('fc_cp').value.trim(),
+    email: document.getElementById('fc_email').value.trim(),
+    regimenes: formRegimenes,
+  };
+  if (!data.alias || !data.rfc || !data.nombre_razon_social || !data.codigo_postal) {
+    toast('Completa los campos obligatorios (*)', 'warning'); return;
+  }
+  if (!formRegimenes.length) { toast('Agrega al menos un régimen fiscal', 'warning'); return; }
+  try {
+    if (id) await api(`/api/cuentas/${id}`, {method:'PUT', body:data});
+    else await api('/api/cuentas', {method:'POST', body:data});
+    toast('Cuenta guardada correctamente', 'success');
+    cancelFormCuenta();
+    loadCuentas();
+  } catch(e) { toast('Error: ' + e.message, 'danger'); }
+}
+
+function editCuenta(id) {
+  const cuenta = cuentas.find(c => c.id === id);
+  if (cuenta) showFormCuenta(cuenta);
+}
+
+async function deleteCuenta(id) {
+  const cuenta = cuentas.find(c => c.id === id);
+  if (!confirm(`¿Eliminar la cuenta "${cuenta?.alias}"?`)) return;
+  await api(`/api/cuentas/${id}`, {method:'DELETE'});
+  toast('Cuenta eliminada', 'warning');
+  loadCuentas();
+}
+
+function cancelFormCuenta() {
+  document.getElementById('formCuentaWrap').classList.add('d-none');
+  formRegimenes = [];
+}
+
+// ─── Config ───────────────────────────────────────────────────────────────────
+async function loadConfig() {
+  const cfg = await api('/api/config');
+  const statusEl = document.getElementById('apiKeyStatus');
+  if (cfg.api_key_set) {
+    statusEl.className = 'alert alert-success py-2 small';
+    statusEl.textContent = '✓ API Key configurada ' + cfg.api_key_preview;
+  } else {
+    statusEl.className = 'alert alert-warning py-2 small';
+    statusEl.textContent = '⚠ API Key no configurada. Sin ella no podrás analizar tickets.';
+  }
+  document.getElementById('urlCelular').textContent = window.location.href.replace('localhost', '<TU-IP-LOCAL>');
+}
+
+function toggleApiKey() {
+  const el = document.getElementById('cfg_apikey');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+async function saveApiKey() {
+  const key = document.getElementById('cfg_apikey').value.trim();
+  if (!key) { toast('Ingresa tu API Key', 'warning'); return; }
+  await api('/api/config', {method:'POST', body:{api_key: key}});
+  toast('API Key guardada', 'success');
+  document.getElementById('cfg_apikey').value = '';
+  loadConfig();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+(async () => {
+  try { catalogs = await api('/api/catalogos'); } catch(e) {}
+  loadDashboard();
+})();
+</script>
+</body>
+</html>

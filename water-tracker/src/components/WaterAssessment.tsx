@@ -63,7 +63,7 @@ export function WaterAssessment({ profile, onStart }: Props) {
                   <em className="text-sky-200 not-italic font-medium">
                     "El metabolismo lento casi siempre tiene detrás un cuerpo deshidratado."
                   </em>{' '}
-                  Y la solución no está en ningún suplemento caro — está en el grifo de tu casa.
+                  Y la solución no está en ningún suplemento caro — está en la llave de tu casa.
                 </p>
 
                 <p className="text-white/65 text-sm leading-relaxed">
@@ -115,7 +115,7 @@ export function WaterAssessment({ profile, onStart }: Props) {
               ¿Cuántos vasos de agua pura tomas al día actualmente?
             </p>
             <p className="text-white/30 text-xs mt-0.5">
-              Solo agua — no café, jugos, refrescos ni infusiones
+              Solo agua — nada de café, jugos, refrescos ni aguas de sabor
             </p>
           </div>
 

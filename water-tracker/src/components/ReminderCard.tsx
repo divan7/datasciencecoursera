@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download, Copy, Check } from 'lucide-react';
-import { openCalendar, downloadICS, getCalendarUrl, type CalendarPlanParams } from '../utils/calendar';
+import { Bell, CheckCircle2, Clock, AlertTriangle, RotateCcw, X, CalendarDays, Download, ExternalLink } from 'lucide-react';
+import { openCalendar, downloadICS, getGoogleCalendarEventUrls, type CalendarPlanParams } from '../utils/calendar';
 
 const isIOS     = /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isAndroid = /Android/.test(navigator.userAgent);
@@ -40,14 +40,6 @@ export function ReminderCard({
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [urlCopied, setUrlCopied] = useState(false);
-
-  async function copyCalendarUrl() {
-    if (!calendarPlan) return;
-    await navigator.clipboard.writeText(getCalendarUrl(calendarPlan));
-    setUrlCopied(true);
-    setTimeout(() => setUrlCopied(false), 3000);
-  }
   const [catchUpTime, setCatchUpTime] = useState(firstOverdueTime ?? '');
   const [catchUpAmount, setCatchUpAmount] = useState(String(glassSizeMl));
 
@@ -228,25 +220,29 @@ export function ReminderCard({
                 </button>
               )}
 
-              {/* Android — copy URL + manual instructions */}
-              {isAndroid && calendarPlan && (
+              {/* Android — one button per time slot, opens GCal event creation directly */}
+              {isAndroid && schedule.length > 0 && (
                 <div className="space-y-2">
-                  <button
-                    onClick={copyCalendarUrl}
-                    className="flex items-center justify-center gap-2 w-full bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 hover:text-white border border-sky-400/30 rounded-xl px-4 py-3 text-sm font-semibold transition-colors"
-                  >
-                    {urlCopied ? <Check size={15} /> : <Copy size={15} />}
-                    {urlCopied ? '¡URL copiada!' : 'Copiar URL del calendario'}
-                  </button>
-                  <div className="bg-white/5 rounded-xl px-3 py-3 space-y-2 border border-white/8">
-                    <p className="text-white/60 text-xs font-semibold">Pasos en Google Calendar:</p>
-                    <ol className="text-white/40 text-xs space-y-1 list-none">
-                      <li>1. Abre <strong className="text-white/60">Google Calendar</strong></li>
-                      <li>2. Toca el menú <strong className="text-white/60">☰</strong> → <strong className="text-white/60">Otros calendarios</strong> → <strong className="text-white/60">+</strong></li>
-                      <li>3. Selecciona <strong className="text-white/60">"Desde URL"</strong></li>
-                      <li>4. Pega la URL y toca <strong className="text-white/60">"Agregar calendario"</strong></li>
-                    </ol>
+                  <p className="text-white/50 text-xs">
+                    Toca cada horario para agregarlo a Google Calendar con repetición de 7 días:
+                  </p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {getGoogleCalendarEventUrls(schedule, glassSizeMl).map(({ time, url }) => (
+                      <a
+                        key={time}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-1.5 bg-white/8 hover:bg-sky-500/20 border border-white/12 hover:border-sky-400/40 rounded-xl px-3 py-2.5 text-white/70 hover:text-white text-xs font-semibold transition-colors"
+                      >
+                        <ExternalLink size={11} className="flex-shrink-0" />
+                        {time}
+                      </a>
+                    ))}
                   </div>
+                  <p className="text-white/25 text-xs text-center">
+                    Cada evento se repite 7 días con alarma
+                  </p>
                 </div>
               )}
 

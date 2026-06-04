@@ -42,7 +42,36 @@ export function openCalendar(p: CalendarPlanParams): void {
   }
 }
 
-// --- Legacy client-side ICS (fallback, not tied to plan weeks) ---
+/** Generates one Google Calendar event-creation URL per time slot.
+ *  Each event repeats daily for `daysCount` days.
+ *  Works directly in the Google Calendar Android app (no ICS / webcal needed). */
+export function getGoogleCalendarEventUrls(
+  schedule: string[],
+  glassSizeMl: number,
+  daysCount = 7,
+): { time: string; url: string }[] {
+  const today = new Date();
+  const d = today.toISOString().slice(0, 10).replace(/-/g, '');
+
+  return schedule.map((time, i) => {
+    const [h, m] = time.split(':').map(Number);
+    const hh = String(h).padStart(2, '0');
+    const mm = String(m).padStart(2, '0');
+    const endM = m + 1 >= 60 ? 0 : m + 1;
+    const endH = m + 1 >= 60 ? h + 1 : h;
+    const start = `${d}T${hh}${mm}00`;
+    const end   = `${d}T${String(endH).padStart(2,'0')}${String(endM).padStart(2,'0')}00`;
+
+    const params = new URLSearchParams({
+      action:  'TEMPLATE',
+      text:    `💧 Toma #${i + 1} — AquaVital (${glassSizeMl} ml)`,
+      dates:   `${start}/${end}`,
+      recur:   `RRULE:FREQ=DAILY;COUNT=${daysCount}`,
+      details: `Bebe ${glassSizeMl} ml de agua. Recordatorio ${i + 1} de ${schedule.length}. — AquaVital`,
+    });
+    return { time, url: `https://calendar.google.com/calendar/event?${params}` };
+  });
+}
 
 export function downloadICS(schedule: string[], glassSizeMl: number): void {
   const today = new Date();

@@ -8,12 +8,11 @@ import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
 
 type SplitMode = 'equal' | 'percent' | 'amount';
-type SplitType = 'own' | 'prorate';
 
 interface QuickFormProps {
   currentUser: User;
   onSave: (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  onSaveMultiple?: (expenses: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[]) => void;
+  onSaveMultiple?: (expenses: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[]) => void; // kept for API compatibility
   prefill?: Partial<Expense>;
   members: SpaceMember[];
   fixedSuggestions?: FixedExpenseTemplate[];
@@ -32,7 +31,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 const QUICK_EXPENSE_CATS: Category[] = ['alimentacion', 'restaurantes', 'transporte', 'hogar', 'salud', 'entretenimiento', 'servicios', 'otro'];
 const QUICK_INCOME_CATS = ['salario', 'freelance', 'negocio', 'bono', 'renta', 'reembolso'];
 
-export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, members, fixedSuggestions = [], pendingIds }: QuickFormProps) {
+export function QuickForm({ currentUser, onSave, onSaveMultiple: _onSaveMultiple, prefill, members, fixedSuggestions = [], pendingIds }: QuickFormProps) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const conceptRef = useRef<HTMLInputElement>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -63,12 +62,10 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [splitEnabled, setSplitEnabled] = useState(false);
-  const [splitType, setSplitType] = useState<SplitType>('own');
   const [splitMode, setSplitMode] = useState<SplitMode>('equal');
   const [splitParticipants, setSplitParticipants] = useState<string[]>([]);
   // maps participant name → their raw input (% or $amount depending on splitMode)
   const [splitShares, setSplitShares] = useState<Record<string, number>>({});
-  const [splitTotal, setSplitTotal] = useState('');
   const [customSplitName, setCustomSplitName] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -78,19 +75,19 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
   const quickCats = isIncome ? QUICK_INCOME_CATS : QUICK_EXPENSE_CATS;
   const allCats = isIncome ? INCOME_CATEGORIES : CATEGORIES;
 
-  // ── Split math ───────────────────────────────────────────────────
-  const totalAmt = parseFloat(splitTotal) || 0;
-  const nPeople = splitParticipants.length + 1; // +1 for current user
+  // ── Split math — uses the main amount field as the total ────────
+  // The payer always records the full amount; obligations are metadata
+  // showing how the cost distributes among participants for month-end analysis.
+  const totalAmt = parseFloat(form.amount) || 0;
+  const nPeople = splitParticipants.length + 1; // +1 for payer
 
-  // Amount each "other" participant owes
   const participantAmount = (name: string): number => {
     if (!totalAmt) return 0;
     if (splitMode === 'equal') return totalAmt / nPeople;
     if (splitMode === 'percent') return totalAmt * (splitShares[name] ?? 0) / 100;
-    return splitShares[name] ?? 0; // amount mode
+    return splitShares[name] ?? 0;
   };
 
-  // Derived user's amount (remainder after others)
   const userAmount = useMemo(() => {
     if (!totalAmt) return 0;
     if (splitMode === 'equal') return totalAmt / nPeople;
@@ -99,14 +96,12 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [totalAmt, splitMode, splitParticipants, splitShares, nPeople]);
 
-  // User's derived % (for display in percent mode)
   const userPercent = useMemo(() => {
     if (splitMode !== 'percent') return 0;
     const othersSum = splitParticipants.reduce((s, n) => s + (splitShares[n] ?? 0), 0);
     return Math.max(0, 100 - othersSum);
   }, [splitMode, splitParticipants, splitShares]);
 
-  // Validation: check if shares are consistent
   const sharesValid = useMemo(() => {
     if (!totalAmt || splitMode === 'equal') return true;
     if (splitMode === 'percent') {
@@ -146,11 +141,9 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
 
   const resetSplit = () => {
     setSplitEnabled(false);
-    setSplitType('own');
     setSplitMode('equal');
     setSplitParticipants([]);
     setSplitShares({});
-    setSplitTotal('');
     setCustomSplitName('');
   };
 
@@ -202,10 +195,9 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const isSplit = splitEnabled && (splitParticipants.length > 0 || splitType === 'own');
-    const rawAmount = isSplit && splitTotal ? splitTotal : form.amount;
-    if (!rawAmount || !form.concept) return;
+    if (!form.amount || !form.concept) return;
 
+    const amount = parseFloat(form.amount);
     const baseData = {
       transactionType,
       date: form.date,
@@ -227,53 +219,20 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
       receiptImageBase64: prefill?.receiptImageBase64,
     } as const;
 
-    const obligations = buildObligations();
+    const isShared = splitEnabled && splitParticipants.length > 0 && sharesValid;
 
-    if (isSplit && splitTotal && totalAmt > 0) {
-      if (splitType === 'prorate' && onSaveMultiple) {
-        const allExpenses: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>[] = [];
-        // Prorate: each member records their own share — no obligations[] to avoid
-        // double-counting in balance analysis (each person pays exactly their own amount).
-        allExpenses.push({
-          ...baseData,
-          amount: userAmount,
-          sharedExpense: true,
-          totalAmount: totalAmt,
-          splitWith: splitParticipants,
-        });
-        for (const name of splitParticipants) {
-          const isMember = members.some((m) => m.name === name);
-          if (isMember) {
-            const theirAmount = participantAmount(name);
-            const theirSplitWith = [form.paidBy, ...splitParticipants.filter((n) => n !== name)];
-            allExpenses.push({
-              ...baseData,
-              paidBy: name as User,
-              amount: theirAmount,
-              sharedExpense: true,
-              totalAmount: totalAmt,
-              splitWith: theirSplitWith,
-            });
-          }
-        }
-        onSaveMultiple(allExpenses);
-      } else {
-        onSave({
-          ...baseData,
-          amount: userAmount,
-          sharedExpense: true,
-          totalAmount: totalAmt,
-          splitWith: splitParticipants.length > 0 ? splitParticipants : undefined,
-          obligations,
-        });
-      }
-    } else {
-      onSave({
-        ...baseData,
-        amount: parseFloat(rawAmount),
-        sharedExpense: form.sharedExpense,
-      });
-    }
+    // Always one record. The payer registers the full amount.
+    // Obligations are metadata for month-end balance analysis.
+    onSave({
+      ...baseData,
+      amount,
+      sharedExpense: isShared || form.sharedExpense,
+      ...(isShared && {
+        totalAmount: amount,
+        splitWith: splitParticipants,
+        obligations: buildObligations(),
+      }),
+    });
 
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -357,29 +316,34 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
         </div>
       )}
 
-      {/* Amount — shows differently when split is active */}
-      {!(splitEnabled && splitTotal) && (
-        <div className={`rounded-2xl p-4 border-2 ${isIncome ? '' : 'bg-teal-50 border-teal-100'}`}
-          style={isIncome ? { backgroundColor: '#f5ede6', borderColor: '#e8c4a8' } : {}}>
-          <label className={`block text-xs font-semibold uppercase tracking-wide mb-1 ${isIncome ? 'text-[#a85a3a]' : 'text-teal-700'}`}>
-            Monto (MXN)
-          </label>
-          <div className="flex items-center gap-2">
-            <span className={`text-2xl font-bold ${isIncome ? 'text-[#cc7a55]' : 'text-teal-800'}`}>$</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0"
-              required
-              value={form.amount}
-              onChange={(e) => set('amount', e.target.value)}
-              placeholder="0.00"
-              className={`flex-1 text-3xl font-bold bg-transparent border-none outline-none ${isIncome ? 'text-[#a85a3a] placeholder-[#e8b89a]' : 'text-teal-900 placeholder-teal-300'}`}
-            />
-          </div>
+      {/* Amount */}
+      <div className={`rounded-2xl p-4 border-2 ${isIncome ? '' : 'bg-teal-50 border-teal-100'}`}
+        style={isIncome ? { backgroundColor: '#f5ede6', borderColor: '#e8c4a8' } : {}}>
+        <label className={`block text-xs font-semibold uppercase tracking-wide mb-1 ${isIncome ? 'text-[#a85a3a]' : 'text-teal-700'}`}>
+          {splitEnabled && splitParticipants.length > 0
+            ? (isIncome ? 'Total recibido (MXN)' : 'Total pagado (MXN)')
+            : 'Monto (MXN)'}
+        </label>
+        <div className="flex items-center gap-2">
+          <span className={`text-2xl font-bold ${isIncome ? 'text-[#cc7a55]' : 'text-teal-800'}`}>$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            required
+            value={form.amount}
+            onChange={(e) => set('amount', e.target.value)}
+            placeholder="0.00"
+            className={`flex-1 text-3xl font-bold bg-transparent border-none outline-none ${isIncome ? 'text-[#a85a3a] placeholder-[#e8b89a]' : 'text-teal-900 placeholder-teal-300'}`}
+          />
         </div>
-      )}
+        {splitEnabled && splitParticipants.length > 0 && totalAmt > 0 && (
+          <p className={`text-xs mt-1 ${isIncome ? 'text-[#a85a3a]' : 'text-teal-600'}`}>
+            Tu parte: ${fmt$(userAmount)} · Otros deben: ${fmt$(totalAmt - userAmount)}
+          </p>
+        )}
+      </div>
 
       {/* Concept */}
       <div className="concept-wrapper relative">
@@ -638,57 +602,13 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
         {splitEnabled && (
           <div className="border-t border-gray-100 bg-gray-50">
 
-            {/* ── Split type ── */}
+            {/* Explanation chip */}
             <div className="px-4 pt-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tipo de registro</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSplitType('own')}
-                  className={`px-3 py-2 rounded-xl border text-xs font-semibold text-left transition-all ${
-                    splitType === 'own'
-                      ? 'border-teal-500 bg-teal-50 text-teal-800'
-                      : 'border-gray-200 bg-white text-gray-500'
-                  }`}
-                >
-                  <div className="font-bold mb-0.5">Solo mi parte</div>
-                  <div className="font-normal text-[10px] leading-tight opacity-70">
-                    Se guarda 1 registro con tu parte
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSplitType('prorate')}
-                  className={`px-3 py-2 rounded-xl border text-xs font-semibold text-left transition-all ${
-                    splitType === 'prorate'
-                      ? 'border-teal-500 bg-teal-50 text-teal-800'
-                      : 'border-gray-200 bg-white text-gray-500'
-                  }`}
-                >
-                  <div className="font-bold mb-0.5">Prorratear</div>
-                  <div className="font-normal text-[10px] leading-tight opacity-70">
-                    Se guardan registros de cada miembro
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* ── Total ── */}
-            <div className="px-4 pt-3">
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">
-                Total {isIncome ? 'del ingreso' : 'de la cuenta'}
-              </label>
-              <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 px-3 py-2.5">
-                <span className="text-gray-400 text-lg">$</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={splitTotal}
-                  onChange={(e) => setSplitTotal(e.target.value)}
-                  placeholder="0.00"
-                  className="flex-1 text-xl font-bold bg-transparent border-none outline-none text-gray-800 placeholder-gray-300"
-                />
-              </div>
+              <p className="text-xs text-teal-700 bg-teal-50 border border-teal-100 rounded-xl px-3 py-2 leading-relaxed">
+                {isIncome
+                  ? 'Se registra el ingreso completo. Las obligaciones indican cómo se distribuye entre los participantes para el análisis mensual.'
+                  : 'Se registra el gasto completo a quien pagó. Las obligaciones indican cuánto debe cada participante para el análisis mensual.'}
+              </p>
             </div>
 
             {/* ── Distribution mode ── */}
@@ -719,7 +639,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
             {/* ── Participants ── */}
             <div className="px-4 pt-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                Participantes{splitType === 'prorate' && ' (miembros = registro propio)'}
+                Participantes
               </p>
 
               {/* Member chips */}
@@ -743,7 +663,6 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
                         style={isAdded ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
                       >
                         {isAdded ? '✓ ' : '+ '}{m.name}
-                        {splitType === 'prorate' && isAdded && <span className="ml-1 opacity-70">📋</span>}
                       </button>
                     );
                   })}
@@ -805,7 +724,6 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
 
                   {/* Other participants */}
                   {splitParticipants.map((name) => {
-                    const isMember = members.some((m) => m.name === name);
                     const amt = participantAmount(name);
                     return (
                       <div key={name} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-100">
@@ -817,12 +735,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
                         </span>
                         <span className="flex-1 text-xs font-semibold text-gray-700 truncate">
                           {name}
-                          {splitType === 'prorate' && isMember && (
-                            <span className="ml-1 text-[10px] text-teal-600">registra</span>
-                          )}
-                          {splitType === 'prorate' && !isMember && (
-                            <span className="ml-1 text-[10px] text-gray-400">externo</span>
-                          )}
+                          <span className="ml-1 text-[10px] text-teal-600 font-normal">debe</span>
                         </span>
                         {splitMode !== 'equal' && (
                           <input
@@ -862,26 +775,30 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple, prefill, member
 
             {/* ── Summary box ── */}
             {totalAmt > 0 && splitParticipants.length > 0 && sharesValid && (
-              <div className="mx-4 my-3 bg-teal-50 border border-teal-100 rounded-xl p-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-xs text-teal-600 mb-0.5">Tu parte ({nPeople} personas)</p>
-                    <p className="text-2xl font-extrabold text-teal-800">${fmt$(userAmount)}</p>
-                    <p className="text-xs text-teal-500 mt-0.5">de ${fmt$(totalAmt)} total</p>
-                  </div>
-                  {splitType === 'prorate' && (
-                    <div className="text-right">
-                      <p className="text-xs text-teal-600 mb-0.5">Registros a crear</p>
-                      <p className="text-xl font-bold text-teal-800">
-                        {1 + splitParticipants.filter((n) => members.some((m) => m.name === n)).length}
-                      </p>
-                      <p className="text-[10px] text-teal-500">
-                        {splitParticipants.filter((n) => !members.some((m) => m.name === n)).length > 0 &&
-                          `+${splitParticipants.filter((n) => !members.some((m) => m.name === n)).length} externos`}
-                      </p>
-                    </div>
-                  )}
+              <div className="mx-4 my-3 bg-teal-50 border border-teal-100 rounded-xl p-3 space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-teal-600">
+                    {isIncome ? `${form.paidBy} recibió` : `${form.paidBy} pagó`}
+                  </p>
+                  <p className="text-sm font-extrabold text-teal-800">${fmt$(totalAmt)}</p>
                 </div>
+                <div className="border-t border-teal-100 pt-1.5 space-y-0.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-teal-600">
+                      Corresponde a {form.paidBy}
+                    </span>
+                    <span className="font-semibold text-teal-800">${fmt$(userAmount)}</span>
+                  </div>
+                  {splitParticipants.map((name) => (
+                    <div key={name} className="flex justify-between text-xs">
+                      <span className="text-gray-500">{name} {isIncome ? 'aporta' : 'debe'}</span>
+                      <span className="font-semibold text-gray-700">${fmt$(participantAmount(name))}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-teal-400 pt-0.5">
+                  Se guarda 1 registro · Las obligaciones quedan en el análisis mensual
+                </p>
               </div>
             )}
 

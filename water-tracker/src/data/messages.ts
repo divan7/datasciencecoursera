@@ -65,7 +65,7 @@ export const WATER_MESSAGES: WaterMessage[] = [
     category: "benefit", emoji: "❤️",
   },
   {
-    text: "El agua mejora la absorción de nutrientes en el intestino. Comer bien con poca agua es como poner gasolina de calidad en un motor oxidado.",
+    text: "El agua mejora la absorción de nutrientes en el intestino. Comer bien con poca agua es como echarle gasolina premium a un carro con el motor echado a perder.",
     category: "benefit", emoji: "🌱",
   },
 
@@ -75,11 +75,11 @@ export const WATER_MESSAGES: WaterMessage[] = [
     category: "consequence", emoji: "😮",
   },
   {
-    text: "Cuando sientes hambre entre comidas, tu cuerpo muchas veces está pidiendo agua. Prueba un vaso antes de buscar algo que comer.",
+    text: "Cuando se te antoja comer entre comidas, muchas veces tu cuerpo en realidad está pidiendo agua. Toma un vaso antes de buscar algo que comer.",
     category: "consequence", emoji: "🤔",
   },
   {
-    text: "El cansancio crónico sin causa aparente suele ser el primer síntoma de deshidratación. Antes de culpar al estrés, toma agua.",
+    text: "El cansancio crónico sin causa aparente casi siempre es deshidratación. Antes de echarle la culpa al estrés o al trabajo, toma agua.",
     category: "consequence", emoji: "😴",
   },
   {
@@ -131,7 +131,7 @@ export const WATER_MESSAGES: WaterMessage[] = [
 
   // Motivation
   {
-    text: "El agua es gratis, está disponible en todas partes y es el suplemento de salud más poderoso que existe. No hay excusas.",
+    text: "El agua es gratis, está en tu llave y es el suplemento de salud más poderoso que existe. Sin pretextos.",
     category: "motivation", emoji: "🌟",
   },
   {

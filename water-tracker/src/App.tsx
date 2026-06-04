@@ -43,8 +43,8 @@ export default function App() {
     // Plan is keyed by userId — preserved in localStorage for when they log back in
   }
 
-  // Loading splash
-  if (!authReady || profileLoading) {
+  // Loading splash — wait for auth, profile, AND plan to finish reading from localStorage
+  if (!authReady || profileLoading || !plan.planReady) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-sky-950 flex items-center justify-center">
         <div className="text-5xl animate-pulse">💧</div>

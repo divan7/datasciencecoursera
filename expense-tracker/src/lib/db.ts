@@ -401,7 +401,7 @@ export const fixedDb = {
 
   async upsertChecks(spaceId: string, checks: MonthlyCheck[]): Promise<void> {
     if (!supabase || !checks.length) return;
-    await supabase.from('fixed_expense_checks').upsert(
+    const { error } = await supabase.from('fixed_expense_checks').upsert(
       checks.map((c) => ({
         id: c.id, space_id: spaceId, template_id: c.templateId,
         month: c.month, status: c.status,
@@ -412,12 +412,13 @@ export const fixedDb = {
       })),
       { onConflict: 'template_id,month' }
     );
+    if (error) throw new Error(error.message);
   },
 
   // Inserts new pendiente checks only — does NOT overwrite an existing confirmed/skipped row.
   async insertChecksIfNew(spaceId: string, checks: MonthlyCheck[]): Promise<void> {
     if (!supabase || !checks.length) return;
-    await supabase.from('fixed_expense_checks').upsert(
+    const { error } = await supabase.from('fixed_expense_checks').upsert(
       checks.map((c) => ({
         id: c.id, space_id: spaceId, template_id: c.templateId,
         month: c.month, status: c.status,
@@ -428,18 +429,25 @@ export const fixedDb = {
       })),
       { onConflict: 'template_id,month', ignoreDuplicates: true }
     );
+    if (error) throw new Error(error.message);
   },
 
+  // Updates status (and related fields) for an existing check, matched by template+month.
+  // Uses UPDATE rather than upsert to avoid mutating the primary key column.
   async updateCheck(check: MonthlyCheck, spaceId: string): Promise<void> {
     if (!supabase) return;
-    await supabase.from('fixed_expense_checks').upsert({
-      id: check.id, space_id: spaceId, template_id: check.templateId,
-      month: check.month, status: check.status,
-      expense_id: check.expenseId ?? null,
-      actual_amount: check.actualAmount ?? null,
-      confirmed_at: check.confirmedAt ?? null,
-      notes: check.notes ?? null,
-    }, { onConflict: 'template_id,month' });
+    const { error } = await supabase.from('fixed_expense_checks')
+      .update({
+        status: check.status,
+        expense_id: check.expenseId ?? null,
+        actual_amount: check.actualAmount ?? null,
+        confirmed_at: check.confirmedAt ?? null,
+        notes: check.notes ?? null,
+      })
+      .eq('space_id', spaceId)
+      .eq('template_id', check.templateId)
+      .eq('month', check.month);
+    if (error) throw new Error(error.message);
   },
 };
 

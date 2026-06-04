@@ -40,6 +40,11 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
 
     // Checks — status-aware merge: confirmado > omitido > pendiente
     fixedDb.listChecks(spaceId).then((remote) => {
+      // Re-read localStorage here — not the stale closure captured at effect start.
+      // The user may have confirmed a check while listChecks was in-flight; saveChecks
+      // is synchronous so localStorage always reflects the latest state by this point.
+      const currentLocalChecks = loadChecks(spaceId);
+
       const STATUS_PRIORITY: Record<string, number> = { confirmado: 2, omitido: 1, pendiente: 0 };
       const mergeKey = (c: MonthlyCheck) => `${c.templateId}_${c.month}`;
 
@@ -48,7 +53,7 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       const prefer = (a: MonthlyCheck, b: MonthlyCheck) =>
         (STATUS_PRIORITY[a.status] ?? 0) >= (STATUS_PRIORITY[b.status] ?? 0) ? a : b;
 
-      for (const c of [...remote, ...localChecks]) {
+      for (const c of [...remote, ...currentLocalChecks]) {
         const key = mergeKey(c);
         byKey.set(key, byKey.has(key) ? prefer(byKey.get(key)!, c) : c);
       }

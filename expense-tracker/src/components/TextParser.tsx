@@ -22,7 +22,7 @@ const EXAMPLES = [
   'Pagué 350 pesos en Walmart con débito BBVA',
   'Netflix 219 y Spotify 89 con crédito Banamex',
   'Gasolina 800 efectivo, comida 420 con tarjeta 1234',
-  'Amazon Prime 169, CFE 580, agua 230 este mes',
+  'Recibí salario de 18000 por transferencia BBVA',
 ];
 
 export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile }: TextParserProps) {
@@ -83,7 +83,7 @@ export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSave
           <p className="text-sm font-semibold text-purple-700">IA analiza tu texto</p>
         </div>
         <p className="text-xs text-gray-500 mb-3">
-          Escribe uno o varios gastos en lenguaje natural. La IA los detecta y separa automáticamente.
+          Escribe uno o varios gastos o ingresos en lenguaje natural. La IA los clasifica automáticamente — si no dices que es ingreso, lo registra como gasto.
         </p>
 
         <div className="relative">

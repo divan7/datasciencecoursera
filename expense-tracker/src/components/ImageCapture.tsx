@@ -30,6 +30,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
   const [error, setError] = useState('');
   const [parsedItems, setParsedItems] = useState<Partial<Expense>[] | null>(null);
   const [totalWarning, setTotalWarning] = useState<string | null>(null);
+  const [transactionType, setTransactionType] = useState<'gasto' | 'ingreso'>('gasto');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -64,7 +65,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     setTotalWarning(null);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today);
+      const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today, transactionType);
       // Attach thumbnail (further compressed) to first item for storage
       if (items.length > 0) {
         const thumbnail = await compressImage(imageBase64, 900, 0.70);
@@ -110,6 +111,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
 
   const handleClear = () => {
     setImagePreview(null); setImageBase64(''); setParsedItems(null); setError(''); setTotalWarning(null);
+    setTransactionType('gasto');
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
@@ -174,14 +176,43 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
 
           {!parsedItems && (
             <>
+              {/* Gasto / Ingreso toggle */}
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
+                <p className="text-xs text-gray-500 mb-2 font-medium">¿Este documento es un…?</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTransactionType('gasto')}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+                      transactionType === 'gasto'
+                        ? 'bg-orange-500 text-white shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    💸 Gasto
+                  </button>
+                  <button
+                    onClick={() => setTransactionType('ingreso')}
+                    className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${
+                      transactionType === 'ingreso'
+                        ? 'bg-green-600 text-white shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    💰 Ingreso
+                  </button>
+                </div>
+              </div>
+
               <button onClick={handleAnalyze} disabled={loading || !imageBase64}
-                className="w-full py-3 bg-orange-500 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-600 disabled:opacity-60 active:scale-95 transition-all">
+                className={`w-full py-3 text-white rounded-2xl font-bold flex items-center justify-center gap-2 disabled:opacity-60 active:scale-95 transition-all ${
+                  transactionType === 'ingreso' ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-500 hover:bg-orange-600'
+                }`}>
                 {loading ? (
-                  <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Desglosando ticket...</>
+                  <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Analizando documento...</>
                 ) : !imageBase64 ? (
                   <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Preparando imagen...</>
                 ) : (
-                  <><Sparkles size={18} /> Desglosar con IA</>
+                  <><Sparkles size={18} /> Analizar con IA</>
                 )}
               </button>
               {imageBase64 && (

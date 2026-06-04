@@ -42,6 +42,9 @@ El usuario describe UNA o VARIAS transacciones (gastos o ingresos) en su mensaje
 Devuelve ÚNICAMENTE un JSON array válido — siempre array, aunque sea un solo elemento.
 Sin texto adicional, sin comentarios, sin markdown. Solo el JSON array.
 
+REGLA PRINCIPAL — transactionType:
+Por defecto clasifica como "gasto". Solo usa "ingreso" si el texto indica explícitamente que se trata de dinero recibido (salario, venta, cobro, reembolso recibido, honorarios cobrados, etc.).
+
 REGLAS — expenseType y frequency:
 1. Si el texto menciona "fijo", "fija", "gasto fijo", "pago fijo", o una frecuencia de pago → expenseType:"fijo". Si no → expenseType:"variable".
 2. Detecta la frecuencia EXACTA según el texto (no asumas mensual si hay otra indicación):
@@ -177,8 +180,12 @@ export async function parseReceiptItems(
   mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
   apiKey: string,
   today: string,
+  transactionType?: 'gasto' | 'ingreso',
 ): Promise<{ items: Partial<Expense>[]; detectedTotal: number | null }> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const typeHint = transactionType === 'ingreso'
+    ? `\nIMPORTANTE: Este documento es un INGRESO (factura cobrada, recibo de pago recibido, estado de honorarios, nómina, etc.). Clasifica TODOS los conceptos con transactionType:"ingreso" y usa categorías de ingreso (salario, freelance, negocio, renta, bono, reembolso, etc.).`
+    : '';
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 2048,
@@ -187,7 +194,7 @@ export async function parseReceiptItems(
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
-        { type: 'text', text: `Hoy es ${today}. Desglosa todos los gastos de este ticket como JSON.` },
+        { type: 'text', text: `Hoy es ${today}. Desglosa todos los conceptos de este documento como JSON.${typeHint}` },
       ],
     }],
   });
@@ -195,13 +202,14 @@ export async function parseReceiptItems(
   if (content.type !== 'text') throw new Error('Respuesta inesperada del modelo');
   const parsed = JSON.parse(stripJson(content.text));
   // Handle both old array format and new { detectedTotal, items } format
-  if (Array.isArray(parsed)) {
-    return { items: parsed, detectedTotal: null };
+  const raw = Array.isArray(parsed)
+    ? { items: parsed, detectedTotal: null }
+    : { items: Array.isArray(parsed.items) ? parsed.items : [], detectedTotal: typeof parsed.detectedTotal === 'number' ? parsed.detectedTotal : null };
+  // Belt-and-suspenders: force transactionType on every item when caller specified it
+  if (transactionType) {
+    raw.items = raw.items.map((it: Partial<Expense>) => ({ ...it, transactionType }));
   }
-  return {
-    items: Array.isArray(parsed.items) ? parsed.items : [],
-    detectedTotal: typeof parsed.detectedTotal === 'number' ? parsed.detectedTotal : null,
-  };
+  return raw;
 }
 
 /**

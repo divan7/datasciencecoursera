@@ -18,11 +18,11 @@ echo Activando entorno virtual...
 call .venv\Scripts\activate.bat
 
 echo Instalando dependencias...
-pip install --upgrade pip -q
-pip install -r requirements.txt -q
+.venv\Scripts\python.exe -m pip install --upgrade pip --quiet 2>nul
+.venv\Scripts\python.exe -m pip install -r requirements.txt
 
 echo Instalando Chromium para automatizacion web...
-playwright install chromium
+.venv\Scripts\playwright.exe install chromium
 
 echo.
 echo ========================================
@@ -30,6 +30,6 @@ echo   Instalacion completa
 echo ========================================
 echo.
 echo Ejecutando FacturaMexico...
-python main.py
+.venv\Scripts\python.exe main.py
 
 pause

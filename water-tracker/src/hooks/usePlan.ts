@@ -20,15 +20,31 @@ export function usePlan(profile: UserProfile | null, userId: string | null) {
     catch { return null; }
   });
 
-  // Re-read from localStorage when the user changes (e.g. after login)
+  // Track which userId has been loaded so we can gate the UI
+  const [readyForUserId, setReadyForUserId] = useState<string | null | '__pending__'>('__pending__');
+
   useEffect(() => {
     try {
-      const data = JSON.parse(localStorage.getItem(planKey(userId)) ?? 'null') as StoredPlan | null;
+      let data = JSON.parse(localStorage.getItem(planKey(userId)) ?? 'null') as StoredPlan | null;
+
+      // Migrate plan saved under the anonymous key to the user-specific key
+      if (!data && userId) {
+        const anon = JSON.parse(localStorage.getItem(planKey(null)) ?? 'null') as StoredPlan | null;
+        if (anon) {
+          data = anon;
+          localStorage.setItem(planKey(userId), JSON.stringify(anon));
+        }
+      }
+
       setStored(data);
     } catch {
       setStored(null);
     }
+    setReadyForUserId(userId);
   }, [userId]);
+
+  // True only after the userId-specific localStorage read has completed
+  const planReady = readyForUserId !== '__pending__' && readyForUserId === userId;
 
   const weeks: PlanWeek[] = stored && profile
     ? buildHydrationPlan(stored.initialGlasses, stored.finalGoalMl, stored.glassSizeMl)
@@ -45,7 +61,6 @@ export function usePlan(profile: UserProfile | null, userId: string | null) {
   const currentWeek: PlanWeek | null = weeks[weekIndex] ?? null;
   const nextWeek: PlanWeek | null = weeks[weekIndex + 1] ?? null;
 
-  // Current effective daily goal
   const currentGoalMl = currentWeek?.dailyGoalMl ?? profile?.daily_goal_ml ?? 0;
 
   function startPlan(initialGlasses: number) {
@@ -67,6 +82,7 @@ export function usePlan(profile: UserProfile | null, userId: string | null) {
 
   return {
     hasPlan: stored !== null,
+    planReady,
     weeks,
     totalWeeks: weeks.length,
     currentWeekNumber: weekIndex + 1,

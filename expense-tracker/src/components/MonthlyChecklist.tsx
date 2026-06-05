@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { CheckCircle2, Circle, MinusCircle, ChevronDown, AlertTriangle, Link, Calendar, Clock } from 'lucide-react';
-import type { FixedExpenseTemplate, MonthlyCheck, CheckStatus } from '../types/fixedExpense';
+import type { FixedExpenseTemplate, MonthlyCheck, CheckStatus, FixedExpenseType } from '../types/fixedExpense';
 import type { Expense } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
 import { isDueInMonth, getNextDueDate } from '../utils/fixedStorage';
@@ -341,6 +341,11 @@ export function MonthlyChecklist({
 
   const filtered = filter === 'all' ? items : items.filter(({ check }) => check.status === filter);
 
+  const getFixedType = (tpl: FixedExpenseTemplate): FixedExpenseType =>
+    tpl.fixedExpenseType ?? (tpl.isCreditCard ? 'credito' : 'servicio');
+  const creditFiltered  = filtered.filter(({ tpl }) => getFixedType(tpl) === 'credito');
+  const serviceFiltered = filtered.filter(({ tpl }) => getFixedType(tpl) === 'servicio');
+
   const stats = useMemo(() => ({
     total:      items.length,
     pendiente:  items.filter(({ check }) => check.status === 'pendiente').length,
@@ -504,21 +509,55 @@ export function MonthlyChecklist({
           {filtered.length === 0 ? (
             <div className="text-center py-8 text-gray-400 text-sm">No hay gastos en esta categoría</div>
           ) : (
-            <div className="space-y-2">
-              {filtered.map(({ tpl, check }) => (
-                <CheckItem
-                  key={check.id}
-                  check={check}
-                  template={tpl}
-                  expense={check.expenseId && check.expenseId !== 'manual'
-                    ? expenses.find((e) => e.id === check.expenseId)
-                    : undefined}
-                  onConfirmManual={handleConfirmManual}
-                  onSkip={onSkip}
-                  onReset={onReset}
-                  onRegisterNow={onRegisterNow}
-                />
-              ))}
+            <div className="space-y-3">
+              {creditFiltered.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">💳 Pagos de créditos</span>
+                    <span className="flex-1 h-px bg-orange-100" />
+                  </div>
+                  <div className="space-y-2">
+                    {creditFiltered.map(({ tpl, check }) => (
+                      <CheckItem
+                        key={check.id}
+                        check={check}
+                        template={tpl}
+                        expense={check.expenseId && check.expenseId !== 'manual'
+                          ? expenses.find((e) => e.id === check.expenseId)
+                          : undefined}
+                        onConfirmManual={handleConfirmManual}
+                        onSkip={onSkip}
+                        onReset={onReset}
+                        onRegisterNow={onRegisterNow}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+              {serviceFiltered.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-teal-600 uppercase tracking-wide">📋 Servicios, colegiatura u otro</span>
+                    <span className="flex-1 h-px bg-teal-100" />
+                  </div>
+                  <div className="space-y-2">
+                    {serviceFiltered.map(({ tpl, check }) => (
+                      <CheckItem
+                        key={check.id}
+                        check={check}
+                        template={tpl}
+                        expense={check.expenseId && check.expenseId !== 'manual'
+                          ? expenses.find((e) => e.id === check.expenseId)
+                          : undefined}
+                        onConfirmManual={handleConfirmManual}
+                        onSkip={onSkip}
+                        onReset={onReset}
+                        onRegisterNow={onRegisterNow}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </>
@@ -570,23 +609,45 @@ export function MonthlyChecklist({
               <p className="font-medium text-gray-600">Sin pagos en {upcomingDays} días</p>
               <p className="text-xs mt-1">Prueba ampliar el rango de días</p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              {upcomingItems.map(({ tpl, dueDate, dueMonth, check, daysUntil }) => (
-                <UpcomingItem
-                  key={`${tpl.id}-${dueMonth}`}
-                  tpl={tpl}
-                  dueDate={dueDate}
-                  daysUntil={daysUntil}
-                  check={check}
-                  onConfirmManual={(checkId) => handleConfirmManual(checkId, dueMonth)}
-                  onSkip={onSkip}
-                  onReset={onReset}
-                  onRegisterNow={onRegisterNow}
-                />
-              ))}
-            </div>
-          )}
+          ) : (() => {
+            const creditUpcoming  = upcomingItems.filter(({ tpl }) => getFixedType(tpl) === 'credito');
+            const serviceUpcoming = upcomingItems.filter(({ tpl }) => getFixedType(tpl) === 'servicio');
+            const renderUpcoming = ({ tpl, dueDate, dueMonth, check, daysUntil }: typeof upcomingItems[0]) => (
+              <UpcomingItem
+                key={`${tpl.id}-${dueMonth}`}
+                tpl={tpl}
+                dueDate={dueDate}
+                daysUntil={daysUntil}
+                check={check}
+                onConfirmManual={(checkId) => handleConfirmManual(checkId, dueMonth)}
+                onSkip={onSkip}
+                onReset={onReset}
+                onRegisterNow={onRegisterNow}
+              />
+            );
+            return (
+              <div className="space-y-3">
+                {creditUpcoming.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">💳 Pagos de créditos</span>
+                      <span className="flex-1 h-px bg-orange-100" />
+                    </div>
+                    <div className="space-y-2">{creditUpcoming.map(renderUpcoming)}</div>
+                  </>
+                )}
+                {serviceUpcoming.length > 0 && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-teal-600 uppercase tracking-wide">📋 Servicios, colegiatura u otro</span>
+                      <span className="flex-1 h-px bg-teal-100" />
+                    </div>
+                    <div className="space-y-2">{serviceUpcoming.map(renderUpcoming)}</div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </>
       )}
     </div>

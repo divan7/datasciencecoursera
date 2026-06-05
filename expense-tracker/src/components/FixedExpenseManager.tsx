@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Bell } from 'lucide-react';
-import type { FixedExpenseTemplate } from '../types/fixedExpense';
+import type { FixedExpenseTemplate, FixedExpenseType, CreditType } from '../types/fixedExpense';
 import type { Category, User, PaymentMethod, Frequency } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 import type { SpaceMember } from '../types/space';
@@ -24,6 +24,20 @@ const FREQ_LABELS: Record<Frequency, string> = {
 const WEEK_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+const CREDIT_TYPE_OPTIONS: { value: CreditType; label: string; icon: string }[] = [
+  { value: 'tarjeta_credito',     label: 'Tarjeta de crédito',        icon: '💳' },
+  { value: 'credito_automotriz',  label: 'Crédito automotriz',        icon: '🚗' },
+  { value: 'credito_hipotecario', label: 'Crédito hipotecario',       icon: '🏠' },
+  { value: 'otro_credito',        label: 'Otro compromiso financiero', icon: '💼' },
+];
+
+const CREDIT_TYPE_LABEL: Record<CreditType, string> = {
+  tarjeta_credito:     '💳 Tarjeta',
+  credito_automotriz:  '🚗 Automotriz',
+  credito_hipotecario: '🏠 Hipotecario',
+  otro_credito:        '💼 Crédito',
+};
+
 const EMPTY_FORM = {
   concept: '', expectedAmount: '', category: 'servicios' as Category,
   paidBy: '' as User, paymentMethod: 'tarjeta_credito' as PaymentMethod,
@@ -31,6 +45,8 @@ const EMPTY_FORM = {
   dayOfMonth: '', dayOfWeek: '1', paymentMonth: '1',
   bank: '', cardLast4: '', notes: '', active: true,
   isCreditCard: false, cutDay: '', paymentDueDaysAfterCut: '20', minimumPayment: '',
+  fixedExpenseType: 'servicio' as FixedExpenseType,
+  creditType: 'tarjeta_credito' as CreditType,
 };
 
 function PaymentDayField({
@@ -105,10 +121,12 @@ function TemplateForm({
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
+  const isCreditCard = form.fixedExpenseType === 'credito' && form.creditType === 'tarjeta_credito';
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.concept || !form.expectedAmount) return;
-    onSave(form);
+    onSave({ ...form, isCreditCard });
   };
 
   return (
@@ -116,6 +134,58 @@ function TemplateForm({
       <p className="text-sm font-bold text-teal-800">
         {initial?.concept ? '✏️ Editar gasto fijo' : '➕ Nuevo gasto fijo'}
       </p>
+
+      {/* ── Clasificación ── */}
+      <div>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Clasificación</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => set('fixedExpenseType', 'credito')}
+            className={`py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all text-left ${
+              form.fixedExpenseType === 'credito'
+                ? 'border-orange-400 bg-orange-50 text-orange-800'
+                : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'
+            }`}
+          >
+            💳 Pago de crédito
+          </button>
+          <button
+            type="button"
+            onClick={() => set('fixedExpenseType', 'servicio')}
+            className={`py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all text-left ${
+              form.fixedExpenseType === 'servicio'
+                ? 'border-teal-400 bg-teal-50 text-teal-800'
+                : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'
+            }`}
+          >
+            📋 Servicio u otro
+          </button>
+        </div>
+      </div>
+
+      {/* ── Tipo de crédito ── */}
+      {form.fixedExpenseType === 'credito' && (
+        <div>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Tipo de crédito</p>
+          <div className="grid grid-cols-2 gap-2">
+            {CREDIT_TYPE_OPTIONS.map(({ value, label, icon }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => set('creditType', value)}
+                className={`py-2 px-2.5 rounded-xl border text-xs font-semibold transition-all text-left leading-tight ${
+                  form.creditType === value
+                    ? 'border-orange-400 bg-orange-50 text-orange-800'
+                    : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'
+                }`}
+              >
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <label className="block text-xs text-gray-500 mb-1">Concepto *</label>
@@ -199,20 +269,8 @@ function TemplateForm({
         </div>
       </div>
 
-      {/* Credit card toggle */}
-      <div className="flex items-center justify-between px-3 py-2.5 bg-orange-50 border border-orange-200 rounded-xl">
-        <div>
-          <p className="text-xs font-semibold text-orange-800">¿Es pago de tarjeta de crédito?</p>
-          <p className="text-xs text-orange-500 mt-0.5">Activa campos de corte y fecha límite</p>
-        </div>
-        <button type="button" onClick={() => set('isCreditCard', !form.isCreditCard)}
-          className={`w-11 h-6 rounded-full transition-all relative ${form.isCreditCard ? 'bg-orange-500' : 'bg-gray-200'}`}>
-          <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${form.isCreditCard ? 'left-5' : 'left-0.5'}`} />
-        </button>
-      </div>
-
-      {/* Credit card specific fields */}
-      {form.isCreditCard && (
+      {/* Credit card specific fields — only when tarjeta_credito is selected */}
+      {isCreditCard && (
         <div className="space-y-3 bg-orange-50 border border-orange-200 rounded-xl p-3">
           <p className="text-xs font-semibold text-orange-800">💳 Datos de la tarjeta</p>
           <div className="grid grid-cols-2 gap-3">
@@ -269,24 +327,29 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [pendingReminder, setPendingReminder] = useState<FixedExpenseTemplate | null>(null);
 
-  const formToTemplate = (form: typeof EMPTY_FORM) => ({
-    concept: form.concept,
-    expectedAmount: parseFloat(form.expectedAmount as string) || 0,
-    category: form.category,
-    paidBy: form.paidBy,
-    paymentMethod: form.paymentMethod,
-    frequency: form.frequency,
-    dayOfMonth: !form.isCreditCard && form.dayOfMonth ? parseInt(form.dayOfMonth as string) : undefined,
-    dayOfWeek: form.frequency === 'semanal' && form.dayOfWeek ? parseInt(form.dayOfWeek) : undefined,
-    paymentMonth: form.frequency === 'anual' && form.paymentMonth ? parseInt(form.paymentMonth) : undefined,
-    bank: form.bank || undefined,
-    cardLast4: form.cardLast4 || undefined,
-    notes: form.notes || undefined,
-    isCreditCard: form.isCreditCard || undefined,
-    cutDay: form.isCreditCard && form.cutDay ? parseInt(form.cutDay as string) : undefined,
-    paymentDueDaysAfterCut: form.isCreditCard && form.paymentDueDaysAfterCut ? parseInt(form.paymentDueDaysAfterCut as string) : undefined,
-    minimumPayment: form.isCreditCard && form.minimumPayment ? parseFloat(form.minimumPayment as string) : undefined,
-  });
+  const formToTemplate = (form: typeof EMPTY_FORM) => {
+    const isCC = form.fixedExpenseType === 'credito' && form.creditType === 'tarjeta_credito';
+    return {
+      concept: form.concept,
+      expectedAmount: parseFloat(form.expectedAmount as string) || 0,
+      category: form.category,
+      paidBy: form.paidBy,
+      paymentMethod: form.paymentMethod,
+      frequency: form.frequency,
+      dayOfMonth: !isCC && form.dayOfMonth ? parseInt(form.dayOfMonth as string) : undefined,
+      dayOfWeek: form.frequency === 'semanal' && form.dayOfWeek ? parseInt(form.dayOfWeek) : undefined,
+      paymentMonth: form.frequency === 'anual' && form.paymentMonth ? parseInt(form.paymentMonth) : undefined,
+      bank: form.bank || undefined,
+      cardLast4: form.cardLast4 || undefined,
+      notes: form.notes || undefined,
+      fixedExpenseType: form.fixedExpenseType,
+      creditType: form.fixedExpenseType === 'credito' ? form.creditType : undefined,
+      isCreditCard: isCC || undefined,
+      cutDay: isCC && form.cutDay ? parseInt(form.cutDay as string) : undefined,
+      paymentDueDaysAfterCut: isCC && form.paymentDueDaysAfterCut ? parseInt(form.paymentDueDaysAfterCut as string) : undefined,
+      minimumPayment: isCC && form.minimumPayment ? parseFloat(form.minimumPayment as string) : undefined,
+    };
+  };
 
   const handleAdd = (form: typeof EMPTY_FORM) => {
     const tpl = onAdd({ ...formToTemplate(form), active: true });
@@ -306,6 +369,110 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
 
   const active   = templates.filter((t) => t.active);
   const inactive = templates.filter((t) => !t.active);
+
+  const getFixedType = (t: FixedExpenseTemplate) =>
+    t.fixedExpenseType ?? (t.isCreditCard ? 'credito' : 'servicio');
+
+  const renderTemplate = (tpl: FixedExpenseTemplate) => (
+    <div key={tpl.id}>
+      {editId === tpl.id ? (
+        <TemplateForm
+          initial={{
+            concept: tpl.concept, expectedAmount: String(tpl.expectedAmount),
+            category: tpl.category, paidBy: tpl.paidBy, paymentMethod: tpl.paymentMethod,
+            frequency: tpl.frequency,
+            dayOfMonth: tpl.dayOfMonth ? String(tpl.dayOfMonth) : '',
+            dayOfWeek: tpl.dayOfWeek ? String(tpl.dayOfWeek) : '1',
+            paymentMonth: tpl.paymentMonth ? String(tpl.paymentMonth) : '1',
+            bank: tpl.bank ?? '', cardLast4: tpl.cardLast4 ?? '', notes: tpl.notes ?? '',
+            isCreditCard: tpl.isCreditCard ?? false,
+            cutDay: tpl.cutDay ? String(tpl.cutDay) : '',
+            paymentDueDaysAfterCut: tpl.paymentDueDaysAfterCut ? String(tpl.paymentDueDaysAfterCut) : '20',
+            minimumPayment: tpl.minimumPayment ? String(tpl.minimumPayment) : '',
+            fixedExpenseType: tpl.fixedExpenseType ?? (tpl.isCreditCard ? 'credito' : 'servicio'),
+            creditType: tpl.creditType ?? (tpl.isCreditCard ? 'tarjeta_credito' : 'tarjeta_credito'),
+          }}
+          onSave={(form) => handleEdit(tpl.id, form)}
+          onCancel={() => setEditId(null)}
+          members={members}
+        />
+      ) : (
+        <div className={`bg-white rounded-xl border p-3 shadow-sm transition-opacity ${!tpl.active ? 'opacity-50' : ''}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-gray-900 text-sm">{tpl.concept}</p>
+                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">
+                  {FREQ_LABELS[tpl.frequency]}
+                </span>
+                {tpl.creditType && (
+                  <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
+                    {CREDIT_TYPE_LABEL[tpl.creditType]}
+                  </span>
+                )}
+                {tpl.reminderEnabled && <Bell size={12} className="text-teal-500" />}
+                {tpl.frequency === 'semanal' && tpl.dayOfWeek && (
+                  <span className="text-xs text-gray-400">{WEEK_DAYS[tpl.dayOfWeek - 1]}</span>
+                )}
+                {tpl.frequency === 'anual' && tpl.paymentMonth && tpl.dayOfMonth && (
+                  <span className="text-xs text-gray-400">
+                    {tpl.dayOfMonth} {MONTHS[tpl.paymentMonth - 1]}
+                  </span>
+                )}
+                {!['semanal','anual','diario'].includes(tpl.frequency) && tpl.dayOfMonth && (
+                  <span className="text-xs text-gray-400">día {tpl.dayOfMonth}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <span className="text-base font-bold text-gray-800">
+                  ${tpl.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                </span>
+                {tpl.minimumPayment && (
+                  <span className="text-xs text-orange-500">mín ${tpl.minimumPayment.toLocaleString('es-MX')}</span>
+                )}
+                <span className="text-xs text-gray-400">
+                  {((CATEGORIES[tpl.category] as string) ?? tpl.category ?? '').replace(/^[^ ]+ /, '')}
+                </span>
+                <span className="text-xs text-gray-400">{tpl.paidBy}</span>
+                {tpl.cardLast4 && <span className="text-xs text-gray-400">···{tpl.cardLast4}</span>}
+              </div>
+              {tpl.isCreditCard && tpl.cutDay && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-orange-600">✂️ Corte día {tpl.cutDay}</span>
+                  <span className="text-xs text-orange-500">· Límite día ~{Math.min(tpl.cutDay + (tpl.paymentDueDaysAfterCut ?? 20), 31)}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={() => setPendingReminder(tpl)}
+                className="p-1.5 text-gray-300 hover:text-teal-500 transition-colors"
+                title="Configurar recordatorio"
+              >
+                <Bell size={15} />
+              </button>
+              <button onClick={() => onUpdate(tpl.id, { active: !tpl.active })}
+                className="p-1.5 text-gray-400 hover:text-teal-500 transition-colors"
+                title={tpl.active ? 'Desactivar' : 'Activar'}>
+                {tpl.active ? <ToggleRight size={18} className="text-green-500" /> : <ToggleLeft size={18} />}
+              </button>
+              <button onClick={() => setEditId(tpl.id)} className="p-1.5 text-gray-400 hover:text-teal-500 transition-colors">
+                <Pencil size={15} />
+              </button>
+              <button onClick={() => handleDelete(tpl.id)}
+                className={`p-1.5 transition-colors ${confirmDel === tpl.id ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}`}>
+                <Trash2 size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const allTpls = [...active, ...inactive];
+  const creditTpls  = allTpls.filter((t) => getFixedType(t) === 'credito');
+  const serviceTpls = allTpls.filter((t) => getFixedType(t) === 'servicio');
 
   return (
     <>
@@ -335,98 +502,29 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
           </div>
         )}
 
-        {[...active, ...inactive].map((tpl) => (
-          <div key={tpl.id}>
-            {editId === tpl.id ? (
-              <TemplateForm
-                initial={{
-                  concept: tpl.concept, expectedAmount: String(tpl.expectedAmount),
-                  category: tpl.category, paidBy: tpl.paidBy, paymentMethod: tpl.paymentMethod,
-                  frequency: tpl.frequency,
-                  dayOfMonth: tpl.dayOfMonth ? String(tpl.dayOfMonth) : '',
-                  dayOfWeek: tpl.dayOfWeek ? String(tpl.dayOfWeek) : '1',
-                  paymentMonth: tpl.paymentMonth ? String(tpl.paymentMonth) : '1',
-                  bank: tpl.bank ?? '', cardLast4: tpl.cardLast4 ?? '', notes: tpl.notes ?? '',
-                  isCreditCard: tpl.isCreditCard ?? false,
-                  cutDay: tpl.cutDay ? String(tpl.cutDay) : '',
-                  paymentDueDaysAfterCut: tpl.paymentDueDaysAfterCut ? String(tpl.paymentDueDaysAfterCut) : '20',
-                  minimumPayment: tpl.minimumPayment ? String(tpl.minimumPayment) : '',
-                }}
-                onSave={(form) => handleEdit(tpl.id, form)}
-                onCancel={() => setEditId(null)}
-                members={members}
-              />
-            ) : (
-              <div className={`bg-white rounded-xl border p-3 shadow-sm transition-opacity ${!tpl.active ? 'opacity-50' : ''}`}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-gray-900 text-sm">{tpl.concept}</p>
-                      <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">
-                        {FREQ_LABELS[tpl.frequency]}
-                      </span>
-                      {tpl.reminderEnabled && (
-                        <Bell size={12} className="text-teal-500" />
-                      )}
-                      {/* Payment day badge */}
-                      {tpl.frequency === 'semanal' && tpl.dayOfWeek && (
-                        <span className="text-xs text-gray-400">{WEEK_DAYS[tpl.dayOfWeek - 1]}</span>
-                      )}
-                      {tpl.frequency === 'anual' && tpl.paymentMonth && tpl.dayOfMonth && (
-                        <span className="text-xs text-gray-400">
-                          {tpl.dayOfMonth} {MONTHS[tpl.paymentMonth - 1]}
-                        </span>
-                      )}
-                      {!['semanal','anual','diario'].includes(tpl.frequency) && tpl.dayOfMonth && (
-                        <span className="text-xs text-gray-400">día {tpl.dayOfMonth}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span className="text-base font-bold text-gray-800">
-                        ${tpl.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-                      </span>
-                      {tpl.minimumPayment && (
-                        <span className="text-xs text-orange-500">mín ${tpl.minimumPayment.toLocaleString('es-MX')}</span>
-                      )}
-                      <span className="text-xs text-gray-400">
-                        {((CATEGORIES[tpl.category] as string) ?? tpl.category ?? '').replace(/^[^ ]+ /, '')}
-                      </span>
-                      <span className="text-xs text-gray-400">{tpl.paidBy}</span>
-                      {tpl.cardLast4 && <span className="text-xs text-gray-400">···{tpl.cardLast4}</span>}
-                    </div>
-                    {tpl.isCreditCard && tpl.cutDay && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-orange-600">✂️ Corte día {tpl.cutDay}</span>
-                        <span className="text-xs text-orange-500">· Límite día ~{Math.min(tpl.cutDay + (tpl.paymentDueDaysAfterCut ?? 20), 31)}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => setPendingReminder(tpl)}
-                      className="p-1.5 text-gray-300 hover:text-teal-500 transition-colors"
-                      title="Configurar recordatorio"
-                    >
-                      <Bell size={15} />
-                    </button>
-                    <button onClick={() => onUpdate(tpl.id, { active: !tpl.active })}
-                      className="p-1.5 text-gray-400 hover:text-teal-500 transition-colors"
-                      title={tpl.active ? 'Desactivar' : 'Activar'}>
-                      {tpl.active ? <ToggleRight size={18} className="text-green-500" /> : <ToggleLeft size={18} />}
-                    </button>
-                    <button onClick={() => setEditId(tpl.id)} className="p-1.5 text-gray-400 hover:text-teal-500 transition-colors">
-                      <Pencil size={15} />
-                    </button>
-                    <button onClick={() => handleDelete(tpl.id)}
-                      className={`p-1.5 transition-colors ${confirmDel === tpl.id ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}`}>
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+        {/* ── Pagos de créditos ── */}
+        {creditTpls.length > 0 && (
+          <>
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">💳 Pagos de créditos</span>
+              <span className="flex-1 h-px bg-orange-100" />
+              <span className="text-xs text-orange-400">{creditTpls.filter((t) => t.active).length} activos</span>
+            </div>
+            {creditTpls.map(renderTemplate)}
+          </>
+        )}
+
+        {/* ── Servicios, colegiatura u otro ── */}
+        {serviceTpls.length > 0 && (
+          <>
+            <div className="flex items-center gap-2 pt-1">
+              <span className="text-xs font-bold text-teal-600 uppercase tracking-wide">📋 Servicios, colegiatura u otro</span>
+              <span className="flex-1 h-px bg-teal-100" />
+              <span className="text-xs text-teal-400">{serviceTpls.filter((t) => t.active).length} activos</span>
+            </div>
+            {serviceTpls.map(renderTemplate)}
+          </>
+        )}
       </div>
 
       {pendingReminder && (

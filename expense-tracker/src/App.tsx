@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { QuickForm } from './components/QuickForm';
 import { TextParser } from './components/TextParser';
@@ -106,6 +106,13 @@ export default function App() {
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
   const [suggestQueue, setSuggestQueue] = useState<{ expense: Expense; autoConfirm?: boolean }[]>([]);
   const [reminderTemplate, setReminderTemplate] = useState<FixedExpenseTemplate | null>(null);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  const saveToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showSaveToast = useCallback((msg: string) => {
+    setSaveToast(msg);
+    if (saveToastTimer.current) clearTimeout(saveToastTimer.current);
+    saveToastTimer.current = setTimeout(() => setSaveToast(null), 3000);
+  }, []);
 
   // ── Expense hooks ─────────────────────────────────────────────
   const { expenses, addExpense, updateExpense, deleteExpense, cloudSyncError, clearCloudSyncError } = useExpenses(spaceId);
@@ -297,8 +304,9 @@ export default function App() {
       }
       setPrefillTemplate(null);
       setActiveTab('list');
+      showSaveToast('Gasto guardado');
     },
-    [addExpense, tryAutoMatch]
+    [addExpense, tryAutoMatch, showSaveToast]
   );
 
   const handleSaveExpenseMultiple = useCallback(
@@ -313,8 +321,9 @@ export default function App() {
       if (unmatchedFijos.length > 0) setSuggestQueue((q) => [...q, ...unmatchedFijos]);
       setPrefillTemplate(null);
       setActiveTab('list');
+      showSaveToast(items.length === 1 ? 'Gasto guardado' : `${items.length} gastos guardados`);
     },
-    [addExpense, tryAutoMatch]
+    [addExpense, tryAutoMatch, showSaveToast]
   );
 
   const handleRegisterFromTemplate = useCallback((tpl: FixedExpenseTemplate) => {
@@ -384,7 +393,8 @@ export default function App() {
     });
     if (unmatchedFijos.length > 0) setSuggestQueue((q) => [...q, ...unmatchedFijos]);
     setActiveTab('list');
-  }, [addExpense, tryAutoMatch, spaceId]);
+    showSaveToast(items.length === 1 ? 'Gasto guardado' : `${items.length} gastos guardados`);
+  }, [addExpense, tryAutoMatch, spaceId, showSaveToast]);
 
   // ── Pending fixed expenses for tray ───────────────────────────
   const currentMonth = format(new Date(), 'yyyy-MM');
@@ -530,6 +540,11 @@ export default function App() {
           <span className="mt-0.5 shrink-0">⚠️</span>
           <span className="flex-1">{cloudSyncError}</span>
           <button onClick={clearCloudSyncError} className="shrink-0 font-medium underline">Cerrar</button>
+        </div>
+      )}
+      {saveToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm px-4 py-2 rounded-full shadow-lg pointer-events-none">
+          ✓ {saveToast}
         </div>
       )}
       <Header

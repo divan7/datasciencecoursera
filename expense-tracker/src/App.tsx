@@ -304,7 +304,7 @@ export default function App() {
       }
       setPrefillTemplate(null);
       setActiveTab('list');
-      showSaveToast('Gasto guardado');
+      showSaveToast(data.transactionType === 'ingreso' ? 'Ingreso guardado' : 'Gasto guardado');
     },
     [addExpense, tryAutoMatch, showSaveToast]
   );
@@ -321,7 +321,15 @@ export default function App() {
       if (unmatchedFijos.length > 0) setSuggestQueue((q) => [...q, ...unmatchedFijos]);
       setPrefillTemplate(null);
       setActiveTab('list');
-      showSaveToast(items.length === 1 ? 'Gasto guardado' : `${items.length} gastos guardados`);
+      const ingresoCount = items.filter((d) => d.transactionType === 'ingreso').length;
+      const gastoCount = items.length - ingresoCount;
+      const toastMsg =
+        ingresoCount === items.length
+          ? (items.length === 1 ? 'Ingreso guardado' : `${items.length} ingresos guardados`)
+          : gastoCount === items.length
+          ? (items.length === 1 ? 'Gasto guardado' : `${items.length} gastos guardados`)
+          : `${items.length} registros guardados`;
+      showSaveToast(toastMsg);
     },
     [addExpense, tryAutoMatch, showSaveToast]
   );
@@ -393,7 +401,15 @@ export default function App() {
     });
     if (unmatchedFijos.length > 0) setSuggestQueue((q) => [...q, ...unmatchedFijos]);
     setActiveTab('list');
-    showSaveToast(items.length === 1 ? 'Gasto guardado' : `${items.length} gastos guardados`);
+    const ingresoCount = items.filter(({ expense }) => expense.transactionType === 'ingreso').length;
+    const gastoCount = items.length - ingresoCount;
+    const toastMsg =
+      ingresoCount === items.length
+        ? (items.length === 1 ? 'Ingreso guardado' : `${items.length} ingresos guardados`)
+        : gastoCount === items.length
+        ? (items.length === 1 ? 'Gasto guardado' : `${items.length} gastos guardados`)
+        : `${items.length} registros guardados`;
+    showSaveToast(toastMsg);
   }, [addExpense, tryAutoMatch, spaceId, showSaveToast]);
 
   // ── Pending fixed expenses for tray ───────────────────────────

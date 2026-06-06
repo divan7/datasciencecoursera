@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Users, CheckCircle, AlertCircle, ArrowLeft, UserCheck, UserPlus } from 'lucide-react';
 import { MEMBER_COLORS } from '../types/space';
 import { invitesDb } from '../lib/db';
@@ -8,10 +8,11 @@ interface Props {
   profile: Profile | null;
   onJoined: (spaceId: string, memberId: string) => void;
   onBack: () => void;
+  initialCode?: string;
 }
 
-export function JoinSpace({ profile, onJoined, onBack }: Props) {
-  const [code, setCode]               = useState('');
+export function JoinSpace({ profile, onJoined, onBack, initialCode }: Props) {
+  const [code, setCode]               = useState(initialCode ?? '');
   const [step, setStep]               = useState<'code' | 'whoami' | 'confirm'>('code');
   const [preview, setPreview]         = useState<InvitePreview | null>(null);
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
@@ -20,6 +21,14 @@ export function JoinSpace({ profile, onJoined, onBack }: Props) {
   const [error, setError]             = useState('');
 
   const formattedCode = code.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 6);
+
+  // Auto-verify when a code arrives pre-filled from the invite URL
+  useEffect(() => {
+    if (initialCode && initialCode.replace(/[^A-Z0-9]/gi, '').length === 6) {
+      handleVerify();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleVerify = async () => {
     if (formattedCode.length !== 6) return;

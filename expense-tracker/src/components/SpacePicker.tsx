@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, X, Pencil, Check } from 'lucide-react';
+import { Plus, X, Pencil, Check, UserPlus } from 'lucide-react';
 import type { AppSpace, SessionState } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
 import { PinPad } from './PinPad';
@@ -10,12 +10,13 @@ interface Props {
   session: SessionState;
   onSwitch: (spaceId: string, memberId: string) => void;
   onUpdateSpaces: (spaces: AppSpace[]) => void;
+  onJoinSpace?: () => void;
 }
 
 type Modal = 'new' | 'rename' | { type: 'confirmDelete'; spaceId: string } | null;
 type PinStep = 'first' | 'confirm';
 
-export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces }: Props) {
+export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces, onJoinSpace }: Props) {
   const [modal, setModal] = useState<Modal>(null);
   const [renameDraft, setRenameDraft] = useState('');
 
@@ -178,8 +179,19 @@ export function SpacePicker({ spaces, session, onSwitch, onUpdateSpaces }: Props
             className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold bg-white border-2 border-dashed border-gray-300 text-gray-400 hover:border-teal-400 hover:text-teal-600 transition-all flex-shrink-0"
           >
             <Plus size={14} />
-            <span>Nueva lista</span>
+            <span>Nueva</span>
           </button>
+
+          {/* Join existing space button */}
+          {onJoinSpace && (
+            <button
+              onClick={onJoinSpace}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-semibold bg-white border-2 border-dashed border-teal-300 text-teal-600 hover:border-teal-500 hover:text-teal-700 hover:bg-teal-50 transition-all flex-shrink-0"
+            >
+              <UserPlus size={14} />
+              <span>Unirme</span>
+            </button>
+          )}
         </div>
       </div>
 

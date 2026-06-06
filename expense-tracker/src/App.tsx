@@ -67,6 +67,9 @@ export default function App() {
   // 'choosing' | 'joining' | 'creating' | 'joined' (post-join confirmation)
   const [welcomeMode, setWelcomeMode] = useState<'choosing' | 'joining' | 'creating' | 'joined'>('choosing');
   const [joinedSpaceName, setJoinedSpaceName] = useState('');
+  // Join-flow overlay — works for users who already have spaces
+  const [showJoinFlow, setShowJoinFlow] = useState(false);
+  const [pendingJoinCode, setPendingJoinCode] = useState<string | null>(null);
 
   // Derived: current space and member
   const currentSpace = useMemo(
@@ -192,6 +195,21 @@ export default function App() {
       // Non-fatal: the member may already have profile_id set (RPC is idempotent)
     });
   }, [user?.id, session?.spaceId, session?.memberId, spacesLoaded]);
+
+  // ── Detect ?join=CODE invite URL parameter ───────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('join');
+    if (code) {
+      const clean = code.replace(/[^A-Z0-9]/gi, '').toUpperCase().slice(0, 6);
+      if (clean.length === 6) {
+        setPendingJoinCode(clean);
+        setShowJoinFlow(true);
+        // Remove the param from the URL without triggering a reload
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, []);
 
   // ── Notification check on mount and focus ────────────────────
   useEffect(() => {
@@ -406,11 +424,30 @@ export default function App() {
     }
   }
 
+  // ── Join flow — accessible to users with or without existing spaces ──
+  // Triggered by: ?join=CODE URL param, "Unirme" button in SpacePicker,
+  // or the welcome screen when user has no spaces yet.
+  if (isSupabaseConfigured && (showJoinFlow || (spaces.length === 0 && welcomeMode === 'joining'))) {
+    return (
+      <JoinSpace
+        profile={profile}
+        initialCode={pendingJoinCode ?? undefined}
+        onJoined={async (sid, mid) => {
+          setShowJoinFlow(false);
+          setPendingJoinCode(null);
+          await handleJoined(sid, mid);
+        }}
+        onBack={() => {
+          setShowJoinFlow(false);
+          setPendingJoinCode(null);
+          setWelcomeMode('choosing');
+        }}
+      />
+    );
+  }
+
   // ── Welcome gate (when Supabase is on and no spaces yet) ─────
   if (isSupabaseConfigured && spaces.length === 0) {
-    if (welcomeMode === 'joining') {
-      return <JoinSpace profile={profile} onJoined={handleJoined} onBack={() => setWelcomeMode('choosing')} />;
-    }
     if (welcomeMode === 'choosing') {
       return <WelcomeChoice onCreateOwn={() => setWelcomeMode('creating')} onJoin={() => setWelcomeMode('joining')} />;
     }
@@ -486,6 +523,7 @@ export default function App() {
           session={session}
           onSwitch={handleSwitchSpace}
           onUpdateSpaces={handleUpdateSpaces}
+          onJoinSpace={isSupabaseConfigured ? () => setShowJoinFlow(true) : undefined}
         />
       </div>
 

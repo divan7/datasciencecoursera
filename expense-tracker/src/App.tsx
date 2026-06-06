@@ -29,7 +29,7 @@ import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace } from './utils/storage';
-import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, loadSpacesFromSupabase, syncSpaceToSupabase, getCacheOwner, setCacheOwner, clearLocalSpaceData } from './utils/spaceStorage';
+import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, syncSpaceToSupabase, getCacheOwner, setCacheOwner, clearLocalSpaceData } from './utils/spaceStorage';
 import { loadFiscalProfile } from './utils/fiscalStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
@@ -334,9 +334,29 @@ export default function App() {
   }, [signOut]);
 
   const handleJoined = useCallback(async (spaceId: string, memberId: string) => {
-    const updated = await loadSpacesFromSupabase();
+    // 1. Guarantee profile_id is set in Supabase BEFORE querying spaces.
+    //    claimMemberProfile is idempotent — safe to call even if already set.
+    if (isSupabaseConfigured) {
+      await spacesDb.claimMemberProfile(spaceId, memberId).catch(console.error);
+    }
+
+    // 2. Load spaces using listMySpaces() directly (avoids the stale-cache
+    //    fallback in loadSpacesFromSupabase that hides the joined space).
+    //    Retry once after 1 s if the joined space isn't yet visible in the result
+    //    (rare but possible with transient Supabase propagation).
+    let remote: AppSpace[] = [];
+    if (isSupabaseConfigured) {
+      remote = await spacesDb.listMySpaces().catch(() => [] as AppSpace[]);
+      if (!remote.find((s) => s.id === spaceId)) {
+        await new Promise((r) => setTimeout(r, 1000));
+        remote = await spacesDb.listMySpaces().catch(() => [] as AppSpace[]);
+      }
+    }
+    const updated = remote.length > 0 ? remote : loadSpaces();
+
     if (updated.length > 0) {
       setSpaces(updated);
+      if (remote.length > 0) saveSpaces(remote);
       const newSession: SessionState = { spaceId, memberId };
       setSession(newSession);
       saveSession(newSession);

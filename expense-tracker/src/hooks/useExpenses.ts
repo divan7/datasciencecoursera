@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Expense } from '../types/expense';
 import { loadExpenses, saveExpenses, generateId } from '../utils/storage';
 import { expensesDb } from '../lib/db';
@@ -8,6 +8,19 @@ export function useExpenses(spaceId: string) {
   const [expenses, setExpenses] = useState<Expense[]>(() =>
     spaceId ? loadExpenses(spaceId) : []
   );
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+  const clearErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reportSyncError = useCallback((msg: string) => {
+    setCloudSyncError(msg);
+    if (clearErrorTimer.current) clearTimeout(clearErrorTimer.current);
+    clearErrorTimer.current = setTimeout(() => setCloudSyncError(null), 8000);
+  }, []);
+
+  const clearCloudSyncError = useCallback(() => {
+    if (clearErrorTimer.current) clearTimeout(clearErrorTimer.current);
+    setCloudSyncError(null);
+  }, []);
 
   useEffect(() => {
     if (!spaceId) return;
@@ -50,10 +63,13 @@ export function useExpenses(spaceId: string) {
       return updated;
     });
     if (isSupabaseConfigured) {
-      expensesDb.create(spaceId, expense).catch(console.error);
+      expensesDb.create(spaceId, expense).catch((err) => {
+        console.error('Error al guardar gasto en la nube:', err);
+        reportSyncError('No se pudo guardar en la nube. El gasto se guardó localmente y se sincronizará cuando la conexión se restablezca.');
+      });
     }
     return expense;
-  }, [spaceId]);
+  }, [spaceId, reportSyncError]);
 
   const updateExpense = useCallback((id: string, data: Partial<Expense>) => {
     setExpenses((prev) => {
@@ -107,5 +123,7 @@ export function useExpenses(spaceId: string) {
     getExpensesByMonth,
     getMonthlyTotal,
     availableMonths,
+    cloudSyncError,
+    clearCloudSyncError,
   };
 }

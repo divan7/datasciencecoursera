@@ -108,7 +108,7 @@ export default function App() {
   const [reminderTemplate, setReminderTemplate] = useState<FixedExpenseTemplate | null>(null);
 
   // ── Expense hooks ─────────────────────────────────────────────
-  const { expenses, addExpense, updateExpense, deleteExpense } = useExpenses(spaceId);
+  const { expenses, addExpense, updateExpense, deleteExpense, cloudSyncError, clearCloudSyncError } = useExpenses(spaceId);
   const {
     templates, checks,
     addTemplate, updateTemplate, deleteTemplate,
@@ -525,6 +525,13 @@ export default function App() {
     <ErrorBoundary>
     <div className="min-h-screen bg-gray-50">
       <PWAUpdateBanner />
+      {cloudSyncError && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-50 border-b border-amber-300 px-4 py-2 flex items-start gap-2 text-sm text-amber-800">
+          <span className="mt-0.5 shrink-0">⚠️</span>
+          <span className="flex-1">{cloudSyncError}</span>
+          <button onClick={clearCloudSyncError} className="shrink-0 font-medium underline">Cerrar</button>
+        </div>
+      )}
       <Header
         activeTab={activeTab}
         onTabChange={setActiveTab}

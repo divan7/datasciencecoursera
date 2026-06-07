@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Save, ChevronDown, ChevronUp, Users, ExternalLink } from 'lucide-react';
 import type {
   Expense, Category, PaymentMethod, TransactionType, ExpenseType, Frequency, ObligationEntry,
@@ -61,7 +61,9 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
   const [tags, setTags]                 = useState((expense.tags ?? []).join(', '));
   const [showAdvanced, setShowAdv]      = useState(false);
   const [obligations, setObligations]   = useState<ObligationEntry[]>(expense.obligations ?? []);
-  const [showSplit, setShowSplit]        = useState(!!(expense.obligations && expense.obligations.length > 0));
+  // Always show the split panel when the space has multiple members so the
+  // user can assign "¿A quién le corresponde pagar?" regardless of input mode.
+  const [showSplit, setShowSplit]        = useState(members.length > 1);
 
   const categoryOptions = transactionType === 'ingreso' ? INCOME_CATEGORIES : CATEGORIES;
   const canSave = concept.trim() && parseFloat(amount) > 0;
@@ -102,6 +104,12 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
     setObligations(members.map((m) => ({ name: m.name, amount: share })));
     setShared(true);
   };
+
+  // Auto-init equal split on mount when the panel is shown but no prior split exists
+  useEffect(() => {
+    if (members.length > 1 && obligations.length === 0) initEqualSplit();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateObligationAmount = (name: string, val: string) => {
     setObligations((prev) => prev.map((o) => o.name === name ? { ...o, amount: parseFloat(val) || 0 } : o));
@@ -360,7 +368,7 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
                 className="flex items-center gap-2 text-xs font-semibold text-purple-600 mb-2"
               >
                 <Users size={14} />
-                {showSplit ? 'Ocultar división' : 'Modificar división entre miembros'}
+                {showSplit ? 'Ocultar división' : 'Mostrar división'}
               </button>
 
               {showSplit && (

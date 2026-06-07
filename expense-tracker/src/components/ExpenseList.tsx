@@ -54,12 +54,14 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
 
   const total = useMemo(() => filtered.reduce((sum, e) => sum + e.amount, 0), [filtered]);
 
-  // Per-member totals for summary
+  // Per-member totals for summary: ingresos - gastos = balance neto
   const memberTotals = useMemo(() => {
-    return members.map((m) => ({
-      member: m,
-      total: filtered.filter((e) => e.paidBy === m.name).reduce((s, e) => s + e.amount, 0),
-    }));
+    return members.map((m) => {
+      const mine = filtered.filter((e) => e.paidBy === m.name);
+      const ingresos = mine.filter((e) => e.transactionType === 'ingreso').reduce((s, e) => s + e.amount, 0);
+      const gastos = mine.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
+      return { member: m, total: ingresos - gastos };
+    });
   }, [filtered, members]);
 
   // Group by date
@@ -111,8 +113,8 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
           {memberTotals.slice(0, 3).map(({ member, total: mt }) => (
             <div key={member.id}>
               <p className="text-xs truncate" style={{ color: MEMBER_COLORS[member.colorIndex] }}>{member.name}</p>
-              <p className="font-bold text-base" style={{ color: MEMBER_COLORS[member.colorIndex] }}>
-                ${mt.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+              <p className="font-bold text-base" style={{ color: mt < 0 ? '#ef4444' : MEMBER_COLORS[member.colorIndex] }}>
+                {mt < 0 ? '-' : ''}${Math.abs(mt).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
               </p>
             </div>
           ))}

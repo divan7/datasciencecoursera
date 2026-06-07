@@ -36,11 +36,15 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
     const fixed = monthExpenses.filter((e) => e.expenseType === 'fijo').reduce((s, e) => s + e.amount, 0);
     const variable = monthExpenses.filter((e) => e.expenseType === 'variable').reduce((s, e) => s + e.amount, 0);
 
-    // Per-member totals
+    // Per-member net: ingresos - gastos
     const byMember = members.reduce((acc, m) => {
-      acc[m.name] = monthExpenses.filter((e) => e.paidBy === m.name).reduce((s, e) => s + e.amount, 0);
+      const mine = monthExpenses.filter((e) => e.paidBy === m.name);
+      const ingresos = mine.filter((e) => e.transactionType === 'ingreso').reduce((s, e) => s + e.amount, 0);
+      const gastos = mine.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
+      acc[m.name] = ingresos - gastos;
       return acc;
     }, {} as Record<string, number>);
+    const totalGastos = monthExpenses.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
 
     // By category
     const byCat: Record<string, number> = {};
@@ -57,7 +61,7 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
       byMethod[e.paymentMethod] = (byMethod[e.paymentMethod] || 0) + e.amount;
     });
 
-    return { total, byMember, fixed, variable, categories, byMethod, count: monthExpenses.length };
+    return { total, byMember, totalGastos, fixed, variable, categories, byMethod, count: monthExpenses.length };
   }, [monthExpenses, members]);
 
   const monthLabel = useMemo(() => {
@@ -122,11 +126,11 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
                 return (
                   <div key={m.id} className="bg-white/10 rounded-xl p-3">
                     <p className="text-teal-200 text-xs truncate">{m.name}</p>
-                    <p className="text-white font-bold text-lg">
-                      ${amt.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                    <p className={`font-bold text-lg ${amt < 0 ? 'text-red-300' : 'text-white'}`}>
+                      {amt < 0 ? '-' : ''}${Math.abs(amt).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
                     </p>
                     <p className="text-teal-300 text-xs">
-                      {stats.total > 0 ? Math.round((amt / stats.total) * 100) : 0}%
+                      {stats.totalGastos > 0 ? Math.round((Math.abs(amt) / stats.totalGastos) * 100) : 0}%
                     </p>
                   </div>
                 );

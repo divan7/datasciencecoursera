@@ -203,6 +203,7 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
             <h3 className="text-sm font-bold text-gray-700 mb-3">Top 5 gastos del mes</h3>
             <div className="space-y-2">
               {[...monthExpenses]
+                .filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso')
                 .sort((a, b) => b.amount - a.amount)
                 .slice(0, 5)
                 .map((e) => (
@@ -223,6 +224,35 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
                 ))}
             </div>
           </div>
+
+          {/* Top income — only shown when there are income entries this month */}
+          {monthExpenses.some((e) => e.transactionType === 'ingreso') && (
+          <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Top 5 ingresos del mes</h3>
+            <div className="space-y-2">
+              {[...monthExpenses]
+                .filter((e) => e.transactionType === 'ingreso')
+                .sort((a, b) => b.amount - a.amount)
+                .slice(0, 5)
+                .map((e) => (
+                  <div key={e.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg">{CATEGORIES[e.category]?.split(' ')[0]}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-gray-800 truncate">{e.concept}</p>
+                        <p className="text-xs text-gray-400">
+                          {e.paidBy} · {e.date.slice(8)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-green-600 flex-shrink-0 ml-2">
+                      +${e.amount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+          )}
         </>
       )}
     </div>

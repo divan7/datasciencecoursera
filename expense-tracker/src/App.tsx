@@ -673,6 +673,11 @@ export default function App() {
             expenses={expenses}
             onEnsureChecks={ensureChecksForMonth}
             onConfirm={confirmCheck}
+            onConfirmWithExpense={useCallback((checkId: string, data: Parameters<typeof addExpense>[0]) => {
+              const saved = addExpense(data);
+              confirmCheck(checkId, saved.id, saved.amount);
+              showSaveToast('Gasto guardado');
+            }, [addExpense, confirmCheck, showSaveToast])}
             onSkip={skipCheck}
             onReset={resetCheck}
             onRegisterNow={handleRegisterFromTemplate}

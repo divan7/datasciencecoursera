@@ -7,6 +7,7 @@ import type { Expense } from '../types/expense';
 import { CATEGORIES } from '../types/expense';
 import { isDueInMonth, getNextDueDate } from '../utils/fixedStorage';
 import type { SpaceMember } from '../types/space';
+import { FixedExpenseConfirmModal } from './FixedExpenseConfirmModal';
 
 interface Props {
   templates: FixedExpenseTemplate[];
@@ -14,6 +15,7 @@ interface Props {
   expenses: Expense[];
   onEnsureChecks: (month: string) => void;
   onConfirm: (checkId: string, expenseId: string, amount: number) => void;
+  onConfirmWithExpense: (checkId: string, data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onSkip: (checkId: string, notes?: string) => void;
   onReset: (checkId: string) => void;
   onRegisterNow: (template: FixedExpenseTemplate) => void;
@@ -270,13 +272,14 @@ function UpcomingItem({
 
 export function MonthlyChecklist({
   templates, checks, expenses, onEnsureChecks,
-  onConfirm, onSkip, onReset, onRegisterNow,
-  members: _members,
+  onConfirm, onConfirmWithExpense, onSkip, onReset, onRegisterNow,
+  members = [],
 }: Props) {
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
   const [filter, setFilter] = useState<'all' | CheckStatus>('all');
   const [viewMode, setViewMode] = useState<'month' | 'upcoming'>('month');
   const [upcomingDays, setUpcomingDays] = useState(30);
+  const [confirmModal, setConfirmModal] = useState<{ checkId: string; tpl: FixedExpenseTemplate; month: string } | null>(null);
 
   // Ensure checks for month view
   useEffect(() => {
@@ -373,9 +376,11 @@ export function MonthlyChecklist({
       .filter((e) => e.date.startsWith(targetMonth) && e.category === tpl.category && (e.transactionType ?? 'gasto') === 'gasto')
       .sort((a, b) => Math.abs(a.amount - tpl.expectedAmount) - Math.abs(b.amount - tpl.expectedAmount))[0];
     if (candidate) {
+      // Matching expense found — link directly (no need for modal)
       onConfirm(checkId, candidate.id, candidate.amount);
     } else {
-      onConfirm(checkId, 'manual', tpl.expectedAmount);
+      // No matching expense — show modal so user can register amount + split
+      setConfirmModal({ checkId, tpl, month: targetMonth });
     }
   };
 
@@ -401,6 +406,7 @@ export function MonthlyChecklist({
   }, [templates]);
 
   return (
+    <>
     <div className="space-y-4">
       {/* View mode toggle */}
       <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1">
@@ -651,5 +657,20 @@ export function MonthlyChecklist({
         </>
       )}
     </div>
+
+    {confirmModal && (
+      <FixedExpenseConfirmModal
+        template={confirmModal.tpl}
+        members={members}
+        currentUser={members[0]?.name ?? ''}
+        month={confirmModal.month}
+        onConfirm={(data) => {
+          onConfirmWithExpense(confirmModal.checkId, data);
+          setConfirmModal(null);
+        }}
+        onClose={() => setConfirmModal(null)}
+      />
+    )}
+    </>
   );
 }

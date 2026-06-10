@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { X, Save, ChevronDown, ChevronUp, Users, ExternalLink } from 'lucide-react';
 import type {
   Expense, Category, PaymentMethod, TransactionType, ExpenseType, Frequency, ObligationEntry,
@@ -6,6 +6,8 @@ import type {
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES, INCOME_CATEGORIES } from '../types/expense';
 import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
+
+type SplitMode = 'equal' | 'percent' | 'amount';
 
 const VENDOR_PORTALS: Record<string, { name: string; url: string }> = {
   walmart: { name: 'Walmart', url: 'https://factura.walmart.com.mx' },
@@ -60,17 +62,118 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
   const [notes, setNotes]               = useState(expense.notes ?? '');
   const [tags, setTags]                 = useState((expense.tags ?? []).join(', '));
   const [showAdvanced, setShowAdv]      = useState(false);
-  const [obligations, setObligations]   = useState<ObligationEntry[]>(expense.obligations ?? []);
-  // Always show the split panel when the space has multiple members so the
-  // user can assign "¿A quién le corresponde pagar?" regardless of input mode.
-  const [showSplit, setShowSplit]        = useState(members.length > 1);
+  // ── Split / proration state ──────────────────────────────────────
+  const [showSplit, setShowSplit] = useState(members.length > 1);
+
+  // Detect split mode from existing obligations
+  const [splitMode, setSplitMode] = useState<SplitMode>(() => {
+    const obs = expense.obligations;
+    if (!obs || obs.length === 0) return 'equal';
+    if (obs.some((o) => o.percent !== undefined)) return 'percent';
+    const first = obs[0].amount;
+    if (obs.every((o) => Math.abs(o.amount - first) < 0.01)) return 'equal';
+    return 'amount';
+  });
+
+  // Participants = members OTHER than paidBy who share the expense
+  const [splitParticipants, setSplitParticipants] = useState<string[]>(() => {
+    const obs = expense.obligations;
+    if (obs && obs.length > 0) return obs.map((o) => o.name).filter((n) => n !== expense.paidBy);
+    return members.filter((m) => m.name !== expense.paidBy).map((m) => m.name);
+  });
+
+  // Raw inputs per participant (% or $) — only used in percent/amount modes
+  const [splitShares, setSplitShares] = useState<Record<string, number>>(() => {
+    const obs = expense.obligations;
+    if (!obs || obs.length === 0) return {};
+    const shares: Record<string, number> = {};
+    obs.forEach((o) => {
+      if (o.name === expense.paidBy) return;
+      shares[o.name] = o.percent !== undefined ? o.percent : o.amount;
+    });
+    return shares;
+  });
+
+  const [customSplitName, setCustomSplitName] = useState('');
 
   const categoryOptions = transactionType === 'ingreso' ? INCOME_CATEGORIES : CATEGORIES;
   const canSave = concept.trim() && parseFloat(amount) > 0;
 
+  // ── Split math ────────────────────────────────────────────────────
+  const totalAmt = parseFloat(amount) || 0;
+  const nPeople  = splitParticipants.length + 1; // +1 for payer
+
+  const participantAmount = (name: string): number => {
+    if (!totalAmt) return 0;
+    if (splitMode === 'equal')   return totalAmt / nPeople;
+    if (splitMode === 'percent') return totalAmt * (splitShares[name] ?? 0) / 100;
+    return splitShares[name] ?? 0;
+  };
+
+  const payerAmount = useMemo(() => {
+    if (!totalAmt) return 0;
+    if (splitMode === 'equal') return totalAmt / nPeople;
+    const othersSum = splitParticipants.reduce((s, n) => s + participantAmount(n), 0);
+    return Math.max(0, totalAmt - othersSum);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [totalAmt, splitMode, splitParticipants, splitShares, nPeople]);
+
+  const payerPercent = useMemo(() => {
+    if (splitMode !== 'percent') return 0;
+    const othersSum = splitParticipants.reduce((s, n) => s + (splitShares[n] ?? 0), 0);
+    return Math.max(0, 100 - othersSum);
+  }, [splitMode, splitParticipants, splitShares]);
+
+  const sharesValid = useMemo(() => {
+    if (!totalAmt || splitMode === 'equal') return true;
+    if (splitMode === 'percent') {
+      const sum = splitParticipants.reduce((s, n) => s + (splitShares[n] ?? 0), 0);
+      return sum <= 100.001;
+    }
+    const sum = splitParticipants.reduce((s, n) => s + (splitShares[n] ?? 0), 0);
+    return sum <= totalAmt + 0.01;
+  }, [totalAmt, splitMode, splitParticipants, splitShares]);
+
+  const memberColorOf = (name: string) => {
+    const m = members.find((mem) => mem.name === name);
+    return m ? MEMBER_COLORS[m.colorIndex] : '#9ca3af';
+  };
+  const fmt$ = (v: number) =>
+    v.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+  const buildObligations = (): ObligationEntry[] | undefined => {
+    if (!showSplit || splitParticipants.length === 0 || !totalAmt) return undefined;
+    return [
+      {
+        name: paidBy,
+        amount: parseFloat(payerAmount.toFixed(2)),
+        ...(splitMode === 'percent' ? { percent: parseFloat(payerPercent.toFixed(2)) } : {}),
+      },
+      ...splitParticipants.map((name) => ({
+        name,
+        amount: parseFloat(participantAmount(name).toFixed(2)),
+        ...(splitMode === 'percent' ? { percent: splitShares[name] ?? 0 } : {}),
+      })),
+    ];
+  };
+
+  const removeParticipant = (name: string) => {
+    setSplitParticipants((p) => p.filter((n) => n !== name));
+    setSplitShares((prev) => { const next = { ...prev }; delete next[name]; return next; });
+  };
+
+  const updateShare = (name: string, val: string) => {
+    setSplitShares((prev) => ({ ...prev, [name]: parseFloat(val) || 0 }));
+  };
+
+  const equalizeAll = () => {
+    setSplitMode('equal');
+    setSplitShares({});
+  };
+
   const handleSave = () => {
     if (!canSave) return;
-    const activeObligations = showSplit && obligations.length > 0 ? obligations : undefined;
+    const activeObligations = buildObligations();
     onSave(expense.id, {
       concept:         concept.trim(),
       amount:          parseFloat(amount),
@@ -95,34 +198,6 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
       tags:            tags.trim() ? tags.split(',').map((t) => t.trim()).filter(Boolean) : undefined,
     });
     onClose();
-  };
-
-  const initEqualSplit = () => {
-    const amt = parseFloat(amount);
-    if (!amt || members.length === 0) return;
-    const share = parseFloat((amt / members.length).toFixed(2));
-    setObligations(members.map((m) => ({ name: m.name, amount: share })));
-    setShared(true);
-  };
-
-  // Auto-init equal split on mount when the panel is shown but no prior split exists
-  useEffect(() => {
-    if (members.length > 1 && obligations.length === 0) initEqualSplit();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const updateObligationAmount = (name: string, val: string) => {
-    setObligations((prev) => prev.map((o) => o.name === name ? { ...o, amount: parseFloat(val) || 0 } : o));
-  };
-
-  const toggleMemberObligation = (name: string) => {
-    setObligations((prev) => {
-      const exists = prev.find((o) => o.name === name);
-      if (exists) return prev.filter((o) => o.name !== name);
-      const amt = parseFloat(amount);
-      const remaining = amt - prev.reduce((s, o) => s + o.amount, 0);
-      return [...prev, { name, amount: Math.max(0, parseFloat(remaining.toFixed(2))) }];
-    });
   };
 
   const inputCls = 'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300';
@@ -360,11 +435,7 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
             <div className="border-t border-gray-100 pt-3">
               <button
                 type="button"
-                onClick={() => {
-                  const next = !showSplit;
-                  setShowSplit(next);
-                  if (next && obligations.length === 0) initEqualSplit();
-                }}
+                onClick={() => setShowSplit((v) => !v)}
                 className="flex items-center gap-2 text-xs font-semibold text-purple-600 mb-2"
               >
                 <Users size={14} />
@@ -372,50 +443,189 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
               </button>
 
               {showSplit && (
-                <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 space-y-2">
-                  <p className="text-xs text-purple-700 font-semibold mb-1">¿A quién le corresponde pagar?</p>
-                  {members.map((m) => {
-                    const ob = obligations.find((o) => o.name === m.name);
-                    const included = !!ob;
-                    return (
-                      <div key={m.id} className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleMemberObligation(m.name)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all flex-shrink-0 ${
-                            included ? 'text-white border-transparent' : 'border-gray-200 text-gray-400 bg-white'
-                          }`}
-                          style={included ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
+                <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 space-y-3">
+                  <p className="text-xs text-purple-700 font-semibold">
+                    {transactionType === 'ingreso'
+                      ? 'Distribución del ingreso entre participantes'
+                      : '¿A quién le corresponde pagar?'}
+                  </p>
+
+                  {/* Mode selector */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      { value: 'equal',   label: '÷ Partes iguales' },
+                      { value: 'percent', label: '% Porcentaje' },
+                      { value: 'amount',  label: '$ Monto' },
+                    ] as { value: SplitMode; label: string }[]).map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => { setSplitMode(opt.value); setSplitShares({}); }}
+                        className={`py-1.5 px-1 rounded-lg border text-[11px] font-semibold transition-all text-center ${
+                          splitMode === opt.value
+                            ? 'border-purple-500 bg-purple-100 text-purple-800'
+                            : 'border-purple-200 bg-white text-gray-500'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Participant chips (all members except payer) */}
+                  <div>
+                    <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Participantes</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {members.filter((m) => m.name !== paidBy).map((m) => {
+                        const isAdded = splitParticipants.includes(m.name);
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() =>
+                              isAdded
+                                ? removeParticipant(m.name)
+                                : setSplitParticipants((p) => [...p, m.name])
+                            }
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                              isAdded ? 'text-white border-transparent' : 'border-purple-200 text-gray-500 bg-white'
+                            }`}
+                            style={isAdded ? { backgroundColor: memberColorOf(m.name) } : {}}
+                          >
+                            {isAdded ? '✓ ' : '+ '}{m.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Custom name */}
+                    <div className="flex gap-2 mt-1.5">
+                      <input
+                        type="text"
+                        value={customSplitName}
+                        onChange={(e) => setCustomSplitName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const n = customSplitName.trim();
+                            if (n && !splitParticipants.includes(n)) setSplitParticipants((p) => [...p, n]);
+                            setCustomSplitName('');
+                          }
+                        }}
+                        placeholder="Otro nombre..."
+                        className="flex-1 px-2.5 py-1 border border-purple-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const n = customSplitName.trim();
+                          if (n && !splitParticipants.includes(n)) setSplitParticipants((p) => [...p, n]);
+                          setCustomSplitName('');
+                        }}
+                        className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold"
+                      >+</button>
+                    </div>
+                  </div>
+
+                  {/* Per-person rows */}
+                  {splitParticipants.length > 0 && totalAmt > 0 && (
+                    <div className="space-y-1.5">
+                      {/* Payer row (auto-computed) */}
+                      <div className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-purple-100">
+                        <span
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-[9px]"
+                          style={{ backgroundColor: memberColorOf(paidBy) }}
                         >
-                          {m.name.slice(0, 1).toUpperCase()}. {m.name}
-                        </button>
-                        {included && (
-                          <div className="flex items-center gap-1 flex-1">
-                            <span className="text-xs text-gray-400">$</span>
-                            <input
-                              type="number"
-                              value={ob.amount || ''}
-                              onChange={(e) => updateObligationAmount(m.name, e.target.value)}
-                              className="w-full text-xs px-2 py-1 border border-purple-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
-                              step="0.01"
-                              min="0"
-                            />
-                          </div>
+                          {paidBy.slice(0, 2).toUpperCase()}
+                        </span>
+                        <span className="flex-1 text-xs font-semibold text-gray-700 truncate">
+                          {paidBy} <span className="text-gray-400 font-normal">(pagó)</span>
+                        </span>
+                        {splitMode === 'percent' && (
+                          <span className="text-xs text-gray-400 flex-shrink-0">{payerPercent.toFixed(1)}%</span>
                         )}
+                        <span className="text-xs font-bold text-purple-700 flex-shrink-0">${fmt$(payerAmount)}</span>
                       </div>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={initEqualSplit}
-                    className="text-xs text-purple-500 hover:text-purple-700 mt-1"
-                  >
-                    ↺ Dividir en partes iguales
-                  </button>
-                  {obligations.length > 0 && (
-                    <p className="text-xs text-gray-400">
-                      Total asignado: ${obligations.reduce((s, o) => s + o.amount, 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                    </p>
+
+                      {/* Other participants */}
+                      {splitParticipants.map((name) => {
+                        const amt = participantAmount(name);
+                        return (
+                          <div key={name} className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-purple-100">
+                            <span
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-[9px]"
+                              style={{ backgroundColor: memberColorOf(name) }}
+                            >
+                              {name.slice(0, 2).toUpperCase()}
+                            </span>
+                            <span className="flex-1 text-xs font-semibold text-gray-700 truncate">
+                              {name}
+                              <span className="ml-1 text-[10px] text-purple-500 font-normal">
+                                {transactionType === 'ingreso' ? 'aporta' : 'debe'}
+                              </span>
+                            </span>
+                            {splitMode !== 'equal' && (
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                value={splitShares[name] ?? ''}
+                                onChange={(e) => updateShare(name, e.target.value)}
+                                placeholder={splitMode === 'percent' ? '%' : '$'}
+                                className={`w-16 text-xs text-right border rounded-lg px-2 py-1 outline-none focus:ring-1 bg-white ${
+                                  sharesValid ? 'border-purple-200 focus:ring-purple-300' : 'border-red-300 focus:ring-red-300'
+                                }`}
+                              />
+                            )}
+                            <span className="text-xs font-bold text-gray-700 flex-shrink-0 w-14 text-right">${fmt$(amt)}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeParticipant(name)}
+                              className="text-gray-300 hover:text-red-400 text-xs flex-shrink-0"
+                            >✕</button>
+                          </div>
+                        );
+                      })}
+
+                      {!sharesValid && (
+                        <p className="text-xs text-red-500 text-center">
+                          {splitMode === 'percent' ? 'Los porcentajes superan el 100%' : 'Los montos superan el total'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Quick actions */}
+                  <div className="flex gap-2">
+                    <button type="button" onClick={equalizeAll}
+                      className="text-xs text-purple-500 hover:text-purple-700">
+                      ↺ Partes iguales
+                    </button>
+                  </div>
+
+                  {/* Summary */}
+                  {splitParticipants.length > 0 && totalAmt > 0 && sharesValid && (
+                    <div className="bg-white border border-purple-100 rounded-xl p-2.5 space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-purple-600">
+                          {transactionType === 'ingreso' ? `${paidBy} recibió` : `${paidBy} pagó`}
+                        </span>
+                        <span className="font-bold text-purple-800">${fmt$(totalAmt)}</span>
+                      </div>
+                      <div className="border-t border-purple-50 pt-1 space-y-0.5">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Corresponde a {paidBy}</span>
+                          <span className="font-semibold text-gray-700">${fmt$(payerAmount)}</span>
+                        </div>
+                        {splitParticipants.map((name) => (
+                          <div key={name} className="flex justify-between text-xs">
+                            <span className="text-gray-500">
+                              {name} {transactionType === 'ingreso' ? 'aporta' : 'debe'}
+                            </span>
+                            <span className="font-semibold text-gray-700">${fmt$(participantAmount(name))}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-purple-400">Se guarda 1 registro · Obligaciones en análisis mensual</p>
+                    </div>
                   )}
                 </div>
               )}

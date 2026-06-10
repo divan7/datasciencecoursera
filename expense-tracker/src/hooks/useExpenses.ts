@@ -72,18 +72,22 @@ export function useExpenses(spaceId: string) {
   }, [spaceId, reportSyncError]);
 
   const updateExpense = useCallback((id: string, data: Partial<Expense>) => {
+    let updatedExpense: Expense | undefined;
     setExpenses((prev) => {
       const updated = prev.map((e) =>
         e.id === id ? { ...e, ...data, updatedAt: new Date().toISOString() } : e
       );
       saveExpenses(updated, spaceId);
-      if (isSupabaseConfigured) {
-        const updatedExpense = updated.find((e) => e.id === id);
-        if (updatedExpense) expensesDb.update(spaceId, updatedExpense).catch(console.error);
-      }
+      updatedExpense = updated.find((e) => e.id === id);
       return updated;
     });
-  }, [spaceId]);
+    if (isSupabaseConfigured && updatedExpense) {
+      expensesDb.update(spaceId, updatedExpense).catch((err) => {
+        console.error('Error al actualizar gasto en la nube:', err);
+        reportSyncError('No se pudo actualizar en la nube. El cambio se guardó localmente y se sincronizará cuando la conexión se restablezca.');
+      });
+    }
+  }, [spaceId, reportSyncError]);
 
   const deleteExpense = useCallback((id: string) => {
     setExpenses((prev) => {

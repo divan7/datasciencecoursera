@@ -68,7 +68,7 @@ function CheckItem({
                 </span>
               )}
               <span className="text-xs text-gray-400">
-                {(CATEGORIES[template.category] as string).replace(/^[^ ]+ /, '')}
+                {((CATEGORIES[template.category] as string) ?? template.category ?? '').replace(/^[^ ]+ /, '')}
               </span>
               <span className="text-xs text-gray-400">
                 {template.paidBy}

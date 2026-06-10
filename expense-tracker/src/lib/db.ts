@@ -120,6 +120,9 @@ function rowToTemplate(r: any): FixedExpenseTemplate {
     active:                   r.active ?? true,
     notes:                    r.notes ?? undefined,
     createdAt:                r.created_at,
+    // Classification
+    fixedExpenseType:         r.fixed_expense_type ?? undefined,
+    creditType:               r.credit_type ?? undefined,
     // Credit card fields
     isCreditCard:             r.is_credit_card ?? undefined,
     cutDay:                   r.cut_day ?? undefined,
@@ -140,6 +143,9 @@ function templateToRow(spaceId: string, t: FixedExpenseTemplate) {
     reminder_enabled: t.reminderEnabled ?? false,
     reminder_days_before: t.reminderDaysBefore ?? 3,
     notes: t.notes ?? null, created_at: t.createdAt,
+    // Classification
+    fixed_expense_type: t.fixedExpenseType ?? null,
+    credit_type:        t.creditType ?? null,
     // Credit card fields
     is_credit_card:             t.isCreditCard ?? null,
     cut_day:                    t.cutDay ?? null,

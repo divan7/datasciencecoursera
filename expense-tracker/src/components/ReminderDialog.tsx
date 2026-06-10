@@ -73,8 +73,10 @@ export function ReminderDialog({ template, onUpdate, onClose }: Props) {
 
   const selectType = (type: ReminderType) => {
     setChosenType(type);
-    // If days were already configured (e.g. from FixedTemplateFromExpenseModal), skip that step
-    if (template.reminderDaysBefore != null) {
+    // For Google Calendar / ICS, open immediately if days are already configured or not needed
+    if (type === 'google' || type === 'ics') {
+      handleConfirm(type, daysBefore);
+    } else if (template.reminderDaysBefore != null) {
       handleConfirm(type, template.reminderDaysBefore);
     } else {
       setStep('days');

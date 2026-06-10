@@ -183,8 +183,8 @@ export function downloadICS(tpl: FixedExpenseTemplate, daysBefore = 1): void {
 }
 
 export function buildGoogleCalendarUrl(tpl: FixedExpenseTemplate): string {
-  const dueDate = getEffectiveDueDate(tpl);
-  if (!dueDate) return '';
+  // Fall back to tomorrow when no specific due date can be computed (e.g. semanal without dayOfWeek)
+  const dueDate = getEffectiveDueDate(tpl) ?? addDays(startOfDay(new Date()), 1);
 
   const dateStr = format(dueDate, 'yyyyMMdd');
   const endStr  = format(addDays(dueDate, 1), 'yyyyMMdd');

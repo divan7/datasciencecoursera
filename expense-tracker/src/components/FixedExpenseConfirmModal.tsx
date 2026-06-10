@@ -137,12 +137,19 @@ export function FixedExpenseConfirmModal({ template, members, currentUser, month
           {/* Amount + Date */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs font-semibold text-gray-500 mb-1 block">Monto real *</label>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">
+                {template.variableAmount ? 'Monto real *' : 'Monto *'}
+              </label>
               <div className="relative">
                 <span className="absolute left-3 top-2 text-gray-400 text-sm">$</span>
                 <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
                   className="w-full pl-6 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
               </div>
+              {template.variableAmount && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  estimado: ${template.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">Fecha de pago</label>

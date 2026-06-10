@@ -60,12 +60,17 @@ function CheckItem({
             </div>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <span className="text-sm font-bold text-gray-800">
-                ${template.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                {check.actualAmount !== undefined
+                  ? `$${check.actualAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}`
+                  : `$${template.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}${template.variableAmount ? ' est.' : ''}`
+                }
               </span>
               {check.actualAmount !== undefined && check.actualAmount !== template.expectedAmount && (
-                <span className={`text-xs font-medium ${amountDiff! > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                  ({amountDiff! > 0 ? '+' : ''}{amountDiff!.toLocaleString('es-MX', { minimumFractionDigits: 0 })} vs esperado)
-                </span>
+                template.variableAmount
+                  ? <span className="text-xs text-gray-400">(est. ${template.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })})</span>
+                  : <span className={`text-xs font-medium ${amountDiff! > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                      ({amountDiff! > 0 ? '+' : ''}{amountDiff!.toLocaleString('es-MX', { minimumFractionDigits: 0 })} vs esperado)
+                    </span>
               )}
               <span className="text-xs text-gray-400">
                 {((CATEGORIES[template.category] as string) ?? template.category ?? '').replace(/^[^ ]+ /, '')}
@@ -95,6 +100,10 @@ function CheckItem({
             <ChevronDown size={14} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
           </button>
         </div>
+
+        {check.status === 'pendiente' && template.variableAmount && (
+          <p className="text-xs text-amber-600 mt-1.5">💡 Monto variable — verifica el recibo</p>
+        )}
 
         {check.status === 'pendiente' && !showSkipInput && (
           <div className="flex gap-2 mt-2">

@@ -47,6 +47,7 @@ const EMPTY_FORM = {
   isCreditCard: false, cutDay: '', paymentDueDaysAfterCut: '20', minimumPayment: '',
   fixedExpenseType: 'servicio' as FixedExpenseType,
   creditType: 'tarjeta_credito' as CreditType,
+  variableAmount: false,
 };
 
 function PaymentDayField({
@@ -196,7 +197,9 @@ function TemplateForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Monto esperado *</label>
+          <label className="block text-xs text-gray-500 mb-1">
+            {form.variableAmount ? 'Monto estimado' : 'Monto esperado'} *
+          </label>
           <input type="number" required min="0" step="0.01" value={form.expectedAmount}
             onChange={(e) => set('expectedAmount', e.target.value)} placeholder="0.00"
             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
@@ -209,6 +212,20 @@ function TemplateForm({
           </select>
         </div>
       </div>
+
+      {/* Variable amount toggle */}
+      <label className="flex items-center gap-2 cursor-pointer select-none">
+        <input type="checkbox" checked={form.variableAmount}
+          onChange={(e) => set('variableAmount', e.target.checked)}
+          className="w-4 h-4 accent-teal-600" />
+        <span className="text-sm text-gray-700 font-medium">Monto variable</span>
+        <span className="text-xs text-gray-400">(CFE, tarjeta, agua…)</span>
+      </label>
+      {form.variableAmount && (
+        <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 -mt-1">
+          💡 El estimado es solo de referencia. Al confirmar el pago te pedirá el monto real.
+        </p>
+      )}
 
       {/* Payment day — adapts to frequency */}
       <PaymentDayField
@@ -344,6 +361,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
       notes: form.notes || undefined,
       fixedExpenseType: form.fixedExpenseType,
       creditType: form.fixedExpenseType === 'credito' ? form.creditType : undefined,
+      variableAmount: form.variableAmount || undefined,
       isCreditCard: isCC || undefined,
       cutDay: isCC && form.cutDay ? parseInt(form.cutDay as string) : undefined,
       paymentDueDaysAfterCut: isCC && form.paymentDueDaysAfterCut ? parseInt(form.paymentDueDaysAfterCut as string) : undefined,
@@ -391,6 +409,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
             minimumPayment: tpl.minimumPayment ? String(tpl.minimumPayment) : '',
             fixedExpenseType: tpl.fixedExpenseType ?? (tpl.isCreditCard ? 'credito' : 'servicio'),
             creditType: tpl.creditType ?? (tpl.isCreditCard ? 'tarjeta_credito' : 'tarjeta_credito'),
+            variableAmount: tpl.variableAmount ?? false,
           }}
           onSave={(form) => handleEdit(tpl.id, form)}
           onCancel={() => setEditId(null)}
@@ -409,6 +428,9 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
                   <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full">
                     {CREDIT_TYPE_LABEL[tpl.creditType]}
                   </span>
+                )}
+                {tpl.variableAmount && (
+                  <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">variable</span>
                 )}
                 {tpl.reminderEnabled && <Bell size={12} className="text-teal-500" />}
                 {tpl.frequency === 'semanal' && tpl.dayOfWeek && (

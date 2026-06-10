@@ -27,6 +27,7 @@ export interface FixedExpenseTemplate {
   paymentDueDaysAfterCut?: number; // días límite de pago después del corte (default 20)
   minimumPayment?: number;        // pago mínimo requerido
   active: boolean;
+  variableAmount?: boolean;       // true = monto varía cada periodo (CFE, tarjeta, etc.)
   notes?: string;
   createdAt: string;
 }

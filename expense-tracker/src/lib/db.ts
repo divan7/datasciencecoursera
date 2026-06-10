@@ -118,6 +118,7 @@ function rowToTemplate(r: any): FixedExpenseTemplate {
     bank:                     r.bank ?? undefined,
     cardLast4:                r.card_last4 ?? undefined,
     active:                   r.active ?? true,
+    variableAmount:           r.variable_amount ?? false,
     notes:                    r.notes ?? undefined,
     createdAt:                r.created_at,
     // Classification
@@ -142,6 +143,7 @@ function templateToRow(spaceId: string, t: FixedExpenseTemplate) {
     payment_month: t.paymentMonth ?? null,
     reminder_enabled: t.reminderEnabled ?? false,
     reminder_days_before: t.reminderDaysBefore ?? 3,
+    variable_amount: t.variableAmount ?? false,
     notes: t.notes ?? null, created_at: t.createdAt,
     // Classification
     fixed_expense_type: t.fixedExpenseType ?? null,

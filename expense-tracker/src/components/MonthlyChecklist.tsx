@@ -210,7 +210,7 @@ function UpcomingItem({
                 ${tpl.expectedAmount.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
               </span>
               <span className="text-xs text-gray-400">
-                {(CATEGORIES[tpl.category] as string).replace(/^[^ ]+ /, '')}
+                {((CATEGORIES[tpl.category] as string) ?? tpl.category ?? '').replace(/^[^ ]+ /, '')}
               </span>
               <span className="text-xs text-gray-400">
                 📅 {format(dueDate, "d 'de' MMMM", { locale: es })}

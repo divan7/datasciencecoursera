@@ -123,6 +123,7 @@ export default function App() {
     confirmCheck, skipCheck, resetCheck,
     tryAutoMatch, addAndConfirmTemplate,
     pendingCountCurrentMonth,
+    cloudSyncError: fixedSyncError,
   } = useFixedExpenses(expenses, spaceId);
 
   // ── Load spaces + settings from Supabase when user logs in ─────
@@ -551,10 +552,10 @@ export default function App() {
     <ErrorBoundary>
     <div className="min-h-screen bg-gray-50">
       <PWAUpdateBanner />
-      {cloudSyncError && (
+      {(cloudSyncError || fixedSyncError) && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-50 border-b border-amber-300 px-4 py-2 flex items-start gap-2 text-sm text-amber-800">
           <span className="mt-0.5 shrink-0">⚠️</span>
-          <span className="flex-1">{cloudSyncError}</span>
+          <span className="flex-1">{cloudSyncError ?? fixedSyncError}</span>
           <button onClick={clearCloudSyncError} className="shrink-0 font-medium underline">Cerrar</button>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import type { FixedExpenseTemplate, MonthlyCheck, CheckStatus } from '../types/fixedExpense';
 import type { Expense } from '../types/expense';
@@ -12,6 +12,14 @@ import { isSupabaseConfigured } from '../lib/supabase';
 export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
   const [templates, setTemplates] = useState<FixedExpenseTemplate[]>(() => loadTemplates(spaceId));
   const [checks, setChecks]       = useState<MonthlyCheck[]>(() => loadChecks(spaceId));
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+  const clearErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const reportSyncError = useCallback((msg: string) => {
+    setCloudSyncError(msg);
+    if (clearErrorTimer.current) clearTimeout(clearErrorTimer.current);
+    clearErrorTimer.current = setTimeout(() => setCloudSyncError(null), 8000);
+  }, []);
 
   useEffect(() => {
     if (!spaceId) return;
@@ -99,22 +107,29 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       return updated;
     });
     if (isSupabaseConfigured) {
-      fixedDb.createTemplate(spaceId, tpl).catch(console.error);
+      fixedDb.createTemplate(spaceId, tpl).catch((err) => {
+        console.error('Error al guardar plantilla en la nube:', err);
+        reportSyncError('No se pudo guardar el gasto fijo en la nube. El cambio se guardó localmente y se sincronizará cuando la conexión se restablezca.');
+      });
     }
     return tpl;
-  }, [spaceId]);
+  }, [spaceId, reportSyncError]);
 
   const updateTemplate = useCallback((id: string, data: Partial<FixedExpenseTemplate>) => {
+    let updatedTpl: FixedExpenseTemplate | undefined;
     setTemplates((prev) => {
       const updated = prev.map((t) => t.id === id ? { ...t, ...data } : t);
       saveTemplates(updated, spaceId);
-      if (isSupabaseConfigured) {
-        const tpl = updated.find((t) => t.id === id);
-        if (tpl) fixedDb.updateTemplate(tpl, spaceId).catch(console.error);
-      }
+      updatedTpl = updated.find((t) => t.id === id);
       return updated;
     });
-  }, [spaceId]);
+    if (isSupabaseConfigured && updatedTpl) {
+      fixedDb.updateTemplate(updatedTpl, spaceId).catch((err) => {
+        console.error('Error al actualizar plantilla en la nube:', err);
+        reportSyncError('No se pudo actualizar el gasto fijo en la nube. El cambio se guardó localmente y se sincronizará cuando la conexión se restablezca.');
+      });
+    }
+  }, [spaceId, reportSyncError]);
 
   const deleteTemplate = useCallback((id: string) => {
     setTemplates((prev) => {
@@ -288,5 +303,6 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     tryAutoMatch,
     addAndConfirmTemplate,
     pendingCountCurrentMonth,
+    cloudSyncError,
   };
 }

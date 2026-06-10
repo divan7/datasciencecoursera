@@ -283,7 +283,9 @@ export function ExpenseEditModal({ expense, members, onSave, onClose }: ExpenseE
 
           {/* Paid by (member pills) */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Quién pagó</label>
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block">
+              {transactionType === 'ingreso' ? 'Quién recibió' : 'Quién pagó'}
+            </label>
             <div className="flex gap-1.5 flex-wrap">
               {members.map((m) => (
                 <button key={m.id} type="button" onClick={() => setPaidBy(m.name)}

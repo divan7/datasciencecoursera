@@ -42,7 +42,7 @@ export function Header({
 }: HeaderProps) {
   const tabs: { id: Tab; icon: React.ReactNode; label: string; badge?: number }[] = [
     { id: 'add',       icon: <PlusCircle size={14} />,      label: 'Registrar' },
-    { id: 'list',      icon: <List size={14} />,            label: 'Gastos' },
+    { id: 'list',      icon: <List size={14} />,            label: 'Movimientos' },
     { id: 'dashboard', icon: <LayoutDashboard size={14} />, label: 'Dashboard' },
     { id: 'checklist', icon: <ClipboardCheck size={14} />,  label: 'Fijos', badge: pendingFixed },
     { id: 'report',    icon: <BarChart3 size={14} />,       label: 'Reporte' },

@@ -22,6 +22,7 @@ interface ExpenseListProps {
 export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = false }: ExpenseListProps) {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState<'all' | 'gasto' | 'ingreso'>('all');
   const [filterUser, setFilterUser] = useState<'all' | string>('all');
   const [filterCategory, setFilterCategory] = useState<'all' | Category>('all');
   const [selectedMonth, setSelectedMonth] = useState(() => format(new Date(), 'yyyy-MM'));
@@ -37,6 +38,8 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
     return expenses
       .filter((e) => {
         if (!e.date.startsWith(selectedMonth)) return false;
+        if (filterType === 'gasto' && (e.transactionType ?? 'gasto') === 'ingreso') return false;
+        if (filterType === 'ingreso' && (e.transactionType ?? 'gasto') !== 'ingreso') return false;
         if (filterUser !== 'all' && e.paidBy !== filterUser) return false;
         if (filterCategory !== 'all' && e.category !== filterCategory) return false;
         if (search) {
@@ -50,9 +53,13 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
         return true;
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [expenses, selectedMonth, filterUser, filterCategory, search]);
+  }, [expenses, selectedMonth, filterType, filterUser, filterCategory, search]);
 
-  const total = useMemo(() => filtered.reduce((sum, e) => sum + e.amount, 0), [filtered]);
+  const totals = useMemo(() => {
+    const ingresos = filtered.filter((e) => e.transactionType === 'ingreso').reduce((s, e) => s + e.amount, 0);
+    const gastos   = filtered.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
+    return { ingresos, gastos, balance: ingresos - gastos };
+  }, [filtered]);
 
   // Per-member totals for summary: ingresos - gastos = balance neto
   const memberTotals = useMemo(() => {
@@ -103,14 +110,26 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
 
       {/* Summary */}
       <div className="bg-white rounded-xl border border-gray-100 p-3 shadow-sm">
-        <div className="grid gap-2 text-center" style={{ gridTemplateColumns: `repeat(${Math.min(members.length + 1, 4)}, 1fr)` }}>
+        <div className="grid gap-2 text-center" style={{ gridTemplateColumns: `repeat(${Math.min(members.length + 3, 5)}, 1fr)` }}>
           <div>
-            <p className="text-xs text-gray-400">Total</p>
+            <p className="text-xs text-gray-400">Gastos</p>
             <p className="font-bold text-gray-900 text-base">
-              ${total.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+              ${totals.gastos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
             </p>
           </div>
-          {memberTotals.slice(0, 3).map(({ member, total: mt }) => (
+          <div>
+            <p className="text-xs text-gray-400">Ingresos</p>
+            <p className="font-bold text-green-600 text-base">
+              +${totals.ingresos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Balance</p>
+            <p className={`font-bold text-base ${totals.balance < 0 ? 'text-red-500' : 'text-teal-600'}`}>
+              {totals.balance < 0 ? '-' : '+'}${Math.abs(totals.balance).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+            </p>
+          </div>
+          {memberTotals.slice(0, 2).map(({ member, total: mt }) => (
             <div key={member.id}>
               <p className="text-xs truncate" style={{ color: MEMBER_COLORS[member.colorIndex] }}>{member.name}</p>
               <p className="font-bold text-base" style={{ color: mt < 0 ? '#ef4444' : MEMBER_COLORS[member.colorIndex] }}>
@@ -128,9 +147,25 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar gastos..."
+          placeholder="Buscar movimientos..."
           className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
         />
+      </div>
+
+      {/* Transaction type filter */}
+      <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1">
+        {([
+          { id: 'all',     label: 'Todos' },
+          { id: 'gasto',   label: '💸 Gastos' },
+          { id: 'ingreso', label: '💰 Ingresos' },
+        ] as { id: typeof filterType; label: string }[]).map((f) => (
+          <button key={f.id} onClick={() => setFilterType(f.id)}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              filterType === f.id ? 'bg-white shadow-sm text-gray-800' : 'text-gray-400'
+            }`}>
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {/* Filters */}
@@ -174,8 +209,10 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
       {grouped.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <p className="text-4xl mb-2">📭</p>
-          <p className="font-medium">No hay gastos registrados</p>
-          <p className="text-sm mt-1">Usa el botón "Registrar" para agregar gastos</p>
+          <p className="font-medium">
+            {filterType === 'ingreso' ? 'No hay ingresos registrados' : filterType === 'gasto' ? 'No hay gastos registrados' : 'No hay movimientos registrados'}
+          </p>
+          <p className="text-sm mt-1">Usa el botón "Registrar" para agregar</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -185,9 +222,23 @@ export function ExpenseList({ expenses, onDelete, onEdit, members, isLector = fa
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   {format(parseISO(date), "EEEE d 'de' MMMM", { locale: es })}
                 </p>
-                <p className="text-xs font-bold text-gray-700">
-                  ${dayExpenses.reduce((s, e) => s + e.amount, 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-                </p>
+                {(() => {
+                  const dayIngresos = dayExpenses.filter((e) => e.transactionType === 'ingreso').reduce((s, e) => s + e.amount, 0);
+                  const dayGastos   = dayExpenses.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
+                  const dayBalance  = dayIngresos - dayGastos;
+                  if (dayIngresos > 0 && dayGastos > 0) {
+                    return (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-green-600 font-medium">+${dayIngresos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</span>
+                        <span className="text-xs font-bold" style={{ color: dayBalance < 0 ? '#ef4444' : '#0d9488' }}>
+                          {dayBalance < 0 ? '-' : '+'}${Math.abs(dayBalance).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                    );
+                  }
+                  if (dayIngresos > 0) return <p className="text-xs font-bold text-green-600">+${dayIngresos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>;
+                  return <p className="text-xs font-bold text-gray-700">${dayGastos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>;
+                })()}
               </div>
               <div className="space-y-2">
                 {(() => {

@@ -32,28 +32,32 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
   );
 
   const stats = useMemo(() => {
-    const total = monthExpenses.reduce((s, e) => s + e.amount, 0);
-    const fixed = monthExpenses.filter((e) => e.expenseType === 'fijo').reduce((s, e) => s + e.amount, 0);
-    const variable = monthExpenses.filter((e) => e.expenseType === 'variable').reduce((s, e) => s + e.amount, 0);
+    const onlyGastos   = monthExpenses.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso');
+    const onlyIngresos = monthExpenses.filter((e) => e.transactionType === 'ingreso');
+    const totalGastos   = onlyGastos.reduce((s, e) => s + e.amount, 0);
+    const totalIngresos = onlyIngresos.reduce((s, e) => s + e.amount, 0);
+    const balance       = totalIngresos - totalGastos;
+
+    const fixed    = onlyGastos.filter((e) => e.expenseType === 'fijo').reduce((s, e) => s + e.amount, 0);
+    const variable = onlyGastos.filter((e) => e.expenseType === 'variable').reduce((s, e) => s + e.amount, 0);
 
     // Per-member net: ingresos - gastos
     const byMember = members.reduce((acc, m) => {
-      const mine = monthExpenses.filter((e) => e.paidBy === m.name);
-      const ingresos = mine.filter((e) => e.transactionType === 'ingreso').reduce((s, e) => s + e.amount, 0);
-      const gastos = mine.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
-      acc[m.name] = ingresos - gastos;
+      const mine     = monthExpenses.filter((e) => e.paidBy === m.name);
+      const ing      = mine.filter((e) => e.transactionType === 'ingreso').reduce((s, e) => s + e.amount, 0);
+      const gas      = mine.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
+      acc[m.name] = ing - gas;
       return acc;
     }, {} as Record<string, number>);
-    const totalGastos = monthExpenses.filter((e) => (e.transactionType ?? 'gasto') !== 'ingreso').reduce((s, e) => s + e.amount, 0);
 
-    // By category
+    // By category — gastos only (income categories are separate)
     const byCat: Record<string, number> = {};
-    monthExpenses.forEach((e) => {
+    onlyGastos.forEach((e) => {
       byCat[e.category] = (byCat[e.category] || 0) + e.amount;
     });
     const categories = Object.entries(byCat)
       .sort(([, a], [, b]) => b - a)
-      .map(([cat, amount]) => ({ cat: cat as Category, amount, pct: total > 0 ? (amount / total) * 100 : 0 }));
+      .map(([cat, amount]) => ({ cat: cat as Category, amount, pct: totalGastos > 0 ? (amount / totalGastos) * 100 : 0 }));
 
     // By payment method
     const byMethod: Record<string, number> = {};
@@ -61,7 +65,11 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
       byMethod[e.paymentMethod] = (byMethod[e.paymentMethod] || 0) + e.amount;
     });
 
-    return { total, byMember, totalGastos, fixed, variable, categories, byMethod, count: monthExpenses.length };
+    return {
+      totalGastos, totalIngresos, balance,
+      byMember, fixed, variable, categories, byMethod,
+      countGastos: onlyGastos.length, countIngresos: onlyIngresos.length,
+    };
   }, [monthExpenses, members]);
 
   const monthLabel = useMemo(() => {
@@ -108,62 +116,83 @@ export function MonthlyReport({ expenses, members, spaces, currentSpaceId }: Mon
       {monthExpenses.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
           <p className="text-4xl mb-2">📊</p>
-          <p className="font-medium">Sin gastos en {monthLabel}</p>
+          <p className="font-medium">Sin movimientos en {monthLabel}</p>
         </div>
       ) : (
         <>
           {/* Main totals */}
           <div className="bg-gradient-to-br from-teal-700 to-teal-800 rounded-2xl p-4 text-white">
             <p className="text-teal-200 text-sm mb-1">{monthLabel}</p>
-            <p className="text-4xl font-bold">
-              ${stats.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-teal-200 text-sm mt-1">{stats.count} gastos registrados</p>
-
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              {members.map((m) => {
-                const amt = stats.byMember[m.name] ?? 0;
-                return (
-                  <div key={m.id} className="bg-white/10 rounded-xl p-3">
-                    <p className="text-teal-200 text-xs truncate">{m.name}</p>
-                    <p className={`font-bold text-lg ${amt < 0 ? 'text-red-300' : 'text-white'}`}>
-                      {amt < 0 ? '-' : ''}${Math.abs(amt).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
-                    </p>
-                    <p className="text-teal-300 text-xs">
-                      {stats.totalGastos > 0 ? Math.round((Math.abs(amt) / stats.totalGastos) * 100) : 0}%
-                    </p>
-                  </div>
-                );
-              })}
+            {/* Balance neto */}
+            <div className="flex items-baseline gap-2">
+              <p className="text-4xl font-bold">
+                {stats.balance < 0 ? '-' : '+'}${Math.abs(stats.balance).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </p>
+              <p className="text-teal-300 text-sm">balance neto</p>
             </div>
+            {/* Income vs expense row */}
+            <div className="flex gap-4 mt-2">
+              <div>
+                <p className="text-teal-300 text-xs">Gastos</p>
+                <p className="text-white font-semibold">-${stats.totalGastos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
+              </div>
+              {stats.totalIngresos > 0 && (
+                <div>
+                  <p className="text-teal-300 text-xs">Ingresos</p>
+                  <p className="text-green-300 font-semibold">+${stats.totalIngresos.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
+                </div>
+              )}
+              <div className="ml-auto text-right">
+                <p className="text-teal-300 text-xs">Movimientos</p>
+                <p className="text-teal-200 text-sm">{stats.countGastos + stats.countIngresos} ({stats.countGastos}g{stats.countIngresos > 0 ? ` · ${stats.countIngresos}i` : ''})</p>
+              </div>
+            </div>
+
+            {members.length > 0 && (
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                {members.map((m) => {
+                  const amt = stats.byMember[m.name] ?? 0;
+                  return (
+                    <div key={m.id} className="bg-white/10 rounded-xl p-3">
+                      <p className="text-teal-200 text-xs truncate">{m.name}</p>
+                      <p className={`font-bold text-lg ${amt < 0 ? 'text-red-300' : 'text-white'}`}>
+                        {amt < 0 ? '-' : '+'}${Math.abs(amt).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                      </p>
+                      <p className="text-teal-300 text-xs">balance neto</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Fixed vs Variable */}
+          {/* Fixed vs Variable — based on gastos only */}
+          {stats.totalGastos > 0 && (
           <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-700 mb-3">Fijos vs Variables</h3>
+            <h3 className="text-sm font-bold text-gray-700 mb-3">Gastos: fijos vs variables</h3>
             <div className="flex gap-4">
               <div className="flex-1 text-center">
-                <p className="text-xs text-gray-400 mb-1">Gastos fijos</p>
+                <p className="text-xs text-gray-400 mb-1">Fijos</p>
                 <p className="font-bold text-gray-900">${stats.fixed.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
-                <p className="text-xs text-gray-400">{stats.total > 0 ? Math.round((stats.fixed / stats.total) * 100) : 0}%</p>
+                <p className="text-xs text-gray-400">{stats.totalGastos > 0 ? Math.round((stats.fixed / stats.totalGastos) * 100) : 0}%</p>
               </div>
               <div className="w-px bg-gray-100" />
               <div className="flex-1 text-center">
-                <p className="text-xs text-gray-400 mb-1">Gastos variables</p>
+                <p className="text-xs text-gray-400 mb-1">Variables</p>
                 <p className="font-bold text-gray-900">${stats.variable.toLocaleString('es-MX', { minimumFractionDigits: 0 })}</p>
-                <p className="text-xs text-gray-400">{stats.total > 0 ? Math.round((stats.variable / stats.total) * 100) : 0}%</p>
+                <p className="text-xs text-gray-400">{stats.totalGastos > 0 ? Math.round((stats.variable / stats.totalGastos) * 100) : 0}%</p>
               </div>
             </div>
-            {/* Progress bar */}
-            {stats.total > 0 && (
+            {stats.totalGastos > 0 && (
               <div className="mt-3 h-3 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-teal-600 rounded-full"
-                  style={{ width: `${(stats.fixed / stats.total) * 100}%` }}
+                  style={{ width: `${(stats.fixed / stats.totalGastos) * 100}%` }}
                 />
               </div>
             )}
           </div>
+          )}
 
           {/* Category breakdown */}
           <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">

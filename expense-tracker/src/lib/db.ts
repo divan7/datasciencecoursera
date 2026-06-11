@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import type { Expense } from '../types/expense';
-import type { FixedExpenseTemplate, MonthlyCheck } from '../types/fixedExpense';
+import type { FixedExpenseTemplate, MonthlyCheck, CheckStatus } from '../types/fixedExpense';
 import type { AppSpace, SpaceMember } from '../types/space';
 import type { AppSettings } from '../utils/storage';
 import { generateId } from '../utils/storage';
@@ -162,7 +162,7 @@ function rowToCheck(r: any): MonthlyCheck {
     id:            r.id,
     month:         r.month,
     templateId:    r.template_id,
-    status:        r.status,
+    status:        (r.status ?? 'pendiente') as CheckStatus,
     expenseId:     r.expense_id ?? undefined,
     actualAmount:  r.actual_amount ? Number(r.actual_amount) : undefined,
     confirmedAt:   r.confirmed_at ?? undefined,

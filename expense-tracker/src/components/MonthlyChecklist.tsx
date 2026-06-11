@@ -42,7 +42,7 @@ function CheckItem({
   const [expanded, setExpanded] = useState(false);
   const [skipNote, setSkipNote] = useState('');
   const [showSkipInput, setShowSkipInput] = useState(false);
-  const cfg = STATUS_CONFIG[check.status];
+  const cfg = STATUS_CONFIG[check.status] ?? STATUS_CONFIG['pendiente'];
 
   const amountDiff = check.actualAmount !== undefined
     ? check.actualAmount - template.expectedAmount
@@ -356,7 +356,7 @@ export function MonthlyChecklist({
   const getFixedType = (tpl: FixedExpenseTemplate): FixedExpenseType =>
     tpl.fixedExpenseType ?? (tpl.isCreditCard ? 'credito' : 'servicio');
   const creditFiltered  = filtered.filter(({ tpl }) => getFixedType(tpl) === 'credito');
-  const serviceFiltered = filtered.filter(({ tpl }) => getFixedType(tpl) === 'servicio');
+  const serviceFiltered = filtered.filter(({ tpl }) => getFixedType(tpl) !== 'credito');
 
   const stats = useMemo(() => ({
     total:      items.length,
@@ -626,7 +626,7 @@ export function MonthlyChecklist({
             </div>
           ) : (() => {
             const creditUpcoming  = upcomingItems.filter(({ tpl }) => getFixedType(tpl) === 'credito');
-            const serviceUpcoming = upcomingItems.filter(({ tpl }) => getFixedType(tpl) === 'servicio');
+            const serviceUpcoming = upcomingItems.filter(({ tpl }) => getFixedType(tpl) !== 'credito');
             const renderUpcoming = ({ tpl, dueDate, dueMonth, check, daysUntil }: typeof upcomingItems[0]) => (
               <UpcomingItem
                 key={`${tpl.id}-${dueMonth}`}

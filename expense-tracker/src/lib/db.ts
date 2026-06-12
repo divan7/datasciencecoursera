@@ -189,9 +189,11 @@ function rowToMember(r: any): SpaceMember {
 export const profilesDb = {
   async getMe(): Promise<Profile | null> {
     if (!supabase) return null;
+    const uid = (await supabase.auth.getUser()).data.user?.id;
+    if (!uid) return null;
     const { data, error } = await supabase
-      .from('profiles').select('*').single();
-    if (error) return null;
+      .from('profiles').select('*').eq('id', uid).single();
+    if (error) { console.error('[getMe]', error.message, error.code); return null; }
     return rowToProfile(data);
   },
 

@@ -393,17 +393,7 @@ export function MonthlyChecklist({
     }
   };
 
-  if (templates.filter((t) => t.active).length === 0) {
-    return (
-      <div className="text-center py-12 text-gray-400">
-        <p className="text-4xl mb-2">📋</p>
-        <p className="font-medium text-gray-600">Sin gastos fijos configurados</p>
-        <p className="text-xs mt-1">Ve a Configuración → Gastos fijos para agregar</p>
-      </div>
-    );
-  }
-
-  // Pending count for upcoming badge (always compute from 30d window regardless of view)
+  // Must be declared before any early return to satisfy Rules of Hooks
   const upcomingPendingCount = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -413,6 +403,16 @@ export function MonthlyChecklist({
       return d && d <= cutoff;
     }).length;
   }, [templates]);
+
+  if (templates.filter((t) => t.active).length === 0) {
+    return (
+      <div className="text-center py-12 text-gray-400">
+        <p className="text-4xl mb-2">📋</p>
+        <p className="font-medium text-gray-600">Sin gastos fijos configurados</p>
+        <p className="text-xs mt-1">Ve a Configuración → Gastos fijos para agregar</p>
+      </div>
+    );
+  }
 
   return (
     <>

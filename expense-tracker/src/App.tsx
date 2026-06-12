@@ -32,7 +32,7 @@ import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, sy
 import { loadFiscalProfile } from './utils/fiscalStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
-import { profilesDb, spacesDb, settingsDb } from './lib/db';
+import { profilesDb, spacesDb, settingsDb, expensesDb } from './lib/db';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { ExpenseWithSpace } from './components/MultiExpenseReview';
@@ -377,8 +377,11 @@ export default function App() {
     }
   }, [spaceId, isAdmin]);
 
-  const handleClearAll = useCallback(() => {
+  const handleClearAll = useCallback(async () => {
     localStorage.removeItem(`expense_tracker_data_${spaceId}`);
+    if (isSupabaseConfigured && spaceId) {
+      await expensesDb.deleteAllForSpace(spaceId).catch(console.error);
+    }
     window.location.reload();
   }, [spaceId]);
 

@@ -400,6 +400,12 @@ export const expensesDb = {
     const { error } = await supabase.from('expenses').update(row).eq('id', id);
     if (error) throw new Error(error.message);
   },
+
+  async deleteAllForSpace(spaceId: string): Promise<void> {
+    if (!supabase) return;
+    const { error } = await supabase.from('expenses').delete().eq('space_id', spaceId);
+    if (error) throw new Error(error.message);
+  },
 };
 
 // ─── Fixed Expense Templates ──────────────────────────────────────────────────

@@ -13,7 +13,7 @@ interface SettingsPanelProps {
   isAdmin?: boolean;
 }
 
-export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSupabaseConnected, isOwner, isAdmin }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSupabaseConnected, isAdmin }: SettingsPanelProps) {
   const [form, setForm] = useState({ ...settings });
   const [showKey, setShowKey] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
@@ -48,8 +48,8 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSu
 
   return (
     <div className="space-y-5">
-      {/* API Key — visible only to the space owner */}
-      {isOwner ? (
+      {/* API Key — visible only to app admins */}
+      {isAdmin ? (
         <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
           <h3 className="text-sm font-bold text-gray-700 mb-1">🤖 API Key de Anthropic</h3>
           <p className="text-xs text-gray-400 mb-3">

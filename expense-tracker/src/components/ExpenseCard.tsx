@@ -182,9 +182,16 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
               />
             </details>
           )}
-          <p className="text-gray-300 text-xs pt-1">
-            Registrado {format(new Date(e.createdAt), "dd/MM/yy HH:mm")}
-          </p>
+          {e.date < e.createdAt.slice(0, 10) ? (
+            <div className="pt-1 space-y-0.5">
+              <p className="text-xs">📅 Fecha del ticket: <span className="font-medium text-gray-700">{format(parseISO(e.date), "dd 'de' MMMM yyyy", { locale: es })}</span></p>
+              <p className="text-gray-300 text-xs">📤 Registrado {format(new Date(e.createdAt), "dd/MM/yy HH:mm")}</p>
+            </div>
+          ) : (
+            <p className="text-gray-300 text-xs pt-1">
+              Registrado {format(new Date(e.createdAt), "dd/MM/yy HH:mm")}
+            </p>
+          )}
         </div>
       )}
     </div>

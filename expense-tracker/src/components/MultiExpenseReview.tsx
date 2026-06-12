@@ -373,19 +373,24 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                 />
               </div>
 
-              {/* Date row */}
+              {/* Date row — always visible with styled input */}
               <div className="flex items-center gap-2 px-3 pb-1">
                 <CalendarDays size={12} className={
                   row.dateStatus === 'conflict' ? 'text-amber-400' :
                   row.dateStatus === 'same_month_past' ? 'text-sky-400' :
-                  'text-gray-300'
+                  'text-gray-400'
                 } />
+                <span className="text-xs text-gray-400 flex-shrink-0">Fecha:</span>
                 <input
                   type="date"
                   value={row.date}
                   onChange={(e) => setRow(i, { date: e.target.value, dateStatus: 'today' })}
-                  className={`text-xs bg-transparent border-none focus:outline-none ${
-                    row.dateStatus === 'conflict' ? 'text-amber-600 font-semibold' : 'text-gray-500'
+                  className={`text-xs font-medium rounded-lg px-2 py-0.5 border focus:outline-none focus:ring-1 ${
+                    row.dateStatus === 'conflict'
+                      ? 'text-amber-700 bg-amber-50 border-amber-300 focus:ring-amber-300'
+                      : row.dateStatus === 'same_month_past'
+                      ? 'text-sky-700 bg-sky-50 border-sky-200 focus:ring-sky-300'
+                      : 'text-gray-700 bg-gray-50 border-gray-200 focus:ring-teal-300'
                   }`}
                 />
                 {row.dateStatus === 'same_month_past' && (

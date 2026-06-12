@@ -8,9 +8,10 @@ interface SettingsPanelProps {
   expenseCount: number;
   onClearAll: () => void;
   isSupabaseConnected?: boolean;
+  isOwner?: boolean;
 }
 
-export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSupabaseConnected }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSupabaseConnected, isOwner }: SettingsPanelProps) {
   const [form, setForm] = useState({ ...settings });
   const [showKey, setShowKey] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
@@ -45,43 +46,58 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSu
 
   return (
     <div className="space-y-5">
-      {/* API Key */}
-      <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-        <h3 className="text-sm font-bold text-gray-700 mb-1">🤖 API Key de Anthropic</h3>
-        <p className="text-xs text-gray-400 mb-3">
-          Necesaria para el análisis de texto con IA y lectura de tickets. Obtén tu clave en{' '}
-          <span className="text-teal-600">console.anthropic.com</span>
-        </p>
-        <div className="relative">
-          <input
-            type={showKey ? 'text' : 'password'}
-            value={form.anthropicApiKey ?? ''}
-            onChange={(e) => set('anthropicApiKey', e.target.value)}
-            placeholder="sk-ant-api..."
-            className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 font-mono"
-          />
-          <button
-            type="button"
-            onClick={() => setShowKey((v) => !v)}
-            className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-          >
-            {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
+      {/* API Key — visible only to the space owner */}
+      {isOwner ? (
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+          <h3 className="text-sm font-bold text-gray-700 mb-1">🤖 API Key de Anthropic</h3>
+          <p className="text-xs text-gray-400 mb-3">
+            Necesaria para el análisis de texto con IA y lectura de tickets. Obtén tu clave en{' '}
+            <span className="text-teal-600">console.anthropic.com</span>
+          </p>
+          <div className="relative">
+            <input
+              type={showKey ? 'text' : 'password'}
+              value={form.anthropicApiKey ?? ''}
+              onChange={(e) => set('anthropicApiKey', e.target.value)}
+              placeholder="sk-ant-api..."
+              className="w-full px-3 py-2 pr-10 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((v) => !v)}
+              className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+            >
+              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          {form.anthropicApiKey && (
+            <p className="text-xs text-green-600 mt-1">API Key configurada — compartida con todos los miembros</p>
+          )}
+          {!form.anthropicApiKey && (
+            <p className="text-xs text-orange-500 mt-1">
+              Sin API Key — el formulario manual funcionará, pero no la IA
+            </p>
+          )}
+          {isSupabaseConnected && (
+            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+              <Cloud size={12} /> Se sincroniza con la lista y todos sus miembros la usarán
+            </p>
+          )}
         </div>
-        {form.anthropicApiKey && (
-          <p className="text-xs text-green-600 mt-1">API Key configurada</p>
-        )}
-        {!form.anthropicApiKey && (
-          <p className="text-xs text-orange-500 mt-1">
-            Sin API Key — el formulario manual funcionará, pero no la IA
-          </p>
-        )}
-        {isSupabaseConnected && (
-          <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-            <Cloud size={12} /> Se sincronizará con tu cuenta en todos los dispositivos
-          </p>
-        )}
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🤖</span>
+            <div>
+              <p className="text-sm font-bold text-gray-700">Análisis con IA</p>
+              {settings.anthropicApiKey
+                ? <p className="text-xs text-green-600 mt-0.5">Activo — configurado por el administrador</p>
+                : <p className="text-xs text-gray-400 mt-0.5">No configurado aún</p>
+              }
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Currency */}
       <div className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">

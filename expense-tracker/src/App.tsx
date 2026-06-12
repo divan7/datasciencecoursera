@@ -33,7 +33,7 @@ import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, sy
 import { loadFiscalProfile } from './utils/fiscalStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
-import { profilesDb, spacesDb } from './lib/db';
+import { profilesDb, spacesDb, settingsDb } from './lib/db';
 import type { Expense } from './types/expense';
 import type { FixedExpenseTemplate } from './types/fixedExpense';
 import type { ExpenseWithSpace } from './components/MultiExpenseReview';
@@ -159,12 +159,14 @@ export default function App() {
         } else {
           activeSpaceId = savedSession!.spaceId;
         }
-        // Load API key from user profile (stored per-user, not per-space)
+        // Load API key: owner's key lives in their profile; non-owners fall back
+        // to the space-level key that the owner writes on each save.
         const remoteApiKey = await profilesDb.getApiKey().catch(() => null);
-        if (remoteApiKey) {
+        const spaceApiKey  = remoteApiKey ?? await settingsDb.get(activeSpaceId).then((s) => s?.anthropicApiKey ?? null).catch(() => null);
+        if (spaceApiKey) {
           const local = loadSettings(activeSpaceId);
-          if (local.anthropicApiKey !== remoteApiKey) {
-            const merged = { ...local, anthropicApiKey: remoteApiKey };
+          if (local.anthropicApiKey !== spaceApiKey) {
+            const merged = { ...local, anthropicApiKey: spaceApiKey };
             saveSettings(merged, activeSpaceId);
             setSettings(merged);
           }
@@ -285,6 +287,8 @@ export default function App() {
       saveSettings(newSettings, spaceId);
       if (isSupabaseConfigured) {
         await profilesDb.setApiKey(newSettings.anthropicApiKey ?? null);
+        // Also persist to space_settings so all members pick up the key
+        await settingsDb.upsert(spaceId, newSettings).catch(console.error);
       }
     }
   }, [spaceId]);
@@ -715,7 +719,8 @@ export default function App() {
             <div className="border-t border-gray-200 pt-5">
               <SettingsPanel settings={settings} onSave={handleSaveSettings}
                 expenseCount={expenses.length} onClearAll={handleClearAll}
-                isSupabaseConnected={isSupabaseConfigured && !!profile} />
+                isSupabaseConnected={isSupabaseConfigured && !!profile}
+                isOwner={currentMember?.role === 'propietario'} />
             </div>
             <div className="border-t border-gray-200 pt-5">
               <FiscalProfileSection

@@ -168,6 +168,9 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSu
       </div>
 
       {/* Admin panel — only visible to admins */}
+      <div className="text-xs text-gray-400 text-center">
+        {isAdmin ? '🛡️ Admin: activo' : '🔒 Admin: inactivo (no es admin)'}
+      </div>
       {isAdmin && (
         <div className="border-t border-gray-100 pt-4">
           <AdminPanel />

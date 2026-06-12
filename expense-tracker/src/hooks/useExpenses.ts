@@ -33,8 +33,11 @@ export function useExpenses(spaceId: string) {
     // re-upload any local-only expenses that never reached the cloud.
     if (isSupabaseConfigured) {
       expensesDb.list(spaceId).then((remote) => {
+        // Re-read localStorage here (not the stale `local` snapshot from mount time)
+        // so any expenses added between mount and this callback are included.
+        const freshLocal = loadExpenses(spaceId);
         const remoteIds = new Set(remote.map((e) => e.id));
-        const localOnly = local.filter((e) => !remoteIds.has(e.id));
+        const localOnly = freshLocal.filter((e) => !remoteIds.has(e.id));
 
         // Recover/back up local-only expenses to Supabase
         if (localOnly.length > 0) {

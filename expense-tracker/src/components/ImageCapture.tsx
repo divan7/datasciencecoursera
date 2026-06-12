@@ -19,12 +19,13 @@ interface ImageCaptureProps {
   members: SpaceMember[];
   fiscalProfile?: FiscalProfile;
   isOwner?: boolean;
+  isAdmin?: boolean;
   hasAiAccess?: boolean;
 }
 
 type MediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
-export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isOwner, hasAiAccess }: ImageCaptureProps) {
+export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isAdmin, hasAiAccess }: ImageCaptureProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string>('');
   const [mediaType, setMediaType] = useState<MediaType>('image/jpeg');
@@ -67,9 +68,9 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     }
     if (!apiKey) {
       setError(
-        isOwner
+        isAdmin
           ? 'Configura tu API Key de Anthropic en Ajustes para usar esta función.'
-          : 'El asistente IA aún no está activado en este espacio. El administrador debe configurarlo en Ajustes.'
+          : 'El asistente IA aún no está activado. El administrador debe configurar la API Key en Ajustes.'
       );
       return;
     }

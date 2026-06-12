@@ -17,6 +17,7 @@ interface TextParserProps {
   members: SpaceMember[];
   fiscalProfile?: FiscalProfile;
   isOwner?: boolean;
+  isAdmin?: boolean;
   hasAiAccess?: boolean;
 }
 
@@ -27,7 +28,7 @@ const EXAMPLES = [
   'Recibí salario de 18000 por transferencia BBVA',
 ];
 
-export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isOwner, hasAiAccess }: TextParserProps) {
+export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isAdmin, hasAiAccess }: TextParserProps) {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -41,9 +42,9 @@ export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSave
     }
     if (!apiKey) {
       setError(
-        isOwner
+        isAdmin
           ? 'Configura tu API Key de Anthropic en Ajustes para usar esta función.'
-          : 'El asistente IA aún no está activado en este espacio. El administrador debe configurarlo en Ajustes.'
+          : 'El asistente IA aún no está activado. El administrador debe configurar la API Key en Ajustes.'
       );
       return;
     }

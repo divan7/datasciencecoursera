@@ -746,6 +746,7 @@ export default function App() {
                   members={currentSpace.members}
                   fiscalProfile={fiscalProfile}
                   isOwner={currentMember?.role === 'propietario'}
+                  isAdmin={effectiveIsAdmin}
                   hasAiAccess={hasAiAccess}
                 />
               )}
@@ -760,6 +761,7 @@ export default function App() {
                   members={currentSpace.members}
                   fiscalProfile={fiscalProfile}
                   isOwner={currentMember?.role === 'propietario'}
+                  isAdmin={effectiveIsAdmin}
                   hasAiAccess={hasAiAccess}
                 />
               )}

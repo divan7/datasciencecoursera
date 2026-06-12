@@ -1,7 +1,21 @@
 import { useState, useMemo } from 'react';
-import { Trash2, CheckCircle2, Save, MessageSquare, Users } from 'lucide-react';
+import { Trash2, CheckCircle2, Save, MessageSquare, Users, CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Expense, Category, PaymentMethod, ExpenseType, Frequency, ObligationEntry } from '../types/expense';
+
+type DateStatus = 'today' | 'same_month_past' | 'conflict';
+
+function classifyDate(itemDate: string, today: string): DateStatus {
+  if (!itemDate || itemDate === today) return 'today';
+  if (itemDate > today) return 'conflict'; // future date
+  return itemDate.slice(0, 7) === today.slice(0, 7) ? 'same_month_past' : 'conflict';
+}
+
+const MONTHS_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function fmtDate(d: string) {
+  const [y, m, day] = d.split('-');
+  return `${parseInt(day)} ${MONTHS_ES[parseInt(m)-1]} ${y}`;
+}
 
 type SplitMode = 'equal' | 'percent' | 'amount';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
@@ -35,6 +49,8 @@ interface RowState {
   paymentMethod: PaymentMethod;
   paidBy: string;
   date: string;
+  ticketDate: string;
+  dateStatus: DateStatus;
   store: string;
   spaceId: string;
   notes: string;
@@ -52,23 +68,27 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
   const receiptImage = items[0]?.receiptImageBase64;
 
   const [rows, setRows] = useState<RowState[]>(() =>
-    items.map((item) => ({
-      concept:       item.concept ?? '',
-      amount:        item.amount ? String(item.amount) : '',
-      category:      (item.category as Category) ?? 'otro',
-      paymentMethod: (item.paymentMethod as PaymentMethod) ?? 'tarjeta_debito',
-      paidBy:        item.paidBy ?? currentUser,
-      date:          item.date ?? today,
-      store:         item.store ?? '',
-      spaceId:       defaultSpaceId,
-      notes:         item.notes ?? '',
-      showNotes:     false,
-      removed:       false,
-      // Respect expenseType from AI (text parser may detect 'fijo'); photos always
-      // arrive as 'variable' from the receipt prompt, so this is safe for both flows.
-      expenseType:   ((item.expenseType as ExpenseType | undefined) ?? 'variable'),
-      frequency:     (item.frequency as Frequency | undefined) ?? 'mensual',
-    }))
+    items.map((item) => {
+      const aiDate = item.date ?? today;
+      const ds = classifyDate(aiDate, today);
+      return {
+        concept:       item.concept ?? '',
+        amount:        item.amount ? String(item.amount) : '',
+        category:      (item.category as Category) ?? 'otro',
+        paymentMethod: (item.paymentMethod as PaymentMethod) ?? 'tarjeta_debito',
+        paidBy:        item.paidBy ?? currentUser,
+        date:          aiDate,
+        ticketDate:    aiDate,
+        dateStatus:    ds,
+        store:         item.store ?? '',
+        spaceId:       defaultSpaceId,
+        notes:         item.notes ?? '',
+        showNotes:     false,
+        removed:       false,
+        expenseType:   ((item.expenseType as ExpenseType | undefined) ?? 'variable'),
+        frequency:     (item.frequency as Frequency | undefined) ?? 'mensual',
+      };
+    })
   );
 
   const [ticketNotes, setTicketNotes] = useState('');
@@ -87,8 +107,17 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
   const currentSpaceMembers = (id: string) => spaces.find((s) => s.id === id)?.members ?? [];
 
   const activeRows = rows.filter((r) => !r.removed);
-  const canSave = activeRows.length > 0 && activeRows.every((r) => r.concept.trim() && parseFloat(r.amount) > 0);
+  const conflictRows = activeRows.filter((r) => r.dateStatus === 'conflict');
+  const hasConflicts = conflictRows.length > 0;
+  const canSave = activeRows.length > 0 && activeRows.every((r) => r.concept.trim() && parseFloat(r.amount) > 0) && !hasConflicts;
   const isTicket = activeRows.length > 1;
+
+  const resolveConflicts = (useTicket: boolean) =>
+    setRows((prev) => prev.map((r) =>
+      r.removed || r.dateStatus !== 'conflict'
+        ? r
+        : { ...r, date: useTicket ? r.ticketDate : today, dateStatus: 'today' as DateStatus }
+    ));
 
   // ── Single-expense split helpers ──────────────────────────────────────
   const splitTotal = parseFloat(activeRows[0]?.amount ?? '0') || 0;
@@ -233,6 +262,44 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         <p className="text-xs text-gray-400">Revisa y asigna a la lista correcta</p>
       </div>
 
+      {/* Date conflict banner — shown when AI detected an out-of-month date */}
+      {hasConflicts && (() => {
+        const uniqueDates = [...new Set(conflictRows.map((r) => r.ticketDate))];
+        const singleDate = uniqueDates.length === 1;
+        return (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3 space-y-2.5">
+            <div className="flex items-start gap-2">
+              <CalendarDays size={15} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Fecha fuera del mes actual</p>
+                <p className="text-xs text-amber-600 mt-0.5">
+                  {singleDate
+                    ? `La IA detectó la fecha ${fmtDate(uniqueDates[0])}, que no pertenece al mes actual.`
+                    : `La IA detectó fechas de meses diferentes al actual.`}
+                  {' '}¿Cómo deseas registrar?
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => resolveConflicts(true)}
+                className="flex-1 py-2 px-3 bg-white border-2 border-amber-300 text-amber-700 rounded-xl text-xs font-bold hover:bg-amber-50 transition-all"
+              >
+                Usar fecha del ticket{singleDate ? ` (${fmtDate(uniqueDates[0])})` : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => resolveConflicts(false)}
+                className="flex-1 py-2 px-3 bg-amber-500 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition-all"
+              >
+                Usar fecha de hoy
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Ticket-level comment — only shown when 2+ items */}
       {isTicket && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
@@ -302,6 +369,33 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                   placeholder="Establecimiento (opcional)"
                   className="flex-1 text-xs text-gray-500 bg-transparent border-none focus:outline-none placeholder-gray-300"
                 />
+              </div>
+
+              {/* Date row */}
+              <div className="flex items-center gap-2 px-3 pb-1">
+                <CalendarDays size={12} className={
+                  row.dateStatus === 'conflict' ? 'text-amber-400' :
+                  row.dateStatus === 'same_month_past' ? 'text-sky-400' :
+                  'text-gray-300'
+                } />
+                <input
+                  type="date"
+                  value={row.date}
+                  onChange={(e) => setRow(i, { date: e.target.value, dateStatus: 'today' })}
+                  className={`text-xs bg-transparent border-none focus:outline-none ${
+                    row.dateStatus === 'conflict' ? 'text-amber-600 font-semibold' : 'text-gray-500'
+                  }`}
+                />
+                {row.dateStatus === 'same_month_past' && (
+                  <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
+                    Registrado hoy
+                  </span>
+                )}
+                {row.dateStatus === 'conflict' && (
+                  <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
+                    Mes diferente
+                  </span>
+                )}
               </div>
 
               {/* Space assignment — always visible */}
@@ -441,7 +535,9 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           style={{ backgroundColor: 'var(--soi-teal)' }}
         >
           <Save size={16} />
-          Guardar {activeRows.length > 1 ? `los ${activeRows.length} gastos` : 'gasto'}
+          {hasConflicts
+            ? 'Define la fecha primero'
+            : `Guardar ${activeRows.length > 1 ? `los ${activeRows.length} gastos` : 'gasto'}`}
         </button>
         <button
           type="button"

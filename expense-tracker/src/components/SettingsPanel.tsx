@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Save, Cloud, CloudOff, Loader } from 'lucide-react';
 import type { AppSettings } from '../utils/storage';
+import { AdminPanel } from './AdminPanel';
 
 interface SettingsPanelProps {
   settings: AppSettings;
@@ -9,9 +10,10 @@ interface SettingsPanelProps {
   onClearAll: () => void;
   isSupabaseConnected?: boolean;
   isOwner?: boolean;
+  isAdmin?: boolean;
 }
 
-export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSupabaseConnected, isOwner }: SettingsPanelProps) {
+export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSupabaseConnected, isOwner, isAdmin }: SettingsPanelProps) {
   const [form, setForm] = useState({ ...settings });
   const [showKey, setShowKey] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
@@ -164,6 +166,13 @@ export function SettingsPanel({ settings, onSave, expenseCount, onClearAll, isSu
           {confirmClear ? 'Confirmar: Borrar todo' : 'Borrar todos los gastos'}
         </button>
       </div>
+
+      {/* Admin panel — only visible to admins */}
+      {isAdmin && (
+        <div className="border-t border-gray-100 pt-4">
+          <AdminPanel />
+        </div>
+      )}
     </div>
   );
 }

@@ -17,7 +17,6 @@ import { UserSwitcher } from './components/UserSwitcher';
 import { SpaceSettings } from './components/SpaceSettings';
 import { SpacePicker } from './components/SpacePicker';
 import { AuthGate } from './components/AuthGate';
-import { AdminPanel } from './components/AdminPanel';
 import { WelcomeChoice } from './components/WelcomeChoice';
 import { JoinSpace } from './components/JoinSpace';
 import { ChangePassword } from './components/ChangePassword';
@@ -640,7 +639,6 @@ export default function App() {
         spaceName={currentSpace.name}
         onAvatarTap={() => setShowUserSwitcher(true)}
         pendingFixed={pendingCountCurrentMonth}
-        isAdmin={isAdmin}
       />
 
       {/* ── Space picker ── */}
@@ -796,7 +794,8 @@ export default function App() {
               <SettingsPanel settings={settings} onSave={handleSaveSettings}
                 expenseCount={expenses.length} onClearAll={handleClearAll}
                 isSupabaseConnected={isSupabaseConfigured && !!profile}
-                isOwner={currentMember?.role === 'propietario'} />
+                isOwner={currentMember?.role === 'propietario'}
+                isAdmin={isAdmin} />
             </div>
             <div className="border-t border-gray-200 pt-5">
               <FiscalProfileSection
@@ -842,10 +841,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Admin ── */}
-        {activeTab === 'admin' && isAdmin && (
-          <AdminPanel />
-        )}
       </main>
 
       {/* ── User switcher modal ── */}

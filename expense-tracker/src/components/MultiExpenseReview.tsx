@@ -373,35 +373,42 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
                 />
               </div>
 
-              {/* Date row — always visible with styled input */}
-              <div className="flex items-center gap-2 px-3 pb-1">
+              {/* Date row — always visible, clearly labeled as AI-detected */}
+              <div className="flex items-center gap-2 px-3 pb-1 flex-wrap">
                 <CalendarDays size={12} className={
                   row.dateStatus === 'conflict' ? 'text-amber-400' :
-                  row.dateStatus === 'same_month_past' ? 'text-sky-400' :
-                  'text-gray-400'
+                  row.dateStatus === 'same_month_past' ? 'text-sky-500' :
+                  'text-purple-400'
                 } />
-                <span className="text-xs text-gray-400 flex-shrink-0">Fecha:</span>
+                <span className={`text-xs font-semibold flex-shrink-0 ${
+                  row.dateStatus === 'conflict' ? 'text-amber-600' :
+                  row.dateStatus === 'same_month_past' ? 'text-sky-600' :
+                  'text-purple-600'
+                }`}>Fecha detectada:</span>
                 <input
                   type="date"
                   value={row.date}
                   onChange={(e) => setRow(i, { date: e.target.value, dateStatus: 'today' })}
-                  className={`text-xs font-medium rounded-lg px-2 py-0.5 border focus:outline-none focus:ring-1 ${
+                  className={`text-xs font-bold rounded-lg px-2 py-0.5 border focus:outline-none focus:ring-1 ${
                     row.dateStatus === 'conflict'
                       ? 'text-amber-700 bg-amber-50 border-amber-300 focus:ring-amber-300'
                       : row.dateStatus === 'same_month_past'
                       ? 'text-sky-700 bg-sky-50 border-sky-200 focus:ring-sky-300'
-                      : 'text-gray-700 bg-gray-50 border-gray-200 focus:ring-teal-300'
+                      : 'text-purple-700 bg-purple-50 border-purple-200 focus:ring-purple-300'
                   }`}
                 />
                 {row.dateStatus === 'same_month_past' && (
                   <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
-                    Registrado hoy
+                    · Registrado hoy
                   </span>
                 )}
                 {row.dateStatus === 'conflict' && (
                   <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
-                    Mes diferente
+                    ⚠ Mes diferente
                   </span>
+                )}
+                {row.dateStatus === 'today' && (
+                  <span className="text-[10px] text-gray-400 flex-shrink-0">· registrado hoy</span>
                 )}
               </div>
 

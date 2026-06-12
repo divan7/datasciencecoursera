@@ -35,6 +35,8 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
   const [expanded, setExpanded] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const hasTicketDate = e.date < e.createdAt.slice(0, 10);
+
   const handleDelete = () => {
     if (!onDelete) return;
     if (confirmDelete) {
@@ -56,35 +58,44 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
 
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold text-gray-900 text-sm truncate">{e.concept}</p>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs text-gray-400">
-                    {format(parseISO(e.date), 'dd MMM', { locale: es })}
-                  </span>
-                  {/* Show upload date when ticket date is earlier than registration date */}
-                  {e.date < e.createdAt.slice(0, 10) && (
-                    <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
-                      📤 Cargado {format(new Date(e.createdAt), 'dd MMM', { locale: es })}
-                    </span>
-                  )}
-                  <span className="text-xs font-medium text-teal-700">{e.paidBy}</span>
-                  {e.store && (
-                    <span className="text-xs text-gray-400 truncate">📍 {e.store}</span>
-                  )}
-                  {e.expenseType === 'fijo' && (
-                    <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full">fijo</span>
-                  )}
-                  {e.sharedExpense && !e.obligations && (
-                    <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">compartido</span>
-                  )}
-                  {e.obligations && e.obligations.length > 1 && (
-                    <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">
-                      ÷ {e.obligations.length} personas
-                    </span>
-                  )}
-                </div>
+
+                {/* Date display: two badges when ticket date ≠ registration date */}
+                {hasTicketDate ? (
+                  <div className="mt-1 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-full">
+                        📅 Ticket: {format(parseISO(e.date), 'dd MMM yyyy', { locale: es })}
+                      </span>
+                      <span className="text-[10px] font-semibold text-sky-700 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded-full">
+                        📤 Registrado: {format(new Date(e.createdAt), 'dd MMM yyyy', { locale: es })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-medium text-teal-700">{e.paidBy}</span>
+                      {e.store && <span className="text-xs text-gray-400 truncate">📍 {e.store}</span>}
+                      {e.expenseType === 'fijo' && <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full">fijo</span>}
+                      {e.sharedExpense && !e.obligations && <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">compartido</span>}
+                      {e.obligations && e.obligations.length > 1 && (
+                        <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">÷ {e.obligations.length} personas</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-gray-400">{format(parseISO(e.date), 'dd MMM', { locale: es })}</span>
+                    <span className="text-xs font-medium text-teal-700">{e.paidBy}</span>
+                    {e.store && <span className="text-xs text-gray-400 truncate">📍 {e.store}</span>}
+                    {e.expenseType === 'fijo' && <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full">fijo</span>}
+                    {e.sharedExpense && !e.obligations && <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">compartido</span>}
+                    {e.obligations && e.obligations.length > 1 && (
+                      <span className="text-xs bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full">÷ {e.obligations.length} personas</span>
+                    )}
+                  </div>
+                )}
               </div>
+
               <div className="flex items-center gap-2 flex-shrink-0">
                 {e.transactionType === 'ingreso' && (
                   <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#f5ede6', color: '#a85a3a' }}>
@@ -109,18 +120,11 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setExpanded((v) => !v)}
-                  className="p-1 text-gray-300 hover:text-gray-500 transition-colors"
-                >
+                <button onClick={() => setExpanded((v) => !v)} className="p-1 text-gray-300 hover:text-gray-500 transition-colors">
                   {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                 </button>
                 {onEdit && (
-                  <button
-                    onClick={() => onEdit(e.id)}
-                    className="p-1 text-gray-300 hover:text-teal-500 transition-colors"
-                    title="Editar"
-                  >
+                  <button onClick={() => onEdit(e.id)} className="p-1 text-gray-300 hover:text-teal-500 transition-colors" title="Editar">
                     <Pencil size={14} />
                   </button>
                 )}
@@ -175,22 +179,16 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
           {e.receiptImageBase64 && (
             <details>
               <summary className="cursor-pointer text-teal-600 font-medium">Ver ticket</summary>
-              <img
-                src={`data:image/jpeg;base64,${e.receiptImageBase64}`}
-                alt="Ticket"
-                className="mt-2 max-w-full rounded-lg border"
-              />
+              <img src={`data:image/jpeg;base64,${e.receiptImageBase64}`} alt="Ticket" className="mt-2 max-w-full rounded-lg border" />
             </details>
           )}
-          {e.date < e.createdAt.slice(0, 10) ? (
+          {hasTicketDate ? (
             <div className="pt-1 space-y-0.5">
-              <p className="text-xs">📅 Fecha del ticket: <span className="font-medium text-gray-700">{format(parseISO(e.date), "dd 'de' MMMM yyyy", { locale: es })}</span></p>
-              <p className="text-gray-300 text-xs">📤 Registrado {format(new Date(e.createdAt), "dd/MM/yy HH:mm")}</p>
+              <p>📅 Fecha del ticket: <span className="font-medium text-gray-700">{format(parseISO(e.date), "dd 'de' MMMM yyyy", { locale: es })}</span></p>
+              <p className="text-gray-300">📤 Registrado {format(new Date(e.createdAt), "dd/MM/yy HH:mm")}</p>
             </div>
           ) : (
-            <p className="text-gray-300 text-xs pt-1">
-              Registrado {format(new Date(e.createdAt), "dd/MM/yy HH:mm")}
-            </p>
+            <p className="text-gray-300 pt-1">Registrado {format(new Date(e.createdAt), "dd/MM/yy HH:mm")}</p>
           )}
         </div>
       )}

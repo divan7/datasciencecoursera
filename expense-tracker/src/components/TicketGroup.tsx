@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Expense } from '../types/expense';
@@ -13,6 +13,18 @@ interface TicketGroupProps {
 
 export function TicketGroup({ expenses, onDelete, onEdit }: TicketGroupProps) {
   const [expanded, setExpanded] = useState(false);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+
+  const handleDeleteAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!onDelete) return;
+    if (confirmDeleteAll) {
+      expenses.forEach((exp) => onDelete(exp.id));
+    } else {
+      setConfirmDeleteAll(true);
+      setTimeout(() => setConfirmDeleteAll(false), 3000);
+    }
+  };
 
   if (expenses.length === 0) return null;
 
@@ -47,6 +59,14 @@ export function TicketGroup({ expenses, onDelete, onEdit }: TicketGroupProps) {
                 <span className="text-xs bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-full border border-teal-100">
                   {expenses.length} artículos
                 </span>
+                {first.date < first.createdAt.slice(0, 10) && (
+                  <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded-full font-semibold">
+                    📤 Cargado {format(new Date(first.createdAt), 'dd MMM', { locale: es })}
+                  </span>
+                )}
+                {confirmDeleteAll && (
+                  <span className="text-[10px] text-red-500 font-semibold">Confirma para borrar todos</span>
+                )}
               </div>
               {first.ticketNotes && (
                 <p className="text-xs text-gray-400 mt-1 italic truncate">{first.ticketNotes}</p>
@@ -56,6 +76,20 @@ export function TicketGroup({ expenses, onDelete, onEdit }: TicketGroupProps) {
               <span className="text-base font-bold text-gray-900">
                 ${total.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAll}
+                  title={confirmDeleteAll ? 'Toca de nuevo para confirmar eliminación' : 'Eliminar todo el grupo'}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    confirmDeleteAll
+                      ? 'bg-red-100 text-red-500'
+                      : 'text-gray-300 hover:text-red-400 hover:bg-red-50'
+                  }`}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
               {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
             </div>
           </div>

@@ -62,6 +62,12 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
                   <span className="text-xs text-gray-400">
                     {format(parseISO(e.date), 'dd MMM', { locale: es })}
                   </span>
+                  {/* Show upload date when ticket date is earlier than registration date */}
+                  {e.date < e.createdAt.slice(0, 10) && (
+                    <span className="text-[10px] bg-sky-50 text-sky-600 border border-sky-200 px-1.5 py-0.5 rounded-full font-semibold flex-shrink-0">
+                      📤 Cargado {format(new Date(e.createdAt), 'dd MMM', { locale: es })}
+                    </span>
+                  )}
                   <span className="text-xs font-medium text-teal-700">{e.paidBy}</span>
                   {e.store && (
                     <span className="text-xs text-gray-400 truncate">📍 {e.store}</span>

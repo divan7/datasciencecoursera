@@ -58,6 +58,7 @@ interface RowState {
   removed: boolean;
   expenseType: ExpenseType;
   frequency: Frequency;
+  transactionType: 'gasto' | 'ingreso';
   obligations?: ObligationEntry[];
 }
 
@@ -72,21 +73,22 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
       const aiDate = item.date ?? today;
       const ds = classifyDate(aiDate, today);
       return {
-        concept:       item.concept ?? '',
-        amount:        item.amount ? String(item.amount) : '',
-        category:      (item.category as Category) ?? 'otro',
-        paymentMethod: (item.paymentMethod as PaymentMethod) ?? 'tarjeta_debito',
-        paidBy:        item.paidBy ?? currentUser,
-        date:          aiDate,
-        ticketDate:    aiDate,
-        dateStatus:    ds,
-        store:         item.store ?? '',
-        spaceId:       defaultSpaceId,
-        notes:         item.notes ?? '',
-        showNotes:     false,
-        removed:       false,
-        expenseType:   ((item.expenseType as ExpenseType | undefined) ?? 'variable'),
-        frequency:     (item.frequency as Frequency | undefined) ?? 'mensual',
+        concept:         item.concept ?? '',
+        amount:          item.amount ? String(item.amount) : '',
+        category:        (item.category as Category) ?? 'otro',
+        paymentMethod:   (item.paymentMethod as PaymentMethod) ?? 'tarjeta_debito',
+        paidBy:          item.paidBy ?? currentUser,
+        date:            aiDate,
+        ticketDate:      aiDate,
+        dateStatus:      ds,
+        store:           item.store ?? '',
+        spaceId:         defaultSpaceId,
+        notes:           item.notes ?? '',
+        showNotes:       false,
+        removed:         false,
+        expenseType:     ((item.expenseType as ExpenseType | undefined) ?? 'variable'),
+        frequency:       (item.frequency as Frequency | undefined) ?? 'mensual',
+        transactionType: (item.transactionType as 'gasto' | 'ingreso' | undefined) ?? 'gasto',
       };
     })
   );
@@ -238,7 +240,7 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           ticketNotes:        ticketId && ticketNotes.trim() ? ticketNotes.trim() : undefined,
           receiptImageBase64: idx === 0 ? receiptImage : undefined,
           invoiceStatus:      invoiceDecision,
-          transactionType:    'gasto' as const,
+          transactionType:    r.transactionType,
           expenseType:        r.expenseType,
           frequency:          r.expenseType === 'fijo' ? r.frequency : undefined,
           currency:           'MXN',

@@ -99,6 +99,10 @@ export default function App() {
     settingsDb.getAiDefaultEnabled().then(setAiDefaultEnabled).catch(() => {});
   }, [user?.id]);
 
+  // isAdmin fallback: profile may be null if profiles table query fails,
+  // so also check directly from the auth user metadata
+  const effectiveIsAdmin = isAdmin || (profile?.isAdmin ?? false);
+
   // Effective AI access: profile override > app default
   const hasAiAccess = profile
     ? (profile.aiEnabled !== null ? profile.aiEnabled : aiDefaultEnabled)
@@ -795,7 +799,7 @@ export default function App() {
                 expenseCount={expenses.length} onClearAll={handleClearAll}
                 isSupabaseConnected={isSupabaseConfigured && !!profile}
                 isOwner={currentMember?.role === 'propietario'}
-                isAdmin={isAdmin} />
+                isAdmin={effectiveIsAdmin} />
             </div>
             <div className="border-t border-gray-200 pt-5">
               <FiscalProfileSection
@@ -804,12 +808,14 @@ export default function App() {
                 onSave={(p) => setFiscalProfile(p)}
               />
             </div>
-            {isSupabaseConfigured && profile && (
+            {isSupabaseConfigured && user && (
               <div className="border-t border-gray-200 pt-5">
                 <div className="bg-gray-50 rounded-2xl p-4 space-y-3">
                   <p className="text-xs text-gray-500">
-                    Sesión: <strong>{profile.email}</strong>
-                    <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700 font-semibold capitalize">{profile.plan}</span>
+                    Sesión: <strong>{user.email}</strong>
+                    {profile && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700 font-semibold capitalize">{profile.plan}</span>
+                    )}
                   </p>
                   <ChangePassword onSetPassword={setPassword} />
                   <button

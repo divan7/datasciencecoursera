@@ -262,6 +262,20 @@ export default function App() {
     });
   }, [user?.id, session?.spaceId, session?.memberId, spacesLoaded]);
 
+  // ── Auto-switch when active space was deleted but others exist ──
+  // Prevents the onboarding gate from showing when a user deletes the
+  // currently-active space but still has other spaces available.
+  useEffect(() => {
+    if (!spacesLoaded || spaces.length === 0 || !session || currentSpace) return;
+    const fallback = spaces[0];
+    const fallbackMember = fallback.members[0];
+    if (fallbackMember) {
+      const newSess = { spaceId: fallback.id, memberId: fallbackMember.id };
+      setSession(newSess);
+      saveSession(newSess);
+    }
+  }, [spaces, session?.spaceId, currentSpace, spacesLoaded]);
+
   // ── Detect ?join=CODE invite URL parameter ───────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -287,9 +301,15 @@ export default function App() {
 
   // ── Handlers ──────────────────────────────────────────────────
   const handleOnboardingComplete = useCallback((space: AppSpace, newSession: SessionState) => {
-    setSpaces([space]);
+    // Append the new space rather than replacing — the user may have other
+    // spaces that were loaded from cloud; wiping them here causes data loss.
+    setSpaces((prev) => {
+      const merged = prev.some((s) => s.id === space.id) ? prev : [...prev, space];
+      saveSpaces(merged);
+      return merged;
+    });
     setSession(newSession);
-    saveSpaces([space]);
+    saveSession(newSession);
     // Set cache owner immediately so a sync failure doesn't cause data loss on
     // next login (null cachedUid would trigger clearLocalSpaceData).
     if (isSupabaseConfigured && user) {
@@ -612,6 +632,17 @@ export default function App() {
   }
 
   // ── Onboarding gate ───────────────────────────────────────────
+  // Show a spinner (not onboarding) while the auto-switch effect above runs:
+  // the active space was deleted but other spaces exist — effect will redirect.
+  if (spaces.length > 0 && session && !currentSpace) {
+    return (
+      <div className="min-h-screen flex items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+        <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"/>
+      </div>
+    );
+  }
+
   if (spaces.length === 0 || !session || !currentSpace || !currentMember) {
     return <SpaceOnboarding onComplete={handleOnboardingComplete} isSupabaseMode={isSupabaseConfigured} />;
   }

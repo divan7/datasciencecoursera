@@ -250,12 +250,11 @@ export const spacesDb = {
 
     const ids = myMemberships.map((m: { space_id: string }) => m.space_id);
     const { data: spacesData } = await supabase
-      .from('spaces').select('*').in('id', ids)
-      .order('created_at', { ascending: false });
+      .from('spaces').select('*').in('id', ids);
     const { data: membersData } = await supabase
       .from('space_members').select('*').in('space_id', ids);
 
-    return (spacesData ?? []).map((s: { id: string; name: string; owner_id: string; max_members: number; plan: string; created_at: string }) => ({
+    const spaces = (spacesData ?? []).map((s: { id: string; name: string; owner_id: string; max_members: number; plan: string; created_at: string }) => ({
       id:         s.id,
       name:       s.name,
       ownerId:    s.owner_id,
@@ -266,6 +265,11 @@ export const spacesDb = {
         .filter((m: { space_id: string }) => m.space_id === s.id)
         .map(rowToMember),
     }));
+
+    // Sort: spaces with more members first (proxy for most active),
+    // then by creation date descending so newer spaces rank equally.
+    spaces.sort((a, b) => b.members.length - a.members.length || b.createdAt.localeCompare(a.createdAt));
+    return spaces;
   },
 
   async createSpace(space: AppSpace, ownerProfileId: string): Promise<void> {

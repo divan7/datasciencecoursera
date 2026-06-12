@@ -831,8 +831,8 @@ export default function App() {
               />
             </div>
             <div className="border-t border-gray-200 pt-5">
-              <div className="mb-2 text-xs text-center rounded-lg py-1" style={{ backgroundColor: effectiveIsAdmin ? '#d1fae5' : '#fee2e2', color: effectiveIsAdmin ? '#065f46' : '#991b1b' }}>
-                DEBUG — isAdmin: {String(effectiveIsAdmin)} · profile: {profile ? 'cargado' : 'null'}
+              <div className="mb-2 text-xs text-center rounded-lg py-1 font-bold" style={{ backgroundColor: effectiveIsAdmin ? '#d1fae5' : '#fee2e2', color: effectiveIsAdmin ? '#065f46' : '#991b1b' }}>
+                v2025-06-12 · isAdmin: {String(effectiveIsAdmin)} · profile: {profile ? 'cargado' : 'null'}
               </div>
               <SettingsPanel settings={settings} onSave={handleSaveSettings}
                 expenseCount={expenses.length} onClearAll={handleClearAll}

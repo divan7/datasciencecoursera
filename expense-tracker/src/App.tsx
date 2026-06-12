@@ -29,7 +29,7 @@ import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
 import { useFixedExpenses } from './hooks/useFixedExpenses';
 import { loadSettings, saveSettings, loadLegacySettings, saveExpenseToAnySpace } from './utils/storage';
-import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, syncSpaceToSupabase, getCacheOwner, setCacheOwner, clearLocalSpaceData } from './utils/spaceStorage';
+import { loadSpaces, saveSpaces, saveSession, loadSession, migrateFromLegacy, syncSpaceToSupabase, getCacheOwner, setCacheOwner, clearLocalSpaceData, getSessionRepairHint, setSessionRepairHint, clearSessionRepairHint } from './utils/spaceStorage';
 import { loadFiscalProfile } from './utils/fiscalStorage';
 import { checkAndFireNotifications } from './services/notificationService';
 import { isSupabaseConfigured } from './lib/supabase';
@@ -136,6 +136,7 @@ export default function App() {
     const cachedUid = getCacheOwner();
     if (cachedUid !== user.id) {
       clearLocalSpaceData();
+      clearSessionRepairHint();
       setSpaces([]);
       setSession(null);
     }
@@ -155,9 +156,11 @@ export default function App() {
           const newSession: SessionState = { spaceId: firstSpace.id, memberId: firstMember.id };
           setSession(newSession);
           saveSession(newSession);
+          setSessionRepairHint(newSession);
           activeSpaceId = firstSpace.id;
         } else {
           activeSpaceId = savedSession!.spaceId;
+          setSessionRepairHint(savedSession!);
         }
         // Load API key: owner's key lives in their profile; non-owners fall back
         // to the space-level key that the owner writes on each save.
@@ -172,7 +175,27 @@ export default function App() {
           }
         }
       } else {
-        // Cloud returned empty. If this is the same user and they have local
+        // Cloud returned empty. Could be profile_id=NULL — attempt repair using
+        // the persisted session hint before falling back to local cache or onboarding.
+        const hint = getSessionRepairHint();
+        if (hint) {
+          try {
+            await spacesDb.claimMemberProfile(hint.spaceId, hint.memberId);
+            const retried = await spacesDb.listMySpaces();
+            if (retried.length > 0) {
+              setSpaces(retried);
+              saveSpaces(retried);
+              const stillValid = retried.some((s) => s.id === hint.spaceId);
+              const activeSession = stillValid ? hint : { spaceId: retried[0].id, memberId: retried[0].members[0].id };
+              setSession(activeSession);
+              saveSession(activeSession);
+              setCacheOwner(user.id);
+              setSpacesLoaded(true);
+              return;
+            }
+          } catch { /* claim_member_profile not deployed or already set — fall through */ }
+        }
+        // Repair didn't help. If this is the same user and they have local
         // data, preserve it and re-sync — don't wipe on transient cloud errors.
         if (cachedUid === user.id) {
           const local = loadSpaces();
@@ -186,6 +209,7 @@ export default function App() {
         } else {
           // Different user: cache was already cleared above; start clean
           clearLocalSpaceData();
+          clearSessionRepairHint();
           setSpaces([]);
           setSession(null);
         }

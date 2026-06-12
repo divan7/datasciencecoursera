@@ -5,6 +5,8 @@ import { isSupabaseConfigured } from '../lib/supabase';
 
 const SPACES_KEY = 'orden_casa_spaces';
 const SESSION_KEY = 'orden_casa_session';
+// Persists across logout as a repair hint for the profile_id=NULL recovery path.
+const SESSION_REPAIR_KEY = 'orden_casa_session_repair';
 // Tracks which authenticated user the local cache belongs to, so we never
 // show one user's cached spaces/expenses to a different user on the same device.
 const CACHE_UID_KEY = 'orden_casa_cache_uid';
@@ -17,9 +19,26 @@ export function setCacheOwner(uid: string): void {
   localStorage.setItem(CACHE_UID_KEY, uid);
 }
 
+export function getSessionRepairHint(): SessionState | null {
+  try {
+    const s = localStorage.getItem(SESSION_REPAIR_KEY);
+    return s ? JSON.parse(s) : null;
+  } catch { return null; }
+}
+
+export function setSessionRepairHint(session: SessionState): void {
+  localStorage.setItem(SESSION_REPAIR_KEY, JSON.stringify(session));
+}
+
+export function clearSessionRepairHint(): void {
+  localStorage.removeItem(SESSION_REPAIR_KEY);
+}
+
 // Wipe every locally cached space, session and per-space dataset. Used when a
 // different user logs in on this device, or when the signed-in user genuinely
 // has no spaces in the cloud (so stale cache must not leak).
+// NOTE: intentionally keeps SESSION_REPAIR_KEY so the login flow can attempt
+// profile_id repair on re-login before showing onboarding.
 export function clearLocalSpaceData(): void {
   const prefixes = [
     'expense_tracker_data_',

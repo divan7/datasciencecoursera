@@ -250,7 +250,8 @@ export const spacesDb = {
 
     const ids = myMemberships.map((m: { space_id: string }) => m.space_id);
     const { data: spacesData } = await supabase
-      .from('spaces').select('*').in('id', ids);
+      .from('spaces').select('*').in('id', ids)
+      .order('created_at', { ascending: false });
     const { data: membersData } = await supabase
       .from('space_members').select('*').in('space_id', ids);
 

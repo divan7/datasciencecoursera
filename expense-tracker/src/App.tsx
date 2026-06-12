@@ -699,22 +699,34 @@ export default function App() {
 
         {/* ── Checklist fijos ── */}
         {activeTab === 'checklist' && (
-          <MonthlyChecklist
-            templates={templates}
-            checks={checks}
-            expenses={expenses}
-            onEnsureChecks={ensureChecksForMonth}
-            onConfirm={confirmCheck}
-            onConfirmWithExpense={useCallback((checkId: string, data: Parameters<typeof addExpense>[0]) => {
-              const saved = addExpense(data);
-              confirmCheck(checkId, saved.id, saved.amount);
-              showSaveToast('Gasto guardado');
-            }, [addExpense, confirmCheck, showSaveToast])}
-            onSkip={skipCheck}
-            onReset={resetCheck}
-            onRegisterNow={handleRegisterFromTemplate}
-            members={currentSpace.members}
-          />
+          <ErrorBoundary fallback={
+            <div className="text-center py-12 space-y-3">
+              <p className="text-4xl">⚠️</p>
+              <p className="font-semibold text-gray-700">Error al cargar los gastos fijos</p>
+              <p className="text-xs text-gray-400">Intenta recargar la app. Si el problema persiste, revisa la consola del navegador.</p>
+              <button onClick={() => window.location.reload()}
+                className="px-4 py-2 rounded-xl bg-teal-600 text-white text-sm font-bold">
+                Recargar
+              </button>
+            </div>
+          }>
+            <MonthlyChecklist
+              templates={templates}
+              checks={checks}
+              expenses={expenses}
+              onEnsureChecks={ensureChecksForMonth}
+              onConfirm={confirmCheck}
+              onConfirmWithExpense={useCallback((checkId: string, data: Parameters<typeof addExpense>[0]) => {
+                const saved = addExpense(data);
+                confirmCheck(checkId, saved.id, saved.amount);
+                showSaveToast('Gasto guardado');
+              }, [addExpense, confirmCheck, showSaveToast])}
+              onSkip={skipCheck}
+              onReset={resetCheck}
+              onRegisterNow={handleRegisterFromTemplate}
+              members={currentSpace.members}
+            />
+          </ErrorBoundary>
         )}
 
         {/* ── Reporte ── */}

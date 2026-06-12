@@ -175,26 +175,28 @@ export default function App() {
           }
         }
       } else {
-        // Cloud returned empty. Could be profile_id=NULL — attempt repair using
-        // the persisted session hint before falling back to local cache or onboarding.
+        // Cloud returned empty. Most common cause: profile_id=NULL on the
+        // member row. Two-step repair, neither destructive:
+        //  1) recoverMySpaces — hint-free, relinks every space I own via owner_id
+        //  2) claimMemberProfile — hint-based, covers non-owner memberships
         const hint = getSessionRepairHint();
-        if (hint) {
-          try {
-            await spacesDb.claimMemberProfile(hint.spaceId, hint.memberId);
-            const retried = await spacesDb.listMySpaces();
-            if (retried.length > 0) {
-              setSpaces(retried);
-              saveSpaces(retried);
-              const stillValid = retried.some((s) => s.id === hint.spaceId);
-              const activeSession = stillValid ? hint : { spaceId: retried[0].id, memberId: retried[0].members[0].id };
-              setSession(activeSession);
-              saveSession(activeSession);
-              setCacheOwner(user.id);
-              setSpacesLoaded(true);
-              return;
-            }
-          } catch { /* claim_member_profile not deployed or already set — fall through */ }
-        }
+        try {
+          await spacesDb.recoverMySpaces().catch(() => 0);
+          if (hint) await spacesDb.claimMemberProfile(hint.spaceId, hint.memberId).catch(() => {});
+          const retried = await spacesDb.listMySpaces();
+          if (retried.length > 0) {
+            setSpaces(retried);
+            saveSpaces(retried);
+            const stillValid = hint && retried.some((s) => s.id === hint.spaceId);
+            const activeSession = stillValid ? hint! : { spaceId: retried[0].id, memberId: retried[0].members[0].id };
+            setSession(activeSession);
+            saveSession(activeSession);
+            setSessionRepairHint(activeSession);
+            setCacheOwner(user.id);
+            setSpacesLoaded(true);
+            return;
+          }
+        } catch { /* recovery RPCs not deployed — fall through */ }
         // Repair didn't help. If this is the same user and they have local
         // data, preserve it and re-sync — don't wipe on transient cloud errors.
         if (cachedUid === user.id) {
@@ -370,9 +372,11 @@ export default function App() {
   }, []);
 
   const handleSignOut = useCallback(async () => {
-    // Clear the device cache so the next person to sign in here starts clean
-    // and never inherits this user's spaces/expenses.
-    clearLocalSpaceData();
+    // Reset in-memory state only. We intentionally KEEP the local cache:
+    // the login-time isolation guard (cachedUid !== user.id) wipes it if a
+    // DIFFERENT user signs in, while the same user re-logging keeps an
+    // instant local fallback even if the cloud fetch fails. Wiping here was
+    // the root cause of "lost lists" when cloud recovery wasn't possible.
     setSpaces([]);
     setSession(null);
     setWelcomeMode('choosing');

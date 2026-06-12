@@ -335,6 +335,15 @@ export const spacesDb = {
     });
     if (error) throw new Error(`claim_member_profile: ${error.message}`);
   },
+
+  /** Hint-free recovery: relinks owner rows (profile_id=NULL) on every space
+   *  whose spaces.owner_id matches the caller's auth.uid(). Returns rows fixed. */
+  async recoverMySpaces(): Promise<number> {
+    if (!supabase) return 0;
+    const { data, error } = await supabase.rpc('recover_my_spaces');
+    if (error) throw new Error(`recover_my_spaces: ${error.message}`);
+    return typeof data === 'number' ? data : 0;
+  },
 };
 
 // ─── Expenses ─────────────────────────────────────────────────────────────────

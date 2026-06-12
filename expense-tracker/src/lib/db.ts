@@ -306,13 +306,13 @@ export const spacesDb = {
     void ownerProfileId;
   },
 
-  async updateSpace(space: AppSpace): Promise<void> {
+  async updateSpace(space: AppSpace, removedMemberIds: string[] = []): Promise<void> {
     if (!supabase) return;
     await supabase.from('spaces').update({
       name: space.name, owner_id: space.ownerId,
       max_members: space.maxMembers, plan: space.plan ?? 'trial',
     }).eq('id', space.id);
-    // Upsert all members
+    // Upsert members that are in the new list
     for (const m of space.members) {
       await supabase.from('space_members').upsert({
         id: m.id, space_id: space.id,
@@ -320,10 +320,12 @@ export const spacesDb = {
         color_index: m.colorIndex, created_at: m.createdAt,
       });
     }
-    // Delete removed members
-    const memberIds = space.members.map((m) => m.id);
-    await supabase.from('space_members')
-      .delete().eq('space_id', space.id).not('id', 'in', `(${memberIds.map((id) => `'${id}'`).join(',')})`);
+    // Only delete members that were explicitly removed by the user
+    // (never delete by exclusion — that wipes members added externally via SQL/invite)
+    if (removedMemberIds.length > 0) {
+      await supabase.from('space_members')
+        .delete().in('id', removedMemberIds);
+    }
   },
 
   async deleteSpace(spaceId: string): Promise<void> {

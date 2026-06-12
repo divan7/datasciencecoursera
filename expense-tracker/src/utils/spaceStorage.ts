@@ -96,12 +96,12 @@ export async function loadSpacesFromSupabase(): Promise<AppSpace[]> {
 }
 
 // Sync a full space (create or update) to Supabase
-export async function syncSpaceToSupabase(space: AppSpace, ownerProfileId?: string): Promise<void> {
+export async function syncSpaceToSupabase(space: AppSpace, ownerProfileId?: string, removedMemberIds: string[] = []): Promise<void> {
   if (!isSupabaseConfigured) return;
   if (ownerProfileId) {
     await spacesDb.createSpace(space, ownerProfileId);
   } else {
-    await spacesDb.updateSpace(space);
+    await spacesDb.updateSpace(space, removedMemberIds);
   }
 }
 

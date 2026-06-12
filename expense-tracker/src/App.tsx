@@ -327,14 +327,19 @@ export default function App() {
   const handleUpdateSpaces = useCallback((updated: AppSpace[]) => {
     setSpaces((prev) => {
       if (isSupabaseConfigured) {
-        const prevIds = new Set(prev.map((s) => s.id));
+        const prevMap = new Map(prev.map((s) => [s.id, s]));
         updated.forEach((s) => {
-          if (!prevIds.has(s.id) && user?.id) {
+          if (!prevMap.has(s.id) && user?.id) {
             // Brand-new space: use createSpace RPC so the owner member gets profile_id set,
             // which is required by the my_space_ids() RLS check on space_invites and other tables.
             syncSpaceToSupabase(s, user.id).catch(console.error);
           } else {
-            syncSpaceToSupabase(s).catch(console.error);
+            // Compute members explicitly removed by the user (prev had them, new list doesn't).
+            // Never delete by exclusion — that wipes members added externally via SQL/invite.
+            const prevMembers = prevMap.get(s.id)?.members ?? [];
+            const newIds = new Set(s.members.map((m) => m.id));
+            const removedIds = prevMembers.filter((m) => !newIds.has(m.id)).map((m) => m.id);
+            syncSpaceToSupabase(s, undefined, removedIds).catch(console.error);
           }
         });
       }

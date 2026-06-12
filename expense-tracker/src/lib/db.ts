@@ -185,6 +185,7 @@ function rowToMember(r: any): SpaceMember {
     role:       r.role,
     colorIndex: r.color_index ?? 0,
     createdAt:  r.created_at,
+    profileId:  r.profile_id ?? undefined,
   };
 }
 

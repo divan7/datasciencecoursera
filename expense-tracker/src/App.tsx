@@ -183,17 +183,34 @@ export default function App() {
         let activeSpaceId = spaceId;
         const savedSession = loadSession();
         const stillValid = savedSession && remote.some((s) => s.id === savedSession.spaceId);
+
+        // Helper: find the member linked to the authenticated user in a space
+        const myMemberIn = (space: AppSpace) =>
+          space.members.find((m) => m.profileId === user.id) ?? space.members[0];
+
         if (!stillValid) {
           const firstSpace = remote[0];
-          const firstMember = firstSpace.members[0];
-          const newSession: SessionState = { spaceId: firstSpace.id, memberId: firstMember.id };
+          const myMember = myMemberIn(firstSpace);
+          const newSession: SessionState = { spaceId: firstSpace.id, memberId: myMember.id };
           setSession(newSession);
           saveSession(newSession);
           setSessionRepairHint(newSession);
           activeSpaceId = firstSpace.id;
         } else {
           activeSpaceId = savedSession!.spaceId;
-          setSessionRepairHint(savedSession!);
+          // If the saved session points to a member that doesn't belong to this
+          // user (e.g., session was reset after a member rename), correct it.
+          const activeSpace = remote.find((s) => s.id === savedSession!.spaceId);
+          const sessionMember = activeSpace?.members.find((m) => m.id === savedSession!.memberId);
+          const myMember = activeSpace ? myMemberIn(activeSpace) : null;
+          if (myMember && (!sessionMember || sessionMember.profileId !== user.id)) {
+            const corrected = { ...savedSession!, memberId: myMember.id };
+            setSession(corrected);
+            saveSession(corrected);
+            setSessionRepairHint(corrected);
+          } else {
+            setSessionRepairHint(savedSession!);
+          }
         }
         // Load API key: owner's key lives in their profile; non-owners fall back
         // to the space-level key that the owner writes on each save.
@@ -218,7 +235,9 @@ export default function App() {
             setSpaces(retried);
             saveSpaces(retried);
             const stillValid = hint && retried.some((s) => s.id === hint.spaceId);
-            const activeSession = stillValid ? hint! : { spaceId: retried[0].id, memberId: retried[0].members[0].id };
+            const fallbackSpace = retried[0];
+            const fallbackMember = fallbackSpace.members.find((m) => m.profileId === user.id) ?? fallbackSpace.members[0];
+            const activeSession = stillValid ? hint! : { spaceId: fallbackSpace.id, memberId: fallbackMember.id };
             setSession(activeSession);
             saveSession(activeSession);
             setSessionRepairHint(activeSession);

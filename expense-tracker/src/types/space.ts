@@ -18,6 +18,7 @@ export interface SpaceMember {
   role: MemberRole;
   colorIndex: number; // index into MEMBER_COLORS
   createdAt: string;
+  profileId?: string; // Supabase auth uid linked to this member, if any
 }
 
 export type SpacePlan = 'free' | 'premium' | 'trial';

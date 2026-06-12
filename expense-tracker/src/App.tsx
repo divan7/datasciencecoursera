@@ -93,6 +93,22 @@ export default function App() {
     }
   }, [spaceId]);
 
+  // Fetch shared API key from space_settings whenever the active space changes.
+  // This ensures members who join a space automatically get the owner's key
+  // without needing to configure anything themselves.
+  useEffect(() => {
+    if (!spaceId || !isSupabaseConfigured || !user) return;
+    settingsDb.get(spaceId).then((remote) => {
+      if (!remote?.anthropicApiKey) return;
+      setSettings((prev) => {
+        if (prev.anthropicApiKey === remote.anthropicApiKey) return prev;
+        const merged = { ...prev, anthropicApiKey: remote.anthropicApiKey };
+        saveSettings(merged, spaceId);
+        return merged;
+      });
+    }).catch(() => {});
+  }, [spaceId, user?.id]);
+
   // ── Fiscal profile (per auth user, falls back to 'local' for offline mode) ──
   const userId = user?.id ?? 'local';
   const [fiscalProfile, setFiscalProfile] = useState<FiscalProfile>(() => loadFiscalProfile(userId));
@@ -667,6 +683,7 @@ export default function App() {
                   apiKey={settings.anthropicApiKey}
                   members={currentSpace.members}
                   fiscalProfile={fiscalProfile}
+                  isOwner={currentMember?.role === 'propietario'}
                 />
               )}
               {inputMode === 'image' && (
@@ -679,6 +696,7 @@ export default function App() {
                   apiKey={settings.anthropicApiKey}
                   members={currentSpace.members}
                   fiscalProfile={fiscalProfile}
+                  isOwner={currentMember?.role === 'propietario'}
                 />
               )}
             </div>

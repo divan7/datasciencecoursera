@@ -143,7 +143,9 @@ export default function App() {
 
     // The cloud is the source of truth for an authenticated user. Fetch directly
     // (not loadSpacesFromSupabase, which falls back to stale local cache on empty).
-    spacesDb.listMySpaces().then(async (remote) => {
+    // recoverMySpaces runs unconditionally (cheap + idempotent): a single stale
+    // linked space must never mask unlinked spaces the user actually owns.
+    spacesDb.recoverMySpaces().catch(() => 0).then(() => spacesDb.listMySpaces()).then(async (remote) => {
       if (remote.length > 0) {
         setSpaces(remote);
         saveSpaces(remote);
@@ -175,13 +177,10 @@ export default function App() {
           }
         }
       } else {
-        // Cloud returned empty. Most common cause: profile_id=NULL on the
-        // member row. Two-step repair, neither destructive:
-        //  1) recoverMySpaces — hint-free, relinks every space I own via owner_id
-        //  2) claimMemberProfile — hint-based, covers non-owner memberships
+        // Cloud returned empty even after recoverMySpaces. Remaining repair:
+        // claimMemberProfile — hint-based, covers non-owner memberships.
         const hint = getSessionRepairHint();
         try {
-          await spacesDb.recoverMySpaces().catch(() => 0);
           if (hint) await spacesDb.claimMemberProfile(hint.spaceId, hint.memberId).catch(() => {});
           const retried = await spacesDb.listMySpaces();
           if (retried.length > 0) {

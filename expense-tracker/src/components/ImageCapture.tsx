@@ -19,11 +19,12 @@ interface ImageCaptureProps {
   members: SpaceMember[];
   fiscalProfile?: FiscalProfile;
   isOwner?: boolean;
+  hasAiAccess?: boolean;
 }
 
 type MediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
-export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isOwner }: ImageCaptureProps) {
+export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isOwner, hasAiAccess }: ImageCaptureProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string>('');
   const [mediaType, setMediaType] = useState<MediaType>('image/jpeg');
@@ -60,6 +61,10 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
 
   const handleAnalyze = async () => {
     if (!imageBase64) return;
+    if (hasAiAccess === false) {
+      setError('Esta función requiere acceso premium. Contacta al administrador para activarla.');
+      return;
+    }
     if (!apiKey) {
       setError(
         isOwner

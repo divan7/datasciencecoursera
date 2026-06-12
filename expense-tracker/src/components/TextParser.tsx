@@ -17,6 +17,7 @@ interface TextParserProps {
   members: SpaceMember[];
   fiscalProfile?: FiscalProfile;
   isOwner?: boolean;
+  hasAiAccess?: boolean;
 }
 
 const EXAMPLES = [
@@ -26,7 +27,7 @@ const EXAMPLES = [
   'Recibí salario de 18000 por transferencia BBVA',
 ];
 
-export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isOwner }: TextParserProps) {
+export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSaveMultiple, apiKey, fiscalProfile, isOwner, hasAiAccess }: TextParserProps) {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -34,6 +35,10 @@ export function TextParser({ currentUser, currentSpaceId, spaces, onSave, onSave
 
   const handleParse = async () => {
     if (!text.trim()) return;
+    if (hasAiAccess === false) {
+      setError('Esta función requiere acceso premium. Contacta al administrador para activarla.');
+      return;
+    }
     if (!apiKey) {
       setError(
         isOwner

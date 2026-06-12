@@ -14,6 +14,7 @@ export interface Profile {
   plan: 'free' | 'trial' | 'premium';
   planExpiresAt: string | null;
   isAdmin: boolean;
+  aiEnabled: boolean | null;  // null = use app default
   createdAt: string;
   lastSeenAt: string;
 }
@@ -29,6 +30,7 @@ function rowToProfile(r: any): Profile {
     plan:          r.plan ?? 'trial',
     planExpiresAt: r.plan_expires_at ?? null,
     isAdmin:       r.is_admin ?? false,
+    aiEnabled:     r.ai_enabled ?? null,
     createdAt:     r.created_at,
     lastSeenAt:    r.last_seen_at,
   };
@@ -235,6 +237,11 @@ export const profilesDb = {
       .from('profiles').select('*').order('created_at', { ascending: false });
     if (error) return [];
     return (data ?? []).map(rowToProfile);
+  },
+
+  async setAiEnabled(profileId: string, enabled: boolean | null): Promise<void> {
+    if (!supabase) return;
+    await supabase.from('profiles').update({ ai_enabled: enabled }).eq('id', profileId);
   },
 };
 
@@ -486,8 +493,12 @@ export const settingsDb = {
     if (!supabase) return null;
     const { data } = await supabase
       .from('space_settings').select('*').eq('space_id', spaceId).single();
-    if (!data) return null;
-    return { currency: data.currency ?? 'MXN', anthropicApiKey: data.anthropic_api_key ?? undefined };
+    const apiKey = data?.anthropic_api_key ?? null;
+    if (apiKey) return { currency: data.currency ?? 'MXN', anthropicApiKey: apiKey };
+    // Fallback: global key set by admin applies to all spaces
+    const { data: global } = await supabase
+      .from('app_settings').select('value').eq('key', 'anthropic_api_key').single();
+    return { currency: data?.currency ?? 'MXN', anthropicApiKey: global?.value ?? undefined };
   },
 
   async upsert(spaceId: string, settings: AppSettings): Promise<void> {
@@ -498,6 +509,29 @@ export const settingsDb = {
       anthropic_api_key: settings.anthropicApiKey ?? null,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'space_id' });
+  },
+
+  async setGlobalApiKey(apiKey: string): Promise<void> {
+    if (!supabase) return;
+    await supabase.from('app_settings').upsert(
+      { key: 'anthropic_api_key', value: apiKey, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+  },
+
+  async getAiDefaultEnabled(): Promise<boolean> {
+    if (!supabase) return true;
+    const { data } = await supabase
+      .from('app_settings').select('value').eq('key', 'ai_default_enabled').single();
+    return data?.value !== 'false';
+  },
+
+  async setAiDefault(enabled: boolean): Promise<void> {
+    if (!supabase) return;
+    await supabase.from('app_settings').upsert(
+      { key: 'ai_default_enabled', value: enabled ? 'true' : 'false', updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
   },
 };
 

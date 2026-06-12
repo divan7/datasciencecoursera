@@ -86,12 +86,24 @@ export default function App() {
   const [settings, setSettings] = useState(() =>
     spaceId ? loadSettings(spaceId) : { currency: 'MXN' }
   );
+  const [aiDefaultEnabled, setAiDefaultEnabled] = useState(true);
 
   useEffect(() => {
     if (spaceId) {
       setSettings(loadSettings(spaceId));
     }
   }, [spaceId]);
+
+  // Load global AI default when user logs in
+  useEffect(() => {
+    if (!user || !isSupabaseConfigured) return;
+    settingsDb.getAiDefaultEnabled().then(setAiDefaultEnabled).catch(() => {});
+  }, [user?.id]);
+
+  // Effective AI access: profile override > app default
+  const hasAiAccess = profile
+    ? (profile.aiEnabled !== null ? profile.aiEnabled : aiDefaultEnabled)
+    : aiDefaultEnabled;
 
   // Fetch shared API key from space_settings whenever the active space changes.
   // This ensures members who join a space automatically get the owner's key
@@ -328,11 +340,14 @@ export default function App() {
       saveSettings(newSettings, spaceId);
       if (isSupabaseConfigured) {
         await profilesDb.setApiKey(newSettings.anthropicApiKey ?? null);
-        // Also persist to space_settings so all members pick up the key
         await settingsDb.upsert(spaceId, newSettings).catch(console.error);
+        // Admin: also write global key so all spaces inherit it
+        if (isAdmin && newSettings.anthropicApiKey) {
+          await settingsDb.setGlobalApiKey(newSettings.anthropicApiKey).catch(console.error);
+        }
       }
     }
-  }, [spaceId]);
+  }, [spaceId, isAdmin]);
 
   const handleClearAll = useCallback(() => {
     localStorage.removeItem(`expense_tracker_data_${spaceId}`);
@@ -690,6 +705,7 @@ export default function App() {
                   members={currentSpace.members}
                   fiscalProfile={fiscalProfile}
                   isOwner={currentMember?.role === 'propietario'}
+                  hasAiAccess={hasAiAccess}
                 />
               )}
               {inputMode === 'image' && (
@@ -703,6 +719,7 @@ export default function App() {
                   members={currentSpace.members}
                   fiscalProfile={fiscalProfile}
                   isOwner={currentMember?.role === 'propietario'}
+                  hasAiAccess={hasAiAccess}
                 />
               )}
             </div>

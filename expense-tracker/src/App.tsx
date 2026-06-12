@@ -386,6 +386,12 @@ export default function App() {
     setActiveTab('add');
   }, []);
 
+  const handleConfirmWithExpense = useCallback((checkId: string, data: Parameters<typeof addExpense>[0]) => {
+    const saved = addExpense(data);
+    confirmCheck(checkId, saved.id, saved.amount);
+    showSaveToast('Gasto guardado');
+  }, [addExpense, confirmCheck, showSaveToast]);
+
   const handleSignOut = useCallback(async () => {
     // Reset in-memory state only. We intentionally KEEP the local cache:
     // the login-time isolation guard (cachedUid !== user.id) wipes it if a
@@ -734,11 +740,7 @@ export default function App() {
               expenses={expenses}
               onEnsureChecks={ensureChecksForMonth}
               onConfirm={confirmCheck}
-              onConfirmWithExpense={useCallback((checkId: string, data: Parameters<typeof addExpense>[0]) => {
-                const saved = addExpense(data);
-                confirmCheck(checkId, saved.id, saved.amount);
-                showSaveToast('Gasto guardado');
-              }, [addExpense, confirmCheck, showSaveToast])}
+              onConfirmWithExpense={handleConfirmWithExpense}
               onSkip={skipCheck}
               onReset={resetCheck}
               onRegisterNow={handleRegisterFromTemplate}

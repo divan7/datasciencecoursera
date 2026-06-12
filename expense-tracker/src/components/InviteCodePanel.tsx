@@ -71,8 +71,14 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
           await withTimeout(invitesDb.create(space.id, space.name, currentMemberId), 15000, 'generar código');
           await load();
           return;
-        } catch {
-          // fall through to show error below
+        } catch (retryErr) {
+          const retryMsg = retryErr instanceof Error ? retryErr.message : '';
+          if (retryMsg.includes('not_authenticated') || retryMsg.includes('function') || isRlsError(retryErr)) {
+            setError('Error de permisos. Intenta cerrar sesión y volver a entrar. Si el problema persiste, pide al administrador que ejecute el script claim_member_profile.sql en Supabase.');
+          } else {
+            setError(retryMsg || 'No se pudo generar el código. Inténtalo de nuevo.');
+          }
+          return;
         }
       }
       const msg =

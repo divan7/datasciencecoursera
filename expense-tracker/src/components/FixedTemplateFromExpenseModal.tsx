@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { X, Save, Bell } from 'lucide-react';
+import { X, Save, Bell, Users, CalendarX } from 'lucide-react';
 import type { Expense, Frequency } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES } from '../types/expense';
-import type { FixedExpenseTemplate } from '../types/fixedExpense';
+import type { FixedExpenseTemplate, DefaultSplit } from '../types/fixedExpense';
 import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
+
+type SplitMode = 'equal' | 'percent' | 'amount';
 
 interface Props {
   expense: Expense;
@@ -26,6 +28,25 @@ export function FixedTemplateFromExpenseModal({ expense, members, onSave, onClos
   const [paymentMonth, setPm]   = useState('1');
   const [reminder, setReminder] = useState(false);
   const [daysBefore, setDaysBefore] = useState('3');
+  const [endsAt, setEndsAt]     = useState('');
+  // Split
+  const [splitEnabled, setSplitEnabled]   = useState(false);
+  const [splitMode, setSplitMode]         = useState<SplitMode>('equal');
+  const [splitParticipants, setParticipants] = useState<string[]>([]);
+  const [splitShares, setShares]          = useState<Record<string, number>>({});
+
+  const memberColor = (name: string) => {
+    const m = members.find((mem) => mem.name === name);
+    return m ? MEMBER_COLORS[m.colorIndex] : '#9ca3af';
+  };
+
+  const buildDefaultSplit = (): DefaultSplit | undefined => {
+    if (!splitEnabled || splitParticipants.length === 0) return undefined;
+    return {
+      mode: splitMode,
+      entries: splitParticipants.map((name) => ({ name, value: splitShares[name] ?? 0 })),
+    };
+  };
 
   const selectCls = 'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white';
 
@@ -47,6 +68,8 @@ export function FixedTemplateFromExpenseModal({ expense, members, onSave, onClos
       active:             true,
       bank:               expense.bank,
       cardLast4:          expense.cardLast4,
+      endsAt:             endsAt || undefined,
+      defaultSplit:       buildDefaultSplit(),
     });
     onClose();
   };
@@ -182,6 +205,92 @@ export function FixedTemplateFromExpenseModal({ expense, members, onSave, onClos
               </div>
             )}
           </div>
+
+          {/* ── Fecha de fin ── */}
+          <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+            <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+              <CalendarX size={13} className="text-gray-400" />
+              Fecha de finalización (opcional)
+            </label>
+            <input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white" />
+            {endsAt && (
+              <p className="text-xs text-amber-600">
+                ⏳ Dejará de aparecer después de {new Date(endsAt + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+            )}
+          </div>
+
+          {/* ── División por defecto ── */}
+          {members.length > 1 && (
+            <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 space-y-3">
+              <button type="button"
+                onClick={() => { setSplitEnabled((v) => !v); setParticipants([]); setShares({}); }}
+                className="flex items-center gap-2 text-xs font-semibold text-purple-700">
+                <Users size={13} />
+                {splitEnabled ? '✓ División guardada' : 'Guardar división por defecto'}
+              </button>
+
+              {splitEnabled && (
+                <>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {([
+                      { value: 'equal', label: '÷ Iguales' },
+                      { value: 'percent', label: '% Porcentaje' },
+                      { value: 'amount', label: '$ Monto' },
+                    ] as { value: SplitMode; label: string }[]).map((opt) => (
+                      <button key={opt.value} type="button"
+                        onClick={() => { setSplitMode(opt.value); setShares({}); }}
+                        className={`py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+                          splitMode === opt.value
+                            ? 'border-purple-500 bg-purple-100 text-purple-800'
+                            : 'border-purple-200 bg-white text-gray-500'
+                        }`}>{opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {members.filter((m) => m.name !== paidBy).map((m) => {
+                      const active = splitParticipants.includes(m.name);
+                      return (
+                        <button key={m.id} type="button"
+                          onClick={() => {
+                            setParticipants((p) => active ? p.filter((n) => n !== m.name) : [...p, m.name]);
+                            if (active) setShares((s) => { const n = { ...s }; delete n[m.name]; return n; });
+                          }}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                            active ? 'text-white border-transparent' : 'border-purple-200 text-gray-500 bg-white'
+                          }`}
+                          style={active ? { backgroundColor: memberColor(m.name) } : {}}>
+                          {active ? '✓ ' : '+ '}{m.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {splitParticipants.length > 0 && splitMode !== 'equal' && (
+                    <div className="space-y-1.5">
+                      {splitParticipants.map((name) => (
+                        <div key={name} className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-purple-100">
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0"
+                            style={{ backgroundColor: memberColor(name) }}>
+                            {name.slice(0, 2).toUpperCase()}
+                          </span>
+                          <span className="flex-1 text-xs text-gray-700 truncate">{name}</span>
+                          <input type="number" inputMode="decimal"
+                            value={splitShares[name] ?? ''}
+                            onChange={(e) => setShares((s) => ({ ...s, [name]: parseFloat(e.target.value) || 0 }))}
+                            placeholder={splitMode === 'percent' ? '%' : '$'}
+                            className="w-16 text-xs text-right border border-purple-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* Payment method info (read-only) */}
           <div className="flex gap-2 text-xs text-gray-400 pb-2">

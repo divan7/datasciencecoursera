@@ -30,6 +30,13 @@ export interface FixedExpenseTemplate {
   variableAmount?: boolean;       // true = monto varía cada periodo (CFE, tarjeta, etc.)
   notes?: string;
   createdAt: string;
+  endsAt?: string;                // YYYY-MM-DD — fecha de fin, opcional
+  defaultSplit?: DefaultSplit;    // división guardada, se pre-rellena al confirmar
+}
+
+export interface DefaultSplit {
+  mode: 'equal' | 'percent' | 'amount';
+  entries: { name: string; value: number }[]; // value = 0 para 'equal', % o $ para los otros
 }
 
 export type CheckStatus = 'pendiente' | 'confirmado' | 'omitido';

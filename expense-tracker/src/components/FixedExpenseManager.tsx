@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Bell } from 'lucide-react';
-import type { FixedExpenseTemplate, FixedExpenseType, CreditType } from '../types/fixedExpense';
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Bell, Users, CalendarX } from 'lucide-react';
+import type { FixedExpenseTemplate, FixedExpenseType, CreditType, DefaultSplit } from '../types/fixedExpense';
 import type { Category, User, PaymentMethod, Frequency } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS } from '../types/expense';
 import type { SpaceMember } from '../types/space';
@@ -38,6 +38,8 @@ const CREDIT_TYPE_LABEL: Record<CreditType, string> = {
   otro_credito:        '💼 Crédito',
 };
 
+type SplitMode = 'equal' | 'percent' | 'amount';
+
 const EMPTY_FORM = {
   concept: '', expectedAmount: '', category: 'servicios' as Category,
   paidBy: '' as User, paymentMethod: 'tarjeta_credito' as PaymentMethod,
@@ -48,6 +50,7 @@ const EMPTY_FORM = {
   fixedExpenseType: 'servicio' as FixedExpenseType,
   creditType: 'tarjeta_credito' as CreditType,
   variableAmount: false,
+  endsAt: '',
 };
 
 function PaymentDayField({
@@ -112,22 +115,46 @@ function PaymentDayField({
 }
 
 function TemplateForm({
-  initial, onSave, onCancel, members,
+  initial, initialSplit, onSave, onCancel, members,
 }: {
   initial?: Partial<typeof EMPTY_FORM>;
-  onSave: (data: typeof EMPTY_FORM) => void;
+  initialSplit?: DefaultSplit;
+  onSave: (data: typeof EMPTY_FORM, defaultSplit: DefaultSplit | undefined) => void;
   onCancel: () => void;
   members: SpaceMember[];
 }) {
   const [form, setForm] = useState({ ...EMPTY_FORM, ...initial });
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
+  // Split state
+  const [splitEnabled, setSplitEnabled] = useState(!!(initialSplit?.entries.length));
+  const [splitMode, setSplitMode]       = useState<SplitMode>(initialSplit?.mode ?? 'equal');
+  const [splitParticipants, setParticipants] = useState<string[]>(
+    initialSplit?.entries.map((e) => e.name) ?? []
+  );
+  const [splitShares, setShares] = useState<Record<string, number>>(
+    Object.fromEntries(initialSplit?.entries.map((e) => [e.name, e.value]) ?? [])
+  );
+
   const isCreditCard = form.fixedExpenseType === 'credito' && form.creditType === 'tarjeta_credito';
+
+  const buildDefaultSplit = (): DefaultSplit | undefined => {
+    if (!splitEnabled || splitParticipants.length === 0) return undefined;
+    return {
+      mode: splitMode,
+      entries: splitParticipants.map((name) => ({ name, value: splitShares[name] ?? 0 })),
+    };
+  };
+
+  const memberColor = (name: string) => {
+    const m = members.find((mem) => mem.name === name);
+    return m ? MEMBER_COLORS[m.colorIndex] : '#9ca3af';
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.concept || !form.expectedAmount) return;
-    onSave({ ...form, isCreditCard });
+    onSave({ ...form, isCreditCard }, buildDefaultSplit());
   };
 
   return (
@@ -324,6 +351,107 @@ function TemplateForm({
           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300" />
       </div>
 
+      {/* ── Fecha de fin ── */}
+      <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+          <CalendarX size={13} className="text-gray-400" />
+          Fecha de finalización (opcional)
+        </label>
+        <input
+          type="date"
+          value={form.endsAt}
+          onChange={(e) => set('endsAt', e.target.value)}
+          className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+        />
+        {form.endsAt && (
+          <p className="text-xs text-amber-600">
+            ⏳ El gasto dejará de aparecer después de {new Date(form.endsAt + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </p>
+        )}
+      </div>
+
+      {/* ── División por defecto ── */}
+      {members.length > 1 && (
+        <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 space-y-3">
+          <button
+            type="button"
+            onClick={() => { setSplitEnabled((v) => !v); setParticipants([]); setShares({}); }}
+            className="flex items-center gap-2 text-xs font-semibold text-purple-700"
+          >
+            <Users size={13} />
+            {splitEnabled ? '✓ División guardada' : 'Guardar división por defecto'}
+          </button>
+
+          {splitEnabled && (
+            <>
+              {/* Mode tabs */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  { value: 'equal',   label: '÷ Iguales' },
+                  { value: 'percent', label: '% Porcentaje' },
+                  { value: 'amount',  label: '$ Monto' },
+                ] as { value: SplitMode; label: string }[]).map((opt) => (
+                  <button key={opt.value} type="button"
+                    onClick={() => { setSplitMode(opt.value); setShares({}); }}
+                    className={`py-1.5 rounded-lg border text-[11px] font-semibold transition-all ${
+                      splitMode === opt.value
+                        ? 'border-purple-500 bg-purple-100 text-purple-800'
+                        : 'border-purple-200 bg-white text-gray-500'
+                    }`}>{opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Member chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {members.filter((m) => m.name !== form.paidBy).map((m) => {
+                  const active = splitParticipants.includes(m.name);
+                  return (
+                    <button key={m.id} type="button"
+                      onClick={() => {
+                        setParticipants((p) => active ? p.filter((n) => n !== m.name) : [...p, m.name]);
+                        if (active) setShares((s) => { const n = { ...s }; delete n[m.name]; return n; });
+                      }}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+                        active ? 'text-white border-transparent' : 'border-purple-200 text-gray-500 bg-white'
+                      }`}
+                      style={active ? { backgroundColor: memberColor(m.name) } : {}}>
+                      {active ? '✓ ' : '+ '}{m.name}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Per-person share inputs */}
+              {splitParticipants.length > 0 && splitMode !== 'equal' && (
+                <div className="space-y-1.5">
+                  {splitParticipants.map((name) => (
+                    <div key={name} className="flex items-center gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-purple-100">
+                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0"
+                        style={{ backgroundColor: memberColor(name) }}>
+                        {name.slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="flex-1 text-xs text-gray-700 truncate">{name}</span>
+                      <input
+                        type="number" inputMode="decimal"
+                        value={splitShares[name] ?? ''}
+                        onChange={(e) => setShares((s) => ({ ...s, [name]: parseFloat(e.target.value) || 0 }))}
+                        placeholder={splitMode === 'percent' ? '%' : '$'}
+                        className="w-16 text-xs text-right border border-purple-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-300 bg-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {splitParticipants.length === 0 && (
+                <p className="text-xs text-purple-400">Selecciona quiénes participan en la división</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 pt-1">
         <button type="submit"
           className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-bold hover:bg-teal-700 transition-all">
@@ -344,7 +472,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const [pendingReminder, setPendingReminder] = useState<FixedExpenseTemplate | null>(null);
 
-  const formToTemplate = (form: typeof EMPTY_FORM) => {
+  const formToTemplate = (form: typeof EMPTY_FORM, defaultSplit?: DefaultSplit) => {
     const isCC = form.fixedExpenseType === 'credito' && form.creditType === 'tarjeta_credito';
     return {
       concept: form.concept,
@@ -366,17 +494,19 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
       cutDay: isCC && form.cutDay ? parseInt(form.cutDay as string) : undefined,
       paymentDueDaysAfterCut: isCC && form.paymentDueDaysAfterCut ? parseInt(form.paymentDueDaysAfterCut as string) : undefined,
       minimumPayment: isCC && form.minimumPayment ? parseFloat(form.minimumPayment as string) : undefined,
+      endsAt: form.endsAt || undefined,
+      defaultSplit: defaultSplit,
     };
   };
 
-  const handleAdd = (form: typeof EMPTY_FORM) => {
-    const tpl = onAdd({ ...formToTemplate(form), active: true });
+  const handleAdd = (form: typeof EMPTY_FORM, defaultSplit: DefaultSplit | undefined) => {
+    const tpl = onAdd({ ...formToTemplate(form, defaultSplit), active: true });
     setShowForm(false);
     setPendingReminder(tpl);
   };
 
-  const handleEdit = (id: string, form: typeof EMPTY_FORM) => {
-    onUpdate(id, formToTemplate(form));
+  const handleEdit = (id: string, form: typeof EMPTY_FORM, defaultSplit: DefaultSplit | undefined) => {
+    onUpdate(id, formToTemplate(form, defaultSplit));
     setEditId(null);
   };
 
@@ -410,8 +540,10 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
             fixedExpenseType: tpl.fixedExpenseType ?? (tpl.isCreditCard ? 'credito' : 'servicio'),
             creditType: tpl.creditType ?? (tpl.isCreditCard ? 'tarjeta_credito' : 'tarjeta_credito'),
             variableAmount: tpl.variableAmount ?? false,
+            endsAt: tpl.endsAt ?? '',
           }}
-          onSave={(form) => handleEdit(tpl.id, form)}
+          initialSplit={tpl.defaultSplit}
+          onSave={(form, split) => handleEdit(tpl.id, form, split)}
           onCancel={() => setEditId(null)}
           members={members}
         />
@@ -433,6 +565,21 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
                   <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">variable</span>
                 )}
                 {tpl.reminderEnabled && <Bell size={12} className="text-teal-500" />}
+                {tpl.endsAt && (() => {
+                  const today = new Date().toISOString().slice(0, 10);
+                  const expired = tpl.endsAt < today;
+                  return (
+                    <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-0.5 ${expired ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
+                      <CalendarX size={10} />
+                      {expired ? 'Vencido' : `Vence ${new Date(tpl.endsAt + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}`}
+                    </span>
+                  );
+                })()}
+                {tpl.defaultSplit && (
+                  <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                    <Users size={10} /> dividido
+                  </span>
+                )}
                 {tpl.frequency === 'semanal' && tpl.dayOfWeek && (
                   <span className="text-xs text-gray-400">{WEEK_DAYS[tpl.dayOfWeek - 1]}</span>
                 )}
@@ -513,7 +660,7 @@ export function FixedExpenseManager({ templates, onAdd, onUpdate, onDelete, memb
         </div>
 
         {showForm && (
-          <TemplateForm onSave={handleAdd} onCancel={() => setShowForm(false)} members={members} />
+          <TemplateForm onSave={handleAdd} onCancel={() => setShowForm(false)} members={members} initialSplit={undefined} />
         )}
 
         {templates.length === 0 && !showForm && (

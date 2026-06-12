@@ -26,16 +26,20 @@ export function FixedExpenseConfirmModal({ template, members, currentUser, month
     return `${month}-${String(Math.min(day, last)).padStart(2, '0')}`;
   }, [template, month]);
 
+  const ds = template.defaultSplit;
   const [amount, setAmount]         = useState(String(template.expectedAmount));
   const [date, setDate]             = useState(defaultDate);
   const [paidBy, setPaidBy]         = useState(template.paidBy ?? currentUser);
   const [paymentMethod, setPayment] = useState<PaymentMethod>(template.paymentMethod ?? 'tarjeta_debito');
-  const [showSplit, setShowSplit]    = useState(members.length > 1);
-  const [splitMode, setSplitMode]   = useState<SplitMode>('equal');
+  const [showSplit, setShowSplit]    = useState(!!(ds?.entries.length) || members.length > 1);
+  const [splitMode, setSplitMode]   = useState<SplitMode>(ds?.mode ?? 'equal');
   const [splitParticipants, setParticipants] = useState<string[]>(
+    ds?.entries.map((e) => e.name) ??
     members.filter((m) => m.name !== (template.paidBy ?? currentUser)).map((m) => m.name)
   );
-  const [splitShares, setShares]    = useState<Record<string, number>>({});
+  const [splitShares, setShares]    = useState<Record<string, number>>(
+    ds ? Object.fromEntries(ds.entries.map((e) => [e.name, e.value])) : {}
+  );
   const [customName, setCustomName] = useState('');
 
   const totalAmt  = parseFloat(amount) || 0;

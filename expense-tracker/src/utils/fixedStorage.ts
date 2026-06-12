@@ -57,6 +57,9 @@ export function getNextDueDate(template: FixedExpenseTemplate, fromDate: Date = 
 
 // Returns true if a template with given frequency is due in month YYYY-MM
 export function isDueInMonth(template: FixedExpenseTemplate, yearMonth: string): boolean {
+  // Respect end date — expired templates never appear after their last month
+  if (template.endsAt && yearMonth > template.endsAt.slice(0, 7)) return false;
+
   const createdSlice = (template.createdAt ?? '2020-01').slice(0, 7);
   const [ty, tm] = createdSlice.split('-').map(Number);
   const [vy, vm] = yearMonth.split('-').map(Number);

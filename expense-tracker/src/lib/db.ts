@@ -131,6 +131,8 @@ function rowToTemplate(r: any): FixedExpenseTemplate {
     cutDay:                   r.cut_day ?? undefined,
     paymentDueDaysAfterCut:   r.payment_due_days_after_cut ?? undefined,
     minimumPayment:           r.minimum_payment ? Number(r.minimum_payment) : undefined,
+    endsAt:                   r.ends_at ?? undefined,
+    defaultSplit:             r.default_split ?? undefined,
   };
 }
 
@@ -155,6 +157,8 @@ function templateToRow(spaceId: string, t: FixedExpenseTemplate) {
     cut_day:                    t.cutDay ?? null,
     payment_due_days_after_cut: t.paymentDueDaysAfterCut ?? null,
     minimum_payment:            t.minimumPayment ?? null,
+    ends_at:                    t.endsAt ?? null,
+    default_split:              t.defaultSplit ?? null,
   };
 }
 

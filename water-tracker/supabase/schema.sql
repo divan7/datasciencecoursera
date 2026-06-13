@@ -10,8 +10,12 @@ create table if not exists water_profiles (
   sleep_time    text     not null default '22:00',
   glass_size_ml int      not null default 250,
   daily_goal_ml int      not null default 2000,
+  streak_data   jsonb    default null,
   updated_at    timestamptz default now()
 );
+
+-- Migration: add streak_data if upgrading from earlier schema
+alter table water_profiles add column if not exists streak_data jsonb default null;
 
 -- Daily water intake logs
 create table if not exists water_intake (

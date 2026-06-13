@@ -38,7 +38,7 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
   const effectiveGoalMl = plan.currentGoalMl;
 
   const reminder = useReminder(profile, totalMl, effectiveGoalMl, notifPrefs.disabledTimes);
-  const streak   = useStreak(totalMl, effectiveGoalMl);
+  const streak   = useStreak(totalMl, effectiveGoalMl, userId);
 
   const pct   = effectiveGoalMl > 0 ? Math.min(100, (totalMl / effectiveGoalMl) * 100) : 0;
   const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });

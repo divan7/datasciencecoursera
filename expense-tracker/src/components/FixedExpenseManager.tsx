@@ -337,11 +337,21 @@ function TemplateForm({
               onChange={(e) => set('minimumPayment', e.target.value)} placeholder="0.00"
               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
           </div>
-          {form.cutDay && (
-            <p className="text-xs text-orange-600">
-              📅 Fecha límite de pago: día {Math.min(parseInt(form.cutDay) + parseInt(form.paymentDueDaysAfterCut || '20'), 31)} del mes siguiente al corte
-            </p>
-          )}
+          {form.cutDay && (() => {
+            let day = parseInt(form.cutDay) + parseInt(form.paymentDueDaysAfterCut || '20');
+            let monthOffset = 0;
+            while (day > 30) { day -= 30; monthOffset++; }
+            const monthLabel = monthOffset === 0
+              ? 'del mismo mes del corte'
+              : monthOffset === 1
+                ? 'del mes siguiente al corte'
+                : `de ${monthOffset} meses después del corte`;
+            return (
+              <p className="text-xs text-orange-600">
+                📅 Fecha límite de pago: día {day}{monthOffset > 0 ? ' (aprox.)' : ''} {monthLabel}
+              </p>
+            );
+          })()}
         </div>
       )}
 

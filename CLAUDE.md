@@ -3,11 +3,13 @@
 ## Stack
 - React 19 + TypeScript + Vite + Tailwind CSS v4
 - Supabase (Postgres + Auth + RLS + Edge Functions)
-- Desplegado en Vercel desde rama `main` del repo `divan7/datasciencecoursera`
+- Desplegado en Vercel (proyecto `orden-casa`) — rama de producción: `claude/expense-tracker-app-T6NmB`
 - PWA con service worker (vite-plugin-pwa)
 
 ## Rama de desarrollo activa
-`claude/expense-tracker-app-T6NmB` → siempre hacer push también a `master` y `main`
+Siempre hacer push a las **tres** ramas: `master`, `main` y `claude/expense-tracker-app-T6NmB`
+- `claude/expense-tracker-app-T6NmB` → dispara deploy automático a **producción** en Vercel
+- `main` y `master` → van a Preview en Vercel
 
 ## Usuario principal
 - email: ivan.porraz@gmail.com

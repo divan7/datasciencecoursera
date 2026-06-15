@@ -31,13 +31,16 @@ export function useReminder(
   const completedGlasses = profile ? Math.floor(totalMl / profile.glass_size_ml) : 0;
   const totalGlasses = profile ? dailyGlasses(effectiveGoalMl, profile.glass_size_ml) : 0;
 
-  // nextTime / overdue based on active (enabled) slots only
-  const status = getScheduleStatus(activeSchedule, completedGlasses);
+  // isDone = actual goal reached, independent of how many slots are active
+  const isDone = completedGlasses >= totalGlasses;
+
+  // nextTime / overdue based on active (enabled) slots only; isDone overrides
+  const status = getScheduleStatus(activeSchedule, isDone ? activeSchedule.length : completedGlasses);
 
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const activeBeforeNow = activeSchedule.filter((t) => timeToMinutes(t) <= nowMin).length;
-  const overdueGlasses = Math.max(0, activeBeforeNow - completedGlasses);
+  const overdueGlasses = isDone ? 0 : Math.max(0, activeBeforeNow - completedGlasses);
 
   const firstOverdueTime: string | null =
     overdueGlasses > 0 ? (activeSchedule[completedGlasses] ?? null) : null;
@@ -88,13 +91,13 @@ export function useReminder(
     completedGlasses,
     totalGlasses,
     nextTime: status.nextTime,
-    countdown: status.isDone
+    countdown: isDone
       ? '¡Meta cumplida!'
       : status.isOverdue
         ? `¡${formatCountdown(status.minutesUntil)} de retraso!`
         : formatCountdown(status.minutesUntil),
-    isOverdue: status.isOverdue,
-    isDone: status.isDone,
+    isOverdue: !isDone && status.isOverdue,
+    isDone,
     overdueGlasses,
     firstOverdueTime,
     notifPermission,

@@ -101,6 +101,9 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
   const [splitShares, setSplitShares] = useState<Record<string, number>>({});
   const [customSplitName, setCustomSplitName] = useState('');
   const [invoiceDecision, setInvoiceDecision] = useState<Expense['invoiceStatus']>(undefined);
+  const [showGlobalSplitPanel, setShowGlobalSplitPanel] = useState(false);
+  const [globalSplitScope, setGlobalSplitScope] = useState<'all' | 'perItem' | 'allExcept' | null>(null);
+  const [exceptRowIndices, setExceptRowIndices] = useState<Set<number>>(new Set());
 
   const setRow = (i: number, patch: Partial<RowState>) =>
     setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
@@ -179,6 +182,46 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         ...(splitMode === 'percent' ? { percent: splitShares[name] ?? 0 } : {}),
       })),
     ];
+  };
+
+  // Global split: build obligations for a given amount using current split config
+  const buildObligationsForAmount = (amount: number, payer: string): ObligationEntry[] => {
+    if (splitParticipants.length === 0 || amount <= 0) return [];
+    if (splitMode === 'equal') {
+      const n = splitParticipants.length + 1;
+      const share = amount / n;
+      return [
+        { name: payer, amount: share },
+        ...splitParticipants.map((name) => ({ name, amount: share })),
+      ];
+    }
+    if (splitMode === 'percent') {
+      const othersSum = splitParticipants.reduce((s, n) => s + (splitShares[n] ?? 0), 0);
+      const payerPct = Math.max(0, 100 - othersSum);
+      return [
+        { name: payer, amount: amount * payerPct / 100, percent: payerPct },
+        ...splitParticipants.map((name) => ({
+          name,
+          amount: amount * (splitShares[name] ?? 0) / 100,
+          percent: splitShares[name] ?? 0,
+        })),
+      ];
+    }
+    return [];
+  };
+
+  const applyGlobalSplit = () => {
+    setRows((prev) =>
+      prev.map((r, rawIdx) => {
+        if (r.removed) return r;
+        if (globalSplitScope === 'allExcept' && exceptRowIndices.has(rawIdx)) return r;
+        const obs = buildObligationsForAmount(parseFloat(r.amount) || 0, r.paidBy);
+        return obs.length > 0 ? { ...r, obligations: obs } : r;
+      })
+    );
+    setShowGlobalSplitPanel(false);
+    setGlobalSplitScope(null);
+    setExceptRowIndices(new Set());
   };
 
   // Called by BillSplitter "Aplicar" — writes per-item obligations to each row
@@ -556,19 +599,23 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
         <button
           type="button"
           onClick={() => {
-            if (isTicket) { setShowBillSplitter(true); }
-            else { setShowSingleSplit((v) => !v); }
+            if (!isTicket) { setShowSingleSplit((v) => !v); return; }
+            if (activeRows.length > 5) {
+              setShowGlobalSplitPanel((v) => { if (v) setGlobalSplitScope(null); return !v; });
+            } else {
+              setShowBillSplitter(true);
+            }
           }}
           disabled={!canSave}
           className={`px-4 py-3 rounded-2xl border text-sm font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-40 active:scale-95 flex-shrink-0 ${
-            !isTicket && showSingleSplit
+            (!isTicket && showSingleSplit) || (isTicket && showGlobalSplitPanel)
               ? 'bg-purple-200 border-purple-400 text-purple-900'
               : 'bg-purple-50 border-purple-200 text-purple-700'
           }`}
-          title={isTicket ? 'Dividir por ítem entre participantes' : 'Dividir entre participantes'}
+          title="Dividir entre participantes"
         >
           <Users size={16} />
-          {isTicket ? 'Dividir por ítem' : 'Dividir'}
+          Dividir
         </button>
         <button
           onClick={onCancel}
@@ -577,6 +624,170 @@ export function MultiExpenseReview({ items, spaces, defaultSpaceId, currentUser,
           ✕
         </button>
       </div>
+
+      {/* ── Global split panel (> 5 items) ── */}
+      {showGlobalSplitPanel && isTicket && activeRows.length > 5 && (
+        <div className="bg-white rounded-2xl border border-purple-200 shadow-sm overflow-hidden">
+          <div className="px-4 pt-3 pb-2 border-b border-purple-100 bg-purple-50 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-purple-800">Dividir {activeRows.length} gastos</p>
+              <p className="text-xs text-purple-500 mt-0.5">Elige el alcance de la división</p>
+            </div>
+            <button type="button" onClick={() => { setShowGlobalSplitPanel(false); setGlobalSplitScope(null); }} className="text-purple-300 hover:text-purple-600 text-lg leading-none px-1">✕</button>
+          </div>
+
+          {/* Scope selector */}
+          <div className="px-4 pt-3 pb-2">
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { value: 'all'      as const, label: 'Toda la lista',    icon: '📋' },
+                { value: 'perItem'  as const, label: 'Por ítem',         icon: '📝' },
+                { value: 'allExcept'as const, label: 'Lista excepto...', icon: '🔀' },
+              ]).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    if (opt.value === 'perItem') {
+                      setShowGlobalSplitPanel(false);
+                      setShowBillSplitter(true);
+                      return;
+                    }
+                    setGlobalSplitScope(opt.value);
+                    if (opt.value !== 'allExcept') setExceptRowIndices(new Set());
+                  }}
+                  className={`py-2.5 px-1 rounded-xl border text-[11px] font-semibold transition-all flex flex-col items-center gap-1 ${
+                    globalSplitScope === opt.value
+                      ? 'border-purple-400 bg-purple-50 text-purple-800'
+                      : 'border-gray-200 bg-white text-gray-500 hover:border-purple-200'
+                  }`}
+                >
+                  <span className="text-base">{opt.icon}</span>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Exception checklist */}
+          {globalSplitScope === 'allExcept' && (
+            <div className="px-4 pb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Ítems con división diferente</p>
+              <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                {rows.map((r, rawIdx) => r.removed ? null : (
+                  <label key={rawIdx} className="flex items-center gap-2 py-1.5 px-1 text-xs cursor-pointer hover:bg-gray-50 rounded-lg">
+                    <input
+                      type="checkbox"
+                      checked={exceptRowIndices.has(rawIdx)}
+                      onChange={() => setExceptRowIndices((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(rawIdx)) next.delete(rawIdx); else next.add(rawIdx);
+                        return next;
+                      })}
+                      className="accent-purple-500"
+                    />
+                    <span className="flex-1 truncate text-gray-700">{r.concept || `Ítem ${rawIdx + 1}`}</span>
+                    <span className="text-gray-400 flex-shrink-0">${parseFloat(r.amount || '0').toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Participant/mode selector (equal and percent only for global split) */}
+          {(globalSplitScope === 'all' || globalSplitScope === 'allExcept') && (
+            <>
+              <div className="px-4 pt-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Distribución</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([
+                    { value: 'equal'   as SplitMode, label: '÷ Partes iguales' },
+                    { value: 'percent' as SplitMode, label: '% Por porcentaje' },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => { setSplitMode(opt.value); setSplitShares({}); }}
+                      className={`py-2 px-1 rounded-lg border text-[11px] font-semibold transition-all text-center ${
+                        splitMode === opt.value
+                          ? 'border-teal-500 bg-teal-50 text-teal-800'
+                          : 'border-gray-200 bg-white text-gray-500'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="px-4 pt-3 pb-1">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Participantes</p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {splitMembers
+                    .filter((m) => m.name !== currentUser)
+                    .map((m) => {
+                      const isAdded = splitParticipants.includes(m.name);
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() =>
+                            isAdded ? removeParticipant(m.name) : setSplitParticipants((p) => [...p, m.name])
+                          }
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                            isAdded ? 'text-white border-transparent' : 'border-gray-200 text-gray-500 bg-white'
+                          }`}
+                          style={isAdded ? { backgroundColor: MEMBER_COLORS[m.colorIndex] } : {}}
+                        >
+                          {isAdded ? '✓ ' : '+ '}{m.name}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                {splitMode === 'percent' && splitParticipants.length > 0 && (
+                  <div className="space-y-1.5 mb-2">
+                    {splitParticipants.map((name) => (
+                      <div key={name} className="flex items-center gap-2">
+                        <span className="flex-1 text-xs text-gray-600 truncate">{name}</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={splitShares[name] ?? ''}
+                          onChange={(e) => updateShare(name, e.target.value)}
+                          placeholder="%"
+                          className={`w-16 text-xs text-right border rounded-lg px-2 py-1 outline-none focus:ring-1 ${
+                            sharesValid ? 'border-gray-200 focus:ring-teal-300' : 'border-red-300 focus:ring-red-300'
+                          }`}
+                        />
+                        <span className="text-xs text-gray-400 w-4">%</span>
+                      </div>
+                    ))}
+                    {!sharesValid && (
+                      <p className="text-xs text-red-500">Los porcentajes superan el 100%</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {splitParticipants.length > 0 && sharesValid && (
+                <div className="px-4 pb-3">
+                  <button
+                    type="button"
+                    onClick={applyGlobalSplit}
+                    className="w-full py-2.5 rounded-xl text-white text-sm font-bold transition-all active:scale-95"
+                    style={{ backgroundColor: 'var(--soi-teal)' }}
+                  >
+                    Aplicar a {globalSplitScope === 'allExcept' && exceptRowIndices.size > 0
+                      ? `${activeRows.length - exceptRowIndices.size} ítem${activeRows.length - exceptRowIndices.size !== 1 ? 's' : ''}`
+                      : 'toda la lista'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Inline 3-mode split panel (single expense only) ── */}
       {showSingleSplit && !isTicket && splitMembers.length > 1 && (

@@ -9,6 +9,7 @@ export function useReminder(
   totalMl: number,
   effectiveGoalMl: number,
   disabledTimes: string[] = [],
+  autoLogEnabled = false,
 ) {
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
     isNotifSupported ? Notification.permission : 'denied',
@@ -58,18 +59,38 @@ export function useReminder(
       const msUntil = (h * 60 + m - nowMin) * 60_000;
       if (msUntil <= 0) return;
 
-      timers.push(setTimeout(() => {
-        new Notification('💧 Hora de tomar agua — AquaVital', {
-          body: `Toma ${index + 1} de ${activeSchedule.length} · ${profile.glass_size_ml} ml`,
-          icon: '/icons/icon-192.png',
-          tag: `water-reminder-${time}`,
-        });
+      timers.push(setTimeout(async () => {
+        const title = '💧 Hora de tomar agua — AquaVital';
+        const body = `Toma ${index + 1} de ${activeSchedule.length} · ${profile.glass_size_ml} ml`;
+        const tag = `water-reminder-${time}`;
+
+        // Use SW notification (supports action buttons + tap-to-log) when available
+        const sw = navigator.serviceWorker?.controller
+          ? await navigator.serviceWorker.ready.catch(() => null)
+          : null;
+
+        if (sw && autoLogEnabled) {
+          sw.showNotification(title, {
+            body,
+            icon: '/icons/icon-192.png',
+            tag,
+            data: { amountMl: profile.glass_size_ml, slot: time, autoLog: true },
+            actions: [
+              { action: 'log',     title: '✅ Ya tomé' },
+              { action: 'dismiss', title: 'Después' },
+            ],
+          } as NotificationOptions);
+        } else if (sw) {
+          sw.showNotification(title, { body, icon: '/icons/icon-192.png', tag });
+        } else {
+          new Notification(title, { body, icon: '/icons/icon-192.png', tag });
+        }
       }, msUntil));
     });
 
     return () => timers.forEach(clearTimeout);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notifPermission, profile, disabledTimes, completedGlasses]);
+  }, [notifPermission, profile, disabledTimes, completedGlasses, autoLogEnabled]);
 
   const requestPermission = useCallback(async () => {
     if (!isNotifSupported) return 'denied' as NotificationPermission;

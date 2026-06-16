@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Settings, LogOut, Droplets, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -13,6 +13,7 @@ import { useIntake } from '../hooks/useIntake';
 import { useReminder } from '../hooks/useReminder';
 import { useStreak } from '../hooks/useStreak';
 import { useNotificationPrefs } from '../hooks/useNotificationPrefs';
+import { useAutoLogPref } from '../hooks/useAutoLogPref';
 import type { UserProfile } from '../types';
 import type { usePlan } from '../hooks/usePlan';
 import type { useJournal } from '../hooks/useJournal';
@@ -31,17 +32,42 @@ interface Props {
 
 export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLogout }: Props) {
   const [showJournal, setShowJournal] = useState(false);
+  const [autoLogToast, setAutoLogToast] = useState(false);
   const { logs, totalMl, addIntake, removeIntake } = useIntake(userId);
-  const notifPrefs = useNotificationPrefs(userId);
+  const notifPrefs   = useNotificationPrefs(userId);
+  const autoLogPref  = useAutoLogPref(userId);
 
   // Use the current week's goal from the plan (not the final profile goal)
   const effectiveGoalMl = plan.currentGoalMl;
 
-  const reminder = useReminder(profile, totalMl, effectiveGoalMl, notifPrefs.disabledTimes);
+  const reminder = useReminder(profile, totalMl, effectiveGoalMl, notifPrefs.disabledTimes, autoLogPref.enabled);
   const streak   = useStreak(totalMl, effectiveGoalMl, userId);
 
   const pct   = effectiveGoalMl > 0 ? Math.min(100, (totalMl / effectiveGoalMl) * 100) : 0;
   const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });
+
+  // Handle tap-to-log from SW notification (?log=250&slot=HH:MM)
+  const autoLogHandled = useRef(false);
+  useEffect(() => {
+    if (autoLogHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const logMl = parseInt(params.get('log') ?? '0', 10);
+    if (logMl <= 0) return;
+    autoLogHandled.current = true;
+    window.history.replaceState({}, '', '/');
+    const slot = params.get('slot');
+    let logTime: Date | undefined;
+    if (slot) {
+      logTime = new Date();
+      const [h, m] = slot.split(':').map(Number);
+      logTime.setHours(h, m, 0, 0);
+      if (logTime > new Date()) logTime.setTime(new Date().getTime() - 60_000);
+    }
+    void addIntake(logMl, logTime);
+    setAutoLogToast(true);
+    setTimeout(() => setAutoLogToast(false), 3500);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleLogPastDrink(amountMl: number, timeStr: string) {
     const [h, m] = timeStr.split(':').map(Number);
@@ -53,6 +79,13 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-sky-950 flex flex-col">
+
+      {/* Auto-log confirmation toast */}
+      {autoLogToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white text-sm font-semibold px-5 py-2.5 rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 animate-pulse">
+          💧 Vaso registrado automáticamente
+        </div>
+      )}
 
       {/* Header */}
       <header className="flex items-center justify-between px-4 pt-6 pb-2 flex-shrink-0">
@@ -121,6 +154,8 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
           } : null}
           onRequestPermission={reminder.requestPermission}
           onLogPastDrink={handleLogPastDrink}
+          autoLogEnabled={autoLogPref.enabled}
+          onToggleAutoLog={autoLogPref.toggle}
         />
 
         {/* Quick add */}

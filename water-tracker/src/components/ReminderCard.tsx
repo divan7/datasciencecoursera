@@ -18,8 +18,10 @@ interface Props {
   glassSizeMl: number;
   schedule: string[];
   calendarPlan: CalendarPlanParams | null;
+  autoLogEnabled: boolean;
   onRequestPermission: () => void;
   onLogPastDrink: (amountMl: number, time: string) => void;
+  onToggleAutoLog: () => void;
 }
 
 export function ReminderCard({
@@ -35,8 +37,10 @@ export function ReminderCard({
   glassSizeMl,
   schedule,
   calendarPlan,
+  autoLogEnabled,
   onRequestPermission,
   onLogPastDrink,
+  onToggleAutoLog,
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -111,9 +115,22 @@ export function ReminderCard({
               </button>
             )}
             {notifPermission === 'granted' && (
-              <div className="flex items-center gap-1 text-xs text-emerald-400">
-                <CheckCircle2 size={11} />
-                Alertas activas
+              <div className="flex flex-col items-end gap-1.5">
+                <div className="flex items-center gap-1 text-xs text-emerald-400">
+                  <CheckCircle2 size={11} />
+                  Alertas activas
+                </div>
+                <button
+                  onClick={onToggleAutoLog}
+                  className={`flex items-center gap-1.5 text-xs rounded-lg px-2 py-1 border transition-colors ${
+                    autoLogEnabled
+                      ? 'bg-sky-500/20 border-sky-400/30 text-sky-300'
+                      : 'bg-white/5 border-white/10 text-white/30 hover:text-white/60'
+                  }`}
+                >
+                  <Bell size={10} />
+                  {autoLogEnabled ? 'Confirmar al tocar ✓' : 'Confirmar al tocar'}
+                </button>
               </div>
             )}
           </div>

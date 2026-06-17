@@ -41,6 +41,36 @@ registerRoute(
   }),
 );
 
+// ── Web Push: receive push from server and show notification ──────────────────
+interface PushPayload {
+  title: string;
+  body: string;
+  slot?: string;
+  amountMl?: number;
+  autoLog?: boolean;
+}
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let data: PushPayload;
+  try { data = event.data.json() as PushPayload; }
+  catch { return; }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      tag: `water-${data.slot ?? 'now'}`,
+      data: { amountMl: data.amountMl, slot: data.slot, autoLog: data.autoLog },
+      actions: [
+        { action: 'log',     title: '✅ Ya tomé' },
+        { action: 'dismiss', title: 'Después' },
+      ],
+    } as NotificationOptions),
+  );
+});
+
 // ── Notification tap: open app and auto-log the drink ─────────────────────────
 interface NotifData {
   amountMl?: number;

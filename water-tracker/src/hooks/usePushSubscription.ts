@@ -1,0 +1,59 @@
+import { useState, useEffect } from 'react';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+
+function urlB64ToUint8(b64: string): Uint8Array {
+  const pad = '='.repeat((4 - (b64.length % 4)) % 4);
+  const raw = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + pad);
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+
+const isPushSupported = typeof window !== 'undefined'
+  && 'PushManager' in window
+  && 'serviceWorker' in navigator;
+
+export function usePushSubscription(userId: string | null, notifPermission: NotificationPermission) {
+  const [subscribed, setSubscribed] = useState(false);
+
+  // Check if already subscribed on mount / permission change
+  useEffect(() => {
+    if (!isPushSupported || notifPermission !== 'granted') return;
+    navigator.serviceWorker.ready
+      .then(reg => reg.pushManager.getSubscription())
+      .then(sub => setSubscribed(sub !== null))
+      .catch(() => {/* ignore */});
+  }, [notifPermission]);
+
+  async function subscribe(): Promise<boolean> {
+    if (!isPushSupported || !VAPID_PUBLIC_KEY || !userId) return false;
+    if (!isSupabaseConfigured || !supabase) return false;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8(VAPID_PUBLIC_KEY) as unknown as ArrayBuffer,
+      });
+
+      const json = sub.toJSON() as { endpoint: string; keys?: { p256dh: string; auth: string } };
+      if (!json.keys) return false;
+
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      await supabase.from('push_subscriptions').upsert({
+        user_id:  userId,
+        endpoint: json.endpoint,
+        p256dh:   json.keys.p256dh,
+        auth:     json.keys.auth,
+        timezone,
+      }, { onConflict: 'endpoint' });
+
+      setSubscribed(true);
+      return true;
+    } catch (err) {
+      console.error('[push] subscribe failed:', err);
+      return false;
+    }
+  }
+
+  return { subscribed, isPushSupported, subscribe };
+}

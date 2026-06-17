@@ -14,6 +14,8 @@ import { useReminder } from '../hooks/useReminder';
 import { useStreak } from '../hooks/useStreak';
 import { useNotificationPrefs } from '../hooks/useNotificationPrefs';
 import { useAutoLogPref } from '../hooks/useAutoLogPref';
+import { usePushSubscription } from '../hooks/usePushSubscription';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { UserProfile } from '../types';
 import type { usePlan } from '../hooks/usePlan';
 import type { useJournal } from '../hooks/useJournal';
@@ -42,6 +44,23 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
 
   const reminder = useReminder(profile, totalMl, effectiveGoalMl, notifPrefs.disabledTimes, autoLogPref.enabled);
   const streak   = useStreak(totalMl, effectiveGoalMl, userId);
+  const pushSub  = usePushSubscription(userId, reminder.notifPermission);
+
+  // Auto-subscribe to Web Push when notifications are granted
+  useEffect(() => {
+    if (reminder.notifPermission === 'granted' && !pushSub.subscribed && pushSub.isPushSupported) {
+      void pushSub.subscribe();
+    }
+  }, [reminder.notifPermission, pushSub.subscribed, pushSub.isPushSupported, pushSub]);
+
+  // Keep Supabase in sync with the current week's effective goal (used by Edge Function)
+  useEffect(() => {
+    if (!userId || !isSupabaseConfigured || !supabase || effectiveGoalMl <= 0) return;
+    void supabase
+      .from('water_profiles')
+      .update({ plan_current_goal_ml: effectiveGoalMl })
+      .eq('id', userId);
+  }, [userId, effectiveGoalMl]);
 
   const pct   = effectiveGoalMl > 0 ? Math.min(100, (totalMl / effectiveGoalMl) * 100) : 0;
   const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });

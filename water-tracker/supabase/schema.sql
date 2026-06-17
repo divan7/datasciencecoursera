@@ -56,3 +56,27 @@ create policy "own journal" on water_journal
 
 create index if not exists water_journal_user
   on water_journal (user_id, created_at);
+
+-- Push subscriptions for Web Push notifications (one row per device/browser)
+create table if not exists push_subscriptions (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users on delete cascade,
+  endpoint   text not null,
+  p256dh     text not null,
+  auth       text not null,
+  timezone   text not null default 'America/Mexico_City',
+  created_at timestamptz default now(),
+  unique(endpoint)
+);
+
+alter table push_subscriptions enable row level security;
+
+create policy "own push subscriptions" on push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Migration: add plan_current_goal_ml so the Edge Function knows the weekly goal
+alter table water_profiles add column if not exists plan_current_goal_ml int default null;
+
+-- Migration: add push_subscriptions table if upgrading
+-- (The create table if not exists above handles this)
+

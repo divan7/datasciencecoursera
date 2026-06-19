@@ -22,6 +22,7 @@ interface Props {
   onRequestPermission: () => void;
   onLogPastDrink: (amountMl: number, time: string) => void;
   onToggleAutoLog: () => void;
+  onUnsubscribePush: () => void;
 }
 
 export function ReminderCard({
@@ -41,6 +42,7 @@ export function ReminderCard({
   onRequestPermission,
   onLogPastDrink,
   onToggleAutoLog,
+  onUnsubscribePush,
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -116,9 +118,16 @@ export function ReminderCard({
             )}
             {notifPermission === 'granted' && (
               <div className="flex flex-col items-end gap-1.5">
-                <div className="flex items-center gap-1 text-xs text-emerald-400">
+                <div className="flex items-center gap-1.5 text-xs text-emerald-400">
                   <CheckCircle2 size={11} />
                   Alertas activas
+                  <button
+                    onClick={onUnsubscribePush}
+                    title="Desactivar notificaciones"
+                    className="text-white/20 hover:text-red-400 transition-colors ml-0.5"
+                  >
+                    <X size={11} />
+                  </button>
                 </div>
                 <button
                   onClick={onToggleAutoLog}

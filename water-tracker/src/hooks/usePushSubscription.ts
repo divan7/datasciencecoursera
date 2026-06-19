@@ -55,5 +55,23 @@ export function usePushSubscription(userId: string | null, notifPermission: Noti
     }
   }
 
-  return { subscribed, isPushSupported, subscribe };
+  async function unsubscribe(): Promise<void> {
+    if (!isPushSupported) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        const endpoint = sub.endpoint;
+        await sub.unsubscribe();
+        if (isSupabaseConfigured && supabase) {
+          await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+        }
+      }
+      setSubscribed(false);
+    } catch (err) {
+      console.error('[push] unsubscribe failed:', err);
+    }
+  }
+
+  return { subscribed, isPushSupported, subscribe, unsubscribe };
 }

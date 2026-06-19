@@ -24,32 +24,37 @@ function emptyStreak(): StreakData {
 }
 
 export function useStreak(totalMl: number, goalMl: number, userId: string | null) {
-  const [data, setData] = useState<StreakData>(() => {
-    try {
-      const key = streakKey(userId);
-      const scoped = localStorage.getItem(key);
-      if (scoped) return JSON.parse(scoped) as StreakData;
-      // Migrate from legacy unscoped key
-      const legacy = localStorage.getItem(LEGACY_KEY);
-      if (legacy) {
+  const [data, setData] = useState<StreakData>(emptyStreak);
+
+  // Track which userId we've already loaded so we reload when userId changes (null → real ID)
+  const loadedForRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (loadedForRef.current === userId) return;
+    loadedForRef.current = userId;
+
+    const key = streakKey(userId);
+
+    // 1. Scoped localStorage key
+    const scoped = localStorage.getItem(key);
+    if (scoped) {
+      try { setData(JSON.parse(scoped) as StreakData); } catch { /* ignore */ }
+      return;
+    }
+
+    // 2. Migrate from legacy unscoped key
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      try {
         const parsed = JSON.parse(legacy) as StreakData;
         localStorage.setItem(key, legacy);
-        return parsed;
-      }
-    } catch { /* ignore */ }
-    return emptyStreak();
-  });
+        setData(parsed);
+      } catch { /* ignore */ }
+      return;
+    }
 
-  const syncedRef = useRef(false);
-
-  // On login: load from Supabase if localStorage has no data for this userId
-  useEffect(() => {
+    // 3. Fetch from Supabase (only when userId is known)
     if (!userId || !isSupabaseConfigured || !supabase) return;
-    if (syncedRef.current) return;
-    const key = streakKey(userId);
-    if (localStorage.getItem(key)) { syncedRef.current = true; return; }
-
-    syncedRef.current = true;
     supabase
       .from('water_profiles')
       .select('streak_data')

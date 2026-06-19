@@ -92,7 +92,7 @@ export function IntakeTimeline({
               </span>
 
               {/* Actions */}
-              {done && log && i === completedGlasses - 1 ? (
+              {done && log ? (
                 <button
                   onClick={() => onRemove(log.id)}
                   className="p-1 text-white/25 hover:text-red-400 transition-colors"

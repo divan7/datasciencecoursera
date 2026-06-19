@@ -175,6 +175,7 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
           onLogPastDrink={handleLogPastDrink}
           autoLogEnabled={autoLogPref.enabled}
           onToggleAutoLog={autoLogPref.toggle}
+          onUnsubscribePush={pushSub.unsubscribe}
         />
 
         {/* Quick add */}

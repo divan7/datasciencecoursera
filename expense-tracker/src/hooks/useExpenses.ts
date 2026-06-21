@@ -9,12 +9,15 @@ export function useExpenses(spaceId: string) {
     spaceId ? loadExpenses(spaceId) : []
   );
   const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
   const clearErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track the spaceId that owns the in-flight fetch so stale responses are discarded
+  const fetchingForSpace = useRef<string>('');
 
   const reportSyncError = useCallback((msg: string) => {
     setCloudSyncError(msg);
     if (clearErrorTimer.current) clearTimeout(clearErrorTimer.current);
-    clearErrorTimer.current = setTimeout(() => setCloudSyncError(null), 8000);
+    clearErrorTimer.current = setTimeout(() => setCloudSyncError(null), 12000);
   }, []);
 
   const clearCloudSyncError = useCallback(() => {
@@ -22,40 +25,96 @@ export function useExpenses(spaceId: string) {
     setCloudSyncError(null);
   }, []);
 
+  // Core sync: fetch from Supabase and merge with local cache.
+  // Returns true on success, false on failure.
+  const syncFromCloud = useCallback(async (sid: string): Promise<boolean> => {
+    if (!isSupabaseConfigured || !sid) return false;
+    try {
+      const remote = await expensesDb.list(sid);
+
+      // Discard response if the user switched spaces while we were waiting
+      if (fetchingForSpace.current !== sid) return false;
+
+      const freshLocal = loadExpenses(sid);
+      const remoteIds = new Set(remote.map((e) => e.id));
+      const localOnly = freshLocal.filter((e) => !remoteIds.has(e.id));
+
+      // Re-upload any local-only expenses to Supabase (non-destructive recovery)
+      if (localOnly.length > 0) {
+        expensesDb.bulkCreate(sid, localOnly)
+          .catch((err) => console.error('No se pudieron re-sincronizar gastos locales:', err));
+      }
+
+      const merged = [...remote, ...localOnly]
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
+      // Only update state if we're still the active space
+      if (fetchingForSpace.current === sid) {
+        setExpenses(merged);
+        saveExpenses(merged, sid);
+      }
+      return true;
+    } catch (err) {
+      console.error('[useExpenses] No se pudo leer gastos remotos:', err);
+      return false;
+    }
+  }, []);
+
   useEffect(() => {
     if (!spaceId) return;
-    // Fast: local cache
+
+    // Show local cache immediately (fast path)
     const local = loadExpenses(spaceId);
     setExpenses(local);
+    setCloudSyncError(null);
 
-    // Slow: sync from Supabase — NON-DESTRUCTIVE merge.
-    // Never overwrite local data with an empty/partial remote result, and
-    // re-upload any local-only expenses that never reached the cloud.
-    if (isSupabaseConfigured) {
-      expensesDb.list(spaceId).then((remote) => {
-        // Re-read localStorage here (not the stale `local` snapshot from mount time)
-        // so any expenses added between mount and this callback are included.
-        const freshLocal = loadExpenses(spaceId);
-        const remoteIds = new Set(remote.map((e) => e.id));
-        const localOnly = freshLocal.filter((e) => !remoteIds.has(e.id));
+    if (!isSupabaseConfigured) return;
 
-        // Recover/back up local-only expenses to Supabase
-        if (localOnly.length > 0) {
-          expensesDb.bulkCreate(spaceId, localOnly)
-            .catch((err) => console.error('No se pudieron re-sincronizar gastos locales:', err));
-        }
+    // Mark this space as the one we're fetching for
+    fetchingForSpace.current = spaceId;
+    setSyncLoading(true);
 
-        // Union by id: keep everything (remote + local-only)
-        const merged = [...remote, ...localOnly]
-          .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-        setExpenses(merged);
-        saveExpenses(merged, spaceId);
-      }).catch((err) => {
-        // On any failure, keep the local data we already showed
-        console.error('No se pudo leer gastos remotos, se mantienen los locales:', err);
-      });
-    }
-  }, [spaceId]);
+    syncFromCloud(spaceId).then((ok) => {
+      if (fetchingForSpace.current !== spaceId) return; // switched away
+      if (!ok) {
+        // First attempt failed — retry once after 3 s (handles post-login RLS propagation delay)
+        setTimeout(() => {
+          if (fetchingForSpace.current !== spaceId) return;
+          syncFromCloud(spaceId).then((retryOk) => {
+            if (fetchingForSpace.current !== spaceId) return;
+            if (!retryOk) {
+              reportSyncError(
+                'No se pudieron cargar los movimientos de la nube. ' +
+                'Verifica tu conexión y toca aquí para reintentar.'
+              );
+            }
+            setSyncLoading(false);
+          });
+        }, 3000);
+      } else {
+        setSyncLoading(false);
+      }
+    });
+
+    return () => {
+      // When spaceId changes, mark the old fetch as stale
+      fetchingForSpace.current = '';
+    };
+  }, [spaceId, syncFromCloud]);
+
+  // Manual retry exposed to UI
+  const retrySync = useCallback(() => {
+    if (!spaceId || !isSupabaseConfigured) return;
+    clearCloudSyncError();
+    fetchingForSpace.current = spaceId;
+    setSyncLoading(true);
+    syncFromCloud(spaceId).then((ok) => {
+      setSyncLoading(false);
+      if (!ok) {
+        reportSyncError('El reintento falló. Verifica tu conexión a internet.');
+      }
+    });
+  }, [spaceId, syncFromCloud, clearCloudSyncError, reportSyncError]);
 
   const addExpense = useCallback((data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => {
     const now = new Date().toISOString();
@@ -132,5 +191,7 @@ export function useExpenses(spaceId: string) {
     availableMonths,
     cloudSyncError,
     clearCloudSyncError,
+    syncLoading,
+    retrySync,
   };
 }

@@ -146,7 +146,7 @@ export default function App() {
   }, []);
 
   // ── Expense hooks ─────────────────────────────────────────────
-  const { expenses, addExpense, updateExpense, deleteExpense, cloudSyncError, clearCloudSyncError } = useExpenses(spaceId);
+  const { expenses, addExpense, updateExpense, deleteExpense, cloudSyncError, clearCloudSyncError, syncLoading, retrySync } = useExpenses(spaceId);
   const {
     templates, checks,
     addTemplate, updateTemplate, deleteTemplate,
@@ -685,7 +685,19 @@ export default function App() {
         <div className="fixed top-0 left-0 right-0 z-50 bg-amber-50 border-b border-amber-300 px-4 py-2 flex items-start gap-2 text-sm text-amber-800">
           <span className="mt-0.5 shrink-0">⚠️</span>
           <span className="flex-1">{cloudSyncError ?? fixedSyncError}</span>
-          <button onClick={clearCloudSyncError} className="shrink-0 font-medium underline">Cerrar</button>
+          {cloudSyncError && (
+            <button onClick={retrySync} className="shrink-0 font-bold text-amber-900 underline">Reintentar</button>
+          )}
+          <button onClick={clearCloudSyncError} className="shrink-0 font-medium underline ml-2">✕</button>
+        </div>
+      )}
+      {syncLoading && expenses.length === 0 && !cloudSyncError && (
+        <div className="fixed top-0 left-0 right-0 z-40 bg-sky-50 border-b border-sky-200 px-4 py-2 flex items-center gap-2 text-sm text-sky-700">
+          <svg className="animate-spin h-4 w-4 text-sky-500 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+          </svg>
+          <span>Cargando movimientos desde la nube…</span>
         </div>
       )}
       {saveToast && (

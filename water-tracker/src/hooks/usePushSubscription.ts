@@ -16,14 +16,29 @@ const isPushSupported = typeof window !== 'undefined'
 export function usePushSubscription(userId: string | null, notifPermission: NotificationPermission) {
   const [subscribed, setSubscribed] = useState(false);
 
-  // Check if already subscribed on mount / permission change
+  // On mount / permission change: check browser subscription and re-upsert to Supabase.
+  // This re-registers endpoints that the push service invalidated and the Edge Function deleted.
   useEffect(() => {
     if (!isPushSupported || notifPermission !== 'granted') return;
     navigator.serviceWorker.ready
       .then(reg => reg.pushManager.getSubscription())
-      .then(sub => setSubscribed(sub !== null))
+      .then(async sub => {
+        if (!sub) { setSubscribed(false); return; }
+        setSubscribed(true);
+        if (!userId || !isSupabaseConfigured || !supabase) return;
+        const json = sub.toJSON() as { endpoint: string; keys?: { p256dh: string; auth: string } };
+        if (!json.keys) return;
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        await supabase.from('push_subscriptions').upsert({
+          user_id: userId,
+          endpoint: json.endpoint,
+          p256dh:   json.keys.p256dh,
+          auth:     json.keys.auth,
+          timezone,
+        }, { onConflict: 'endpoint' });
+      })
       .catch(() => {/* ignore */});
-  }, [notifPermission]);
+  }, [notifPermission, userId]);
 
   async function subscribe(): Promise<boolean> {
     if (!isPushSupported || !VAPID_PUBLIC_KEY || !userId) return false;

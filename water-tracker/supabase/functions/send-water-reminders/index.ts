@@ -180,25 +180,33 @@ const supabase = createClient(
 Deno.serve(async () => {
   const utcNow = new Date();
 
-  // Load all subscriptions with their user's profile
-  const { data: subs, error } = await supabase
+  // Load all subscriptions
+  const { data: subs, error: subsError } = await supabase
     .from('push_subscriptions')
-    .select('*, water_profiles(*)');
+    .select('*');
 
-  if (error || !subs?.length) {
-    return new Response(JSON.stringify({ sent: 0, error: error?.message }), { status: 200 });
+  if (subsError || !subs?.length) {
+    return new Response(JSON.stringify({ sent: 0, error: subsError?.message }), { status: 200 });
   }
+
+  // Load profiles for all subscription users in one query
+  const userIds = [...new Set(subs.map((s: { user_id: string }) => s.user_id))];
+  const { data: profiles } = await supabase
+    .from('water_profiles')
+    .select('id, glass_size_ml, daily_goal_ml, plan_current_goal_ml, wake_time, sleep_time')
+    .in('id', userIds);
+
+  const profileMap = new Map(
+    (profiles ?? []).map((p: {
+      id: string; glass_size_ml: number; daily_goal_ml: number;
+      plan_current_goal_ml: number | null; wake_time: string; sleep_time: string;
+    }) => [p.id, p])
+  );
 
   let sent = 0;
 
   for (const sub of subs) {
-    const profile = sub.water_profiles as {
-      glass_size_ml: number;
-      daily_goal_ml: number;
-      plan_current_goal_ml: number | null;
-      wake_time: string;
-      sleep_time: string;
-    } | null;
+    const profile = profileMap.get(sub.user_id) ?? null;
     if (!profile) continue;
 
     // Convert UTC now to user's local time

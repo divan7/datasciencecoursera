@@ -133,9 +133,9 @@ export function ReminderCard({
                   <button
                     onClick={onUnsubscribePush}
                     title="Desactivar notificaciones"
-                    className="text-white/20 hover:text-red-400 transition-colors"
+                    className="text-white/40 hover:text-red-400 transition-colors"
                   >
-                    <X size={11} />
+                    <X size={13} />
                   </button>
                 </div>
                 <button

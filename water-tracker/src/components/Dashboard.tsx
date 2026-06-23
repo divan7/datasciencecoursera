@@ -60,13 +60,15 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
   }, []);
 
   // Keep Supabase in sync with the current week's effective goal (used by Edge Function)
+  // Gate on plan.planReady so we don't overwrite with the fallback daily_goal_ml on first render
   useEffect(() => {
     if (!userId || !isSupabaseConfigured || !supabase || effectiveGoalMl <= 0) return;
+    if (!plan.planReady) return;
     void supabase
       .from('water_profiles')
       .update({ plan_current_goal_ml: effectiveGoalMl })
       .eq('id', userId);
-  }, [userId, effectiveGoalMl]);
+  }, [userId, effectiveGoalMl, plan.planReady]);
 
   const pct   = effectiveGoalMl > 0 ? Math.min(100, (totalMl / effectiveGoalMl) * 100) : 0;
   const today = format(new Date(), "EEEE, d 'de' MMMM", { locale: es });

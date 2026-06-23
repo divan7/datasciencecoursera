@@ -104,9 +104,11 @@ Deno.serve(async (req) => {
   );
 
   let sent = 0;
+  console.log('[push] total subs:', subs.length, '| force:', force);
 
   for (const sub of subs) {
     const profile = profileMap.get(sub.user_id) ?? null;
+    console.log('[push] sub id:', sub.id, 'user:', sub.user_id.slice(0,8), 'tz:', sub.timezone, 'profile?', !!profile);
     if (!profile) continue;
 
     const localMin = localMinutes(utcNow, sub.timezone);
@@ -136,9 +138,10 @@ Deno.serve(async (req) => {
     });
 
     const status = await sendPush({ endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
-    console.log('[push] status:', status, 'endpoint:', sub.endpoint.slice(-30));
+    console.log('[push] status:', status, 'user:', sub.user_id.slice(0,8), 'endpoint:', sub.endpoint.slice(-50), 'tz:', sub.timezone);
 
     if (status === 410 || status === 404) {
+      console.log('[push] deleting stale subscription:', sub.id);
       await supabase.from('push_subscriptions').delete().eq('id', sub.id);
     } else if (status < 300) {
       sent++;

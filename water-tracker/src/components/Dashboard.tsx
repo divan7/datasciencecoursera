@@ -47,13 +47,6 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
   const streak   = useStreak(totalMl, effectiveGoalMl, userId);
   const pushSub  = usePushSubscription(userId, reminder.notifPermission);
 
-  // Auto-subscribe to Web Push when notifications are granted
-  useEffect(() => {
-    if (reminder.notifPermission === 'granted' && !pushSub.subscribed && pushSub.isPushSupported) {
-      void pushSub.subscribe();
-    }
-  }, [reminder.notifPermission, pushSub.subscribed, pushSub.isPushSupported, pushSub]);
-
   // Receive in-app reminders from SW when app is in foreground
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
@@ -227,7 +220,9 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
             wakeTime: profile.wake_time,
             sleepTime: profile.sleep_time,
           } : null}
+          pushSubscribed={pushSub.subscribed}
           onRequestPermission={reminder.requestPermission}
+          onSubscribePush={pushSub.subscribe}
           onLogPastDrink={handleLogPastDrink}
           autoLogEnabled={autoLogPref.enabled}
           onToggleAutoLog={autoLogPref.toggle}

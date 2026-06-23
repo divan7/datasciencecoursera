@@ -18,8 +18,10 @@ interface Props {
   glassSizeMl: number;
   schedule: string[];
   calendarPlan: CalendarPlanParams | null;
+  pushSubscribed: boolean;
   autoLogEnabled: boolean;
   onRequestPermission: () => void;
+  onSubscribePush: () => Promise<boolean>;
   onLogPastDrink: (amountMl: number, time: string) => void;
   onToggleAutoLog: () => void;
   onUnsubscribePush: () => void;
@@ -39,8 +41,10 @@ export function ReminderCard({
   glassSizeMl,
   schedule,
   calendarPlan,
+  pushSubscribed,
   autoLogEnabled,
   onRequestPermission,
+  onSubscribePush,
   onLogPastDrink,
   onToggleAutoLog,
   onUnsubscribePush,
@@ -118,7 +122,16 @@ export function ReminderCard({
                 Activar alertas
               </button>
             )}
-            {notifPermission === 'granted' && (
+            {notifPermission === 'granted' && !pushSubscribed && (
+              <button
+                onClick={() => void onSubscribePush()}
+                className="flex items-center gap-1 text-xs bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 hover:text-white border border-sky-500/25 rounded-lg px-2 py-1 transition-colors"
+              >
+                <Bell size={11} />
+                Activar push
+              </button>
+            )}
+            {notifPermission === 'granted' && pushSubscribed && (
               <div className="flex flex-col items-end gap-1.5">
                 <div className="flex items-center gap-1.5 text-xs text-emerald-400">
                   <CheckCircle2 size={11} />

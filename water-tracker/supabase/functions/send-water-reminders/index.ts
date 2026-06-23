@@ -77,8 +77,10 @@ function localMinutes(utc: Date, timezone: string): number {
   }
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
   const utcNow = new Date();
+  let force = false;
+  try { const body = await req.json(); force = body.force === true; } catch { /* ignore */ }
 
   const { data: subs, error: subsError } = await supabase
     .from('push_subscriptions')
@@ -111,8 +113,8 @@ Deno.serve(async () => {
     const goalMl   = profile.plan_current_goal_ml ?? profile.daily_goal_ml;
     const schedule = buildSchedule(goalMl, profile.glass_size_ml, profile.wake_time, profile.sleep_time);
 
-    const slotIdx = schedule.findIndex(t => timeToMinutes(t) === localMin);
-    if (slotIdx === -1) continue;
+    const slotIdx = force ? 0 : schedule.findIndex(t => timeToMinutes(t) === localMin);
+    if (!force && slotIdx === -1) continue;
 
     const windowStart = new Date(utcNow.getTime() - 13 * 3_600_000).toISOString();
     const windowEnd   = new Date(utcNow.getTime() + 13 * 3_600_000).toISOString();

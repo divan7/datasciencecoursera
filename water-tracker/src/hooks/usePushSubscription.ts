@@ -62,6 +62,13 @@ export function usePushSubscription(userId: string | null, notifPermission: Noti
         timezone,
       }, { onConflict: 'endpoint' });
 
+      // Keep only this subscription — delete any stale ones for the same user
+      await supabase
+        .from('push_subscriptions')
+        .delete()
+        .eq('user_id', userId)
+        .neq('endpoint', json.endpoint);
+
       setSubscribed(true);
       return true;
     } catch (err) {

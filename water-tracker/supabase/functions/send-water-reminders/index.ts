@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
 
     const totalMl          = intake?.reduce((s: number, l: { amount_ml: number }) => s + l.amount_ml, 0) ?? 0;
     const completedGlasses = Math.floor(totalMl / profile.glass_size_ml);
-    if (completedGlasses > slotIdx) continue;
+    if (!force && completedGlasses > slotIdx) continue;
 
     const payload = JSON.stringify({
       title: '💧 Hora de tomar agua',

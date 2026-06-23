@@ -57,17 +57,28 @@ self.addEventListener('push', (event) => {
   catch { return; }
 
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
-      tag: `water-${data.slot ?? 'now'}`,
-      data: { amountMl: data.amountMl, slot: data.slot, autoLog: data.autoLog },
-      actions: [
-        { action: 'log',     title: '✅ Ya tomé' },
-        { action: 'dismiss', title: 'Después' },
-      ],
-    } as NotificationOptions),
+    (async () => {
+      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const appOpen = windowClients.some((c) => (c as WindowClient).visibilityState === 'visible');
+
+      if (appOpen) {
+        // App is in foreground — relay to app UI instead of system notification
+        windowClients.forEach((c) => c.postMessage({ type: 'WATER_REMINDER', data }));
+        return;
+      }
+
+      await self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        tag: `water-${data.slot ?? 'now'}`,
+        data: { amountMl: data.amountMl, slot: data.slot, autoLog: data.autoLog },
+        actions: [
+          { action: 'log',     title: '✅ Ya tomé' },
+          { action: 'dismiss', title: 'Después' },
+        ],
+      } as NotificationOptions);
+    })()
   );
 });
 

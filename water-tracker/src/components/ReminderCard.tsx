@@ -23,6 +23,7 @@ interface Props {
   onLogPastDrink: (amountMl: number, time: string) => void;
   onToggleAutoLog: () => void;
   onUnsubscribePush: () => void;
+  onTestNotification: () => void;
 }
 
 export function ReminderCard({
@@ -43,6 +44,7 @@ export function ReminderCard({
   onLogPastDrink,
   onToggleAutoLog,
   onUnsubscribePush,
+  onTestNotification,
 }: Props) {
   const [showCatchUp, setShowCatchUp] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -122,9 +124,16 @@ export function ReminderCard({
                   <CheckCircle2 size={11} />
                   Alertas activas
                   <button
+                    onClick={onTestNotification}
+                    title="Probar notificación"
+                    className="text-white/20 hover:text-sky-400 transition-colors ml-0.5 text-[10px]"
+                  >
+                    Probar
+                  </button>
+                  <button
                     onClick={onUnsubscribePush}
                     title="Desactivar notificaciones"
-                    className="text-white/20 hover:text-red-400 transition-colors ml-0.5"
+                    className="text-white/20 hover:text-red-400 transition-colors"
                   >
                     <X size={11} />
                   </button>

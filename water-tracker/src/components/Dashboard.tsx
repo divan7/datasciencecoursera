@@ -35,6 +35,7 @@ interface Props {
 export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLogout }: Props) {
   const [showJournal, setShowJournal] = useState(false);
   const [autoLogToast, setAutoLogToast] = useState(false);
+  const [inAppReminder, setInAppReminder] = useState<{ amountMl: number; slot: string } | null>(null);
   const { logs, totalMl, addIntake, removeIntake } = useIntake(userId);
   const notifPrefs   = useNotificationPrefs(userId);
   const autoLogPref  = useAutoLogPref(userId);
@@ -52,6 +53,18 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
       void pushSub.subscribe();
     }
   }, [reminder.notifPermission, pushSub.subscribed, pushSub.isPushSupported, pushSub]);
+
+  // Receive in-app reminders from SW when app is in foreground
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    function onMessage(event: MessageEvent) {
+      if (event.data?.type !== 'WATER_REMINDER') return;
+      const d = event.data.data as { amountMl?: number; slot?: string };
+      if (d.amountMl) setInAppReminder({ amountMl: d.amountMl, slot: d.slot ?? '' });
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
 
   // Keep Supabase in sync with the current week's effective goal (used by Edge Function)
   useEffect(() => {
@@ -88,6 +101,20 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function testPushNotification() {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification('💧 Notificación de prueba', {
+        body: 'Si ves esto, las alertas funcionan correctamente en tu dispositivo.',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        tag: 'aquavital-test',
+      });
+    } catch (err) {
+      console.error('[push] test failed:', err);
+    }
+  }
+
   async function handleLogPastDrink(amountMl: number, timeStr: string) {
     const [h, m] = timeStr.split(':').map(Number);
     const past = new Date();
@@ -103,6 +130,35 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
       {autoLogToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-white text-sm font-semibold px-5 py-2.5 rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center gap-2 animate-pulse">
           💧 Vaso registrado automáticamente
+        </div>
+      )}
+
+      {/* In-app reminder (when push arrives while app is open) */}
+      {inAppReminder && (
+        <div className="fixed bottom-5 left-4 right-4 z-50 bg-sky-600 text-white rounded-2xl p-4 shadow-2xl shadow-sky-900/60 flex items-center justify-between gap-3 animate-pulse">
+          <div>
+            <p className="font-semibold text-sm">💧 Hora de tomar agua</p>
+            <p className="text-sky-100 text-xs">{inAppReminder.amountMl} ml · {inAppReminder.slot}</p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button
+              onClick={() => {
+                void addIntake(inAppReminder.amountMl);
+                setAutoLogToast(true);
+                setTimeout(() => setAutoLogToast(false), 3500);
+                setInAppReminder(null);
+              }}
+              className="bg-white text-sky-700 text-sm font-bold px-3 py-1.5 rounded-xl"
+            >
+              Ya tomé ✅
+            </button>
+            <button
+              onClick={() => setInAppReminder(null)}
+              className="text-sky-100/70 hover:text-white text-sm px-2 py-1.5 transition-colors"
+            >
+              Después
+            </button>
+          </div>
         </div>
       )}
 
@@ -176,6 +232,7 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
           autoLogEnabled={autoLogPref.enabled}
           onToggleAutoLog={autoLogPref.toggle}
           onUnsubscribePush={pushSub.unsubscribe}
+          onTestNotification={testPushNotification}
         />
 
         {/* Quick add */}

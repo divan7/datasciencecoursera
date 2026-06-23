@@ -25,24 +25,24 @@ function emptyStreak(): StreakData {
 
 export function useStreak(totalMl: number, goalMl: number, userId: string | null) {
   const [data, setData] = useState<StreakData>(emptyStreak);
+  const [streakLoaded, setStreakLoaded] = useState(false);
 
-  // Track which userId we've already loaded so we reload when userId changes (null → real ID)
   const loadedForRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     if (loadedForRef.current === userId) return;
     loadedForRef.current = userId;
+    setStreakLoaded(false);
 
     const key = streakKey(userId);
 
-    // 1. Scoped localStorage key
     const scoped = localStorage.getItem(key);
     if (scoped) {
       try { setData(JSON.parse(scoped) as StreakData); } catch { /* ignore */ }
+      setStreakLoaded(true);
       return;
     }
 
-    // 2. Migrate from legacy unscoped key
     const legacy = localStorage.getItem(LEGACY_KEY);
     if (legacy) {
       try {
@@ -50,11 +50,15 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         localStorage.setItem(key, legacy);
         setData(parsed);
       } catch { /* ignore */ }
+      setStreakLoaded(true);
       return;
     }
 
-    // 3. Fetch from Supabase (only when userId is known)
-    if (!userId || !isSupabaseConfigured || !supabase) return;
+    if (!userId || !isSupabaseConfigured || !supabase) {
+      setStreakLoaded(true);
+      return;
+    }
+
     supabase
       .from('water_profiles')
       .select('streak_data')
@@ -66,12 +70,14 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
           setData(remote);
           localStorage.setItem(key, JSON.stringify(remote));
         }
+        setStreakLoaded(true);
       });
   }, [userId]);
 
   const today = todayDate();
 
   useEffect(() => {
+    if (!streakLoaded) return;
     if (goalMl <= 0 || totalMl < goalMl) return;
     if (data.lastCompletedDate === today) return;
 
@@ -96,7 +102,7 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         .eq('id', userId)
         .then(() => { /* fire-and-forget */ });
     }
-  }, [totalMl, goalMl, today, data, userId]);
+  }, [totalMl, goalMl, today, data, userId, streakLoaded]);
 
   const streakBroken =
     data.lastCompletedDate !== null &&

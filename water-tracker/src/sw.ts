@@ -101,9 +101,23 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  // "✅ Tomé" button or tap on notification body → open with log params
-  const url = `/?log=${data.amountMl}&slot=${encodeURIComponent(data.slot ?? '')}`;
-  event.waitUntil(focusOrOpen(url));
+  // "✅ Ya tomé" or tap on notification body
+  event.waitUntil(
+    (async () => {
+      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (windowClients.length > 0) {
+        // App already open: postMessage so the running React app handles the log
+        const client = windowClients[0] as WindowClient;
+        await client.focus();
+        client.postMessage({ type: 'AUTO_LOG', amountMl: data.amountMl, slot: data.slot });
+      } else {
+        // App closed: open with URL params, mount effect will log on load
+        await self.clients.openWindow(
+          `/?log=${data.amountMl}&slot=${encodeURIComponent(data.slot ?? '')}`,
+        );
+      }
+    })(),
+  );
 });
 
 async function focusOrOpen(url: string): Promise<void> {

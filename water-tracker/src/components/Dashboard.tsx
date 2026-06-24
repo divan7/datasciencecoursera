@@ -47,13 +47,25 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
   const streak   = useStreak(totalMl, effectiveGoalMl, userId);
   const pushSub  = usePushSubscription(userId, reminder.notifPermission);
 
-  // Receive in-app reminders from SW when app is in foreground
+  // Keep addIntake stable in SW message handler (avoids stale closure)
+  const addIntakeRef = useRef(addIntake);
+  useEffect(() => { addIntakeRef.current = addIntake; }, [addIntake]);
+
+  // Receive messages from SW: foreground reminders and notification tap auto-log
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     function onMessage(event: MessageEvent) {
-      if (event.data?.type !== 'WATER_REMINDER') return;
-      const d = event.data.data as { amountMl?: number; slot?: string };
-      if (d.amountMl) setInAppReminder({ amountMl: d.amountMl, slot: d.slot ?? '' });
+      if (event.data?.type === 'WATER_REMINDER') {
+        const d = event.data.data as { amountMl?: number; slot?: string };
+        if (d.amountMl) setInAppReminder({ amountMl: d.amountMl, slot: d.slot ?? '' });
+      } else if (event.data?.type === 'AUTO_LOG') {
+        const d = event.data as { amountMl?: number };
+        if (d.amountMl) {
+          void addIntakeRef.current(d.amountMl);
+          setAutoLogToast(true);
+          setTimeout(() => setAutoLogToast(false), 3500);
+        }
+      }
     }
     navigator.serviceWorker.addEventListener('message', onMessage);
     return () => navigator.serviceWorker.removeEventListener('message', onMessage);

@@ -7,20 +7,36 @@ function todayKey() {
   return `aquavital-intake-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
+function loadFromStorage(key: string): IntakeLog[] {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as IntakeLog[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function useIntake(userId: string | null) {
-  const [logs, setLogs] = useState<IntakeLog[]>(() => {
-    try {
-      const stored = localStorage.getItem(todayKey());
-      return stored ? (JSON.parse(stored) as IntakeLog[]) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [dateKey, setDateKey] = useState(todayKey);
+  const [logs, setLogs] = useState<IntakeLog[]>(() => loadFromStorage(todayKey()));
 
   const persist = useCallback((next: IntakeLog[]) => {
     setLogs(next);
     localStorage.setItem(todayKey(), JSON.stringify(next));
   }, []);
+
+  // Reset logs when the day changes (app left open overnight)
+  useEffect(() => {
+    function onVisibility() {
+      const newKey = todayKey();
+      if (document.visibilityState === 'visible' && newKey !== dateKey) {
+        setDateKey(newKey);
+        setLogs(loadFromStorage(newKey));
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [dateKey]);
 
   useEffect(() => {
     if (!userId || !isSupabaseConfigured || !supabase) return;
@@ -39,7 +55,7 @@ export function useIntake(userId: string | null) {
       .then(({ data }) => {
         if (data) persist(data as IntakeLog[]);
       });
-  }, [userId, persist]);
+  }, [userId, dateKey, persist]);
 
   async function addIntake(amountMl: number, loggedAt?: Date) {
     const timestamp = (loggedAt ?? new Date()).toISOString();

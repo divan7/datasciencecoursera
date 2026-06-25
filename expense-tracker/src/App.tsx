@@ -23,6 +23,7 @@ import { ChangePassword } from './components/ChangePassword';
 import { PWAUpdateBanner } from './components/PWAUpdateBanner';
 import { FiscalProfileSection } from './components/FiscalProfileSection';
 import { FiscalSummary } from './components/FiscalSummary';
+import { FixedExpenseBulkImport } from './components/FixedExpenseBulkImport';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAuth } from './hooks/useAuth';
 import { useExpenses } from './hooks/useExpenses';
@@ -858,6 +859,13 @@ export default function App() {
               onDelete={deleteTemplate}
               members={currentSpace.members}
             />
+            <div className="border-t border-gray-200 pt-5">
+              <FixedExpenseBulkImport
+                members={currentSpace.members}
+                apiKey={settings.anthropicApiKey}
+                onImport={(tpls) => { tpls.forEach((t) => addTemplate(t)); }}
+              />
+            </div>
             <div className="border-t border-gray-200 pt-5">
               <SpaceSettings
                 spaces={spaces}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, Save, Bell, Users, CalendarX } from 'lucide-react';
 import type { Expense, Frequency } from '../types/expense';
 import { CATEGORIES, PAYMENT_METHODS, FREQUENCIES } from '../types/expense';
-import type { FixedExpenseTemplate, DefaultSplit } from '../types/fixedExpense';
+import type { FixedExpenseTemplate, DefaultSplit, FixedExpenseType, CreditType } from '../types/fixedExpense';
 import type { SpaceMember } from '../types/space';
 import { MEMBER_COLORS } from '../types/space';
 
@@ -29,6 +29,11 @@ export function FixedTemplateFromExpenseModal({ expense, members, onSave, onClos
   const [reminder, setReminder] = useState(false);
   const [daysBefore, setDaysBefore] = useState('3');
   const [endsAt, setEndsAt]     = useState('');
+  // Fixed expense type
+  const [fixedExpenseType, setFixedExpenseType] = useState<FixedExpenseType>('servicio');
+  const [creditType, setCreditType]             = useState<CreditType>('tarjeta_credito');
+  const [cutDay, setCutDay]                     = useState('');
+  const [paymentDueDays, setPaymentDueDays]     = useState('20');
   // Split
   const [splitEnabled, setSplitEnabled]   = useState(false);
   const [splitMode, setSplitMode]         = useState<SplitMode>('equal');
@@ -50,26 +55,43 @@ export function FixedTemplateFromExpenseModal({ expense, members, onSave, onClos
 
   const selectCls = 'w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white';
 
+  const isCreditCardType = fixedExpenseType === 'credito' && creditType === 'tarjeta_credito';
+
+  const dueDatePreview = (() => {
+    if (!isCreditCardType || !cutDay) return null;
+    let day = parseInt(cutDay) + parseInt(paymentDueDays || '20');
+    let monthOffset = 0;
+    while (day > 30) { day -= 30; monthOffset++; }
+    const label = monthOffset === 0 ? 'del mismo mes del corte'
+      : monthOffset === 1 ? 'del mes siguiente al corte'
+      : `de ${monthOffset} meses después del corte`;
+    return `📅 Fecha límite: día ${day}${monthOffset > 0 ? ' (aprox.)' : ''} ${label}`;
+  })();
+
   const handleSave = () => {
     onSave({
-      concept:            concept.trim(),
-      expectedAmount:     parseFloat(amount) || expense.amount,
-      category:           expense.category,
+      concept:                  concept.trim(),
+      expectedAmount:           parseFloat(amount) || expense.amount,
+      category:                 expense.category,
       paidBy,
-      paymentMethod:      expense.paymentMethod,
+      paymentMethod:            expense.paymentMethod,
       frequency,
-      dayOfMonth:         ['mensual', 'bimestral', 'trimestral', 'semestral', 'quincenal', 'anual'].includes(frequency) && dayOfMonth
-                            ? parseInt(dayOfMonth) : undefined,
-      dayOfWeek:          frequency === 'semanal' ? parseInt(dayOfWeek) : undefined,
-      paymentMonth:       frequency === 'anual' ? parseInt(paymentMonth) : undefined,
-      reminderEnabled:    reminder,
-      reminderDaysBefore: reminder ? parseInt(daysBefore) || 3 : undefined,
-      fixedExpenseType:   'servicio',
-      active:             true,
-      bank:               expense.bank,
-      cardLast4:          expense.cardLast4,
-      endsAt:             endsAt || undefined,
-      defaultSplit:       buildDefaultSplit(),
+      dayOfMonth:               ['mensual', 'bimestral', 'trimestral', 'semestral', 'quincenal', 'anual'].includes(frequency) && dayOfMonth
+                                  ? parseInt(dayOfMonth) : undefined,
+      dayOfWeek:                frequency === 'semanal' ? parseInt(dayOfWeek) : undefined,
+      paymentMonth:             frequency === 'anual' ? parseInt(paymentMonth) : undefined,
+      reminderEnabled:          reminder,
+      reminderDaysBefore:       reminder ? parseInt(daysBefore) || 3 : undefined,
+      fixedExpenseType,
+      creditType:               fixedExpenseType === 'credito' ? creditType : undefined,
+      isCreditCard:             isCreditCardType,
+      cutDay:                   isCreditCardType && cutDay ? parseInt(cutDay) : undefined,
+      paymentDueDaysAfterCut:   isCreditCardType ? parseInt(paymentDueDays) || 20 : undefined,
+      active:                   true,
+      bank:                     expense.bank,
+      cardLast4:                expense.cardLast4,
+      endsAt:                   endsAt || undefined,
+      defaultSplit:             buildDefaultSplit(),
     });
     onClose();
   };
@@ -136,6 +158,77 @@ export function FixedTemplateFromExpenseModal({ expense, members, onSave, onClos
               ))}
             </div>
           </div>
+
+          {/* Fixed expense type */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Tipo de gasto fijo</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setFixedExpenseType('servicio')}
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${
+                  fixedExpenseType === 'servicio'
+                    ? 'border-teal-400 bg-teal-50 text-teal-800'
+                    : 'border-gray-200 bg-white text-gray-400'
+                }`}>
+                📋 Servicio u otro
+              </button>
+              <button type="button" onClick={() => setFixedExpenseType('credito')}
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${
+                  fixedExpenseType === 'credito'
+                    ? 'border-orange-400 bg-orange-50 text-orange-800'
+                    : 'border-gray-200 bg-white text-gray-400'
+                }`}>
+                💳 Pago de crédito
+              </button>
+            </div>
+          </div>
+
+          {/* Credit type (when credito) */}
+          {fixedExpenseType === 'credito' && (
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-1.5 block">Tipo de crédito</label>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'tarjeta_credito', label: '💳 Tarjeta de crédito' },
+                  { value: 'credito_automotriz', label: '🚗 Automotriz' },
+                  { value: 'credito_hipotecario', label: '🏠 Hipotecario' },
+                  { value: 'otro_credito', label: '💼 Otro crédito' },
+                ] as { value: CreditType; label: string }[]).map((opt) => (
+                  <button key={opt.value} type="button" onClick={() => setCreditType(opt.value)}
+                    className={`py-2 px-2.5 rounded-xl border text-xs font-semibold text-left leading-tight transition-all ${
+                      creditType === opt.value
+                        ? 'border-orange-400 bg-orange-50 text-orange-800'
+                        : 'border-gray-200 bg-white text-gray-400'
+                    }`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Credit card fields */}
+          {isCreditCardType && (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-3">
+              <p className="text-xs font-semibold text-orange-800">💳 Datos de la tarjeta</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Día de corte</label>
+                  <input type="number" min="1" max="31" value={cutDay} onChange={(e) => setCutDay(e.target.value)}
+                    placeholder="Ej: 15"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Días límite pago</label>
+                  <input type="number" min="1" max="30" value={paymentDueDays} onChange={(e) => setPaymentDueDays(e.target.value)}
+                    placeholder="20"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                </div>
+              </div>
+              {dueDatePreview && (
+                <p className="text-xs text-orange-600">{dueDatePreview}</p>
+              )}
+            </div>
+          )}
 
           {/* Frequency */}
           <div>

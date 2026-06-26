@@ -84,6 +84,11 @@ PASO 3 — Desglosa los artículos:
 - Los montos de los grupos DEBEN sumar exactamente el total del ticket
 - Incluye la fecha del ticket si aparece; si no, usa hoy
 
+PASO 3b — Detecta si es gasto fijo:
+- Si el documento es una factura de servicio recurrente (internet, luz, gas, agua, teléfono, suscripción, renta, seguro, membresía, etc.) → expenseType:"fijo"
+- Para servicios sin frecuencia explícita: servicios públicos (luz/agua/gas/internet/teléfono) → frequency:"mensual"; seguros → "mensual"; suscripciones digitales → "mensual"
+- Si es un ticket de tienda/supermercado/restaurante → expenseType:"variable"
+
 PASO 4 — Devuelve ÚNICAMENTE este objeto JSON. Sin texto adicional, sin comentarios, sin markdown:
 {
   "detectedTotal": <número o null>,
@@ -300,6 +305,52 @@ Analiza la imagen y responde JSON.`;
     cfdiValidIssues: parsed.cfdiValidIssues ?? undefined,
     reasoning: parsed.reasoning ?? '',
   };
+}
+
+export async function parseFixedExpensesFromCSV(
+  csvText: string,
+  apiKey: string,
+  memberNames: string[],
+): Promise<Partial<Record<string, unknown>>[]> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const membersStr = memberNames.length > 0 ? memberNames.join(', ') : 'el primer miembro disponible';
+  const systemPrompt = `Eres un asistente de finanzas personales. Recibes texto en formato CSV (puede ser el template estándar u otro formato personalizado) con gastos fijos recurrentes.
+
+Interpreta las columnas y devuelve ÚNICAMENTE un JSON array válido. Sin texto adicional, sin markdown.
+
+Miembros disponibles para "paidBy" (usa el nombre exacto): ${membersStr}
+
+Campos del objeto de salida (todos requeridos salvo los marcados opcionales):
+- concept: string
+- expectedAmount: number
+- category: una de [alimentacion, transporte, hogar, salud, educacion, entretenimiento, ropa, servicios, seguros, suscripciones, viajes, restaurantes, mascotas, belleza, inversiones, deudas, otro]
+- paidBy: string (nombre exacto del miembro; si no se especifica usa "${memberNames[0] ?? ''}")
+- paymentMethod: efectivo | tarjeta_debito | tarjeta_credito | transferencia | otro
+- frequency: diario | semanal | quincenal | mensual | bimestral | trimestral | semestral | anual
+- dayOfMonth: number|null (1-31, día de pago)
+- bank: string|null
+- cardLast4: string|null (4 dígitos)
+- fixedExpenseType: "credito" | "servicio"
+- isCreditCard: boolean
+- cutDay: number|null (día de corte; solo si isCreditCard=true)
+- paymentDueDaysAfterCut: number|null (default 20; solo si isCreditCard=true)
+- reminderEnabled: boolean (default false)
+- reminderDaysBefore: number (default 3)
+- active: boolean (default true)
+
+Ejemplo de salida:
+[{"concept":"Netflix","expectedAmount":219,"category":"suscripciones","paidBy":"${memberNames[0] ?? 'Ivan'}","paymentMethod":"tarjeta_credito","frequency":"mensual","dayOfMonth":1,"bank":"Banamex","cardLast4":"5678","fixedExpenseType":"servicio","isCreditCard":false,"cutDay":null,"paymentDueDaysAfterCut":null,"reminderEnabled":false,"reminderDaysBefore":3,"active":true}]`;
+
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: `Interpreta este CSV y devuelve el JSON array:\n\n${csvText}` }],
+  });
+  const content = response.content[0];
+  if (content.type !== 'text') throw new Error('Respuesta inesperada del modelo');
+  const parsed = JSON.parse(stripJson(content.text));
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
 export function validatePartialExpense(data: Partial<Expense>): { valid: boolean; missing: string[] } {

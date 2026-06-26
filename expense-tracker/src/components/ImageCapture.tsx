@@ -34,6 +34,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
   const [parsedItems, setParsedItems] = useState<Partial<Expense>[] | null>(null);
   const [totalWarning, setTotalWarning] = useState<string | null>(null);
   const [transactionType, setTransactionType] = useState<'gasto' | 'ingreso'>('gasto');
+  const [detailMode, setDetailMode] = useState<'detalle' | 'total'>('detalle');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +87,26 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
         items[0].receiptImageBase64 = thumbnail;
       }
 
+      if (detailMode === 'total') {
+        // Collapse all items into a single record using the ticket total
+        const totalAmount = detectedTotal ?? items.reduce((s, it) => s + (it.amount ?? 0), 0);
+        const store = items[0]?.store;
+        const concept = store ? store : transactionType === 'ingreso' ? 'Ingreso recibido' : 'Compra';
+        const single: Partial<Expense> = {
+          amount:          totalAmount ?? 0,
+          concept,
+          category:        items[0]?.category ?? (transactionType === 'ingreso' ? 'otro_ingreso' as never : 'otro'),
+          paymentMethod:   items[0]?.paymentMethod ?? 'otro',
+          date:            items[0]?.date,
+          store,
+          transactionType,
+          expenseType:     'variable',
+          receiptImageBase64: items[0]?.receiptImageBase64,
+        };
+        setParsedItems([single]);
+        return;
+      }
+
       // Validate sum of items vs ticket total
       if (detectedTotal !== null && items.length > 0) {
         const sum = items.reduce((s, it) => s + (it.amount ?? 0), 0);
@@ -125,7 +146,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
 
   const handleClear = () => {
     setImagePreview(null); setImageBase64(''); setParsedItems(null); setError(''); setTotalWarning(null);
-    setTransactionType('gasto');
+    setTransactionType('gasto'); setDetailMode('detalle');
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
@@ -215,6 +236,38 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
                     💰 Ingreso
                   </button>
                 </div>
+              </div>
+
+              {/* Detail mode: all items vs single total */}
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
+                <p className="text-xs text-gray-500 mb-2 font-medium">¿Cómo quieres registrar este ticket?</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDetailMode('detalle')}
+                    className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all leading-tight ${
+                      detailMode === 'detalle'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    📋 Detalle por artículo
+                  </button>
+                  <button
+                    onClick={() => setDetailMode('total')}
+                    className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all leading-tight ${
+                      detailMode === 'total'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    🧾 Solo el total
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1.5">
+                  {detailMode === 'detalle'
+                    ? 'La IA desglosa cada artículo en un gasto separado.'
+                    : 'Se guarda un solo registro con el monto total del ticket.'}
+                </p>
               </div>
 
               <button onClick={handleAnalyze} disabled={loading || !imageBase64}

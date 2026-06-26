@@ -139,7 +139,7 @@ export function ReminderCard({
                   <button
                     onClick={onTestNotification}
                     title="Probar notificación"
-                    className="text-white/20 hover:text-sky-400 transition-colors ml-0.5 text-[10px]"
+                    className="text-white/50 hover:text-sky-400 transition-colors ml-0.5 text-[10px]"
                   >
                     Probar
                   </button>

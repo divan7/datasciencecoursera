@@ -36,7 +36,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
   const [detectedTotal, setDetectedTotal] = useState<number | null>(null);
   const [reconciling, setReconciling] = useState(false);
   const [transactionType, setTransactionType] = useState<'gasto' | 'ingreso'>('gasto');
-  const [detailMode, setDetailMode] = useState<'detalle' | 'total'>('detalle');
+  const [detailMode, setDetailMode] = useState<'full' | 'grouped' | 'total'>('grouped');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -83,7 +83,8 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     setDetectedTotal(null);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
-      const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today, transactionType);
+      const allowGrouping = detailMode !== 'full';
+      const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today, transactionType, allowGrouping);
       // Attach thumbnail (further compressed) to first item for storage
       if (items.length > 0) {
         const thumbnail = await compressImage(imageBase64, 900, 0.70);
@@ -172,7 +173,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
 
   const handleClear = () => {
     setImagePreview(null); setImageBase64(''); setParsedItems(null); setError(''); setTotalWarning(null);
-    setDetectedTotal(null); setTransactionType('gasto'); setDetailMode('detalle');
+    setDetectedTotal(null); setTransactionType('gasto'); setDetailMode('grouped');
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
@@ -264,35 +265,34 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
                 </div>
               </div>
 
-              {/* Detail mode: all items vs single total */}
+              {/* Detail mode: 3 options */}
               <div className="bg-gray-50 border border-gray-200 rounded-2xl p-3">
                 <p className="text-xs text-gray-500 mb-2 font-medium">¿Cómo quieres registrar este ticket?</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setDetailMode('detalle')}
-                    className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all leading-tight ${
-                      detailMode === 'detalle'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    📋 Detalle por artículo
-                  </button>
-                  <button
-                    onClick={() => setDetailMode('total')}
-                    className={`flex-1 py-2 px-2 rounded-xl text-xs font-bold transition-all leading-tight ${
-                      detailMode === 'total'
-                        ? 'bg-purple-600 text-white shadow-sm'
-                        : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    🧾 Solo el total
-                  </button>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    { id: 'full',    emoji: '📋', label: 'Artículo\npor artículo' },
+                    { id: 'grouped', emoji: '📊', label: 'Agrupado\npor categoría' },
+                    { id: 'total',   emoji: '🧾', label: 'Solo el\ntotal' },
+                  ] as { id: 'full' | 'grouped' | 'total'; emoji: string; label: string }[]).map(({ id, emoji, label }) => (
+                    <button key={id}
+                      onClick={() => setDetailMode(id)}
+                      className={`py-2 px-1 rounded-xl text-[11px] font-bold transition-all leading-tight text-center ${
+                        detailMode === id
+                          ? 'bg-purple-600 text-white shadow-sm'
+                          : 'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="block text-base leading-none mb-0.5">{emoji}</span>
+                      {label.split('\n').map((l, i) => <span key={i} className="block">{l}</span>)}
+                    </button>
+                  ))}
                 </div>
-                <p className="text-[10px] text-gray-400 mt-1.5">
-                  {detailMode === 'detalle'
-                    ? 'La IA desglosa cada artículo en un gasto separado.'
-                    : 'Se guarda un solo registro con el monto total del ticket.'}
+                <p className="text-[10px] text-gray-400 mt-2">
+                  {detailMode === 'full'
+                    ? 'Cada línea del ticket = un gasto. Más lento pero máximo detalle.'
+                    : detailMode === 'grouped'
+                    ? 'La IA agrupa artículos similares en pocos registros (recomendado).'
+                    : 'Un solo registro con el total del ticket.'}
                 </p>
               </div>
 
@@ -301,11 +301,11 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
                   transactionType === 'ingreso' ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-500 hover:bg-orange-600'
                 }`}>
                 {loading ? (
-                  <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Analizando documento...</>
+                  <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> {detailMode === 'full' ? 'Analizando artículo por artículo…' : 'Analizando documento...'}</>
                 ) : !imageBase64 ? (
                   <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Preparando imagen...</>
                 ) : (
-                  <><Sparkles size={18} /> Analizar con IA</>
+                  <><Sparkles size={18} /> {detailMode === 'full' ? 'Analizar (modo completo)' : 'Analizar con IA'}</>
                 )}
               </button>
               {imageBase64 && (

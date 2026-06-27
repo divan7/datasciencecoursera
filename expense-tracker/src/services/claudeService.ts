@@ -67,7 +67,7 @@ Ejemplo con fijo: [{"transactionType":"gasto","amount":1200,"concept":"Renta men
 Ejemplo mixto: [{"transactionType":"ingreso","amount":15000,"concept":"Salario","category":"salario","paymentMethod":"transferencia"},{"transactionType":"gasto","amount":500,"concept":"Gasolina","category":"transporte","paymentMethod":"efectivo","expenseType":"variable"}]
 Ejemplo multi-pagador: [{"transactionType":"gasto","amount":500,"concept":"Cena restaurante","category":"restaurantes","paymentMethod":"tarjeta_debito","expenseType":"variable","sharedExpense":true,"payments":[{"name":"Ivan","amount":300},{"name":"María","amount":200}]}]`;
 
-const RECEIPT_SYSTEM = `Eres un asistente de finanzas personales especializado en leer tickets de compra.
+const RECEIPT_SYSTEM_BASE = `Eres un asistente de finanzas personales especializado en leer tickets de compra.
 
 PASO 1 — Identifica el establecimiento:
 Busca el nombre del negocio/tienda en el encabezado, logo o pie del ticket (ej: Walmart, OXXO, Costco, Farmacias Guadalajara, etc.).
@@ -77,12 +77,6 @@ Si no logras leerlo claramente, usa el tipo de negocio que puedas inferir (ej: "
 PASO 2 — Localiza el TOTAL del ticket:
 Busca el monto total cobrado (puede llamarse "TOTAL", "TOTAL A PAGAR", "IMPORTE TOTAL", "GRAND TOTAL", etc.).
 Si no puedes leerlo con claridad, usa null.
-
-PASO 3 — Desglosa los artículos:
-- Si el ticket tiene ≤6 artículos, crea uno por artículo relevante
-- Si tiene muchos artículos, agrúpalos por categoría (ej: "Alimentos", "Bebidas", "Higiene", "Snacks")
-- Los montos de los grupos DEBEN sumar exactamente el total del ticket
-- Incluye la fecha del ticket si aparece; si no, usa hoy
 
 PASO 3b — Detecta si es gasto fijo:
 - Si el documento es una factura de servicio recurrente (internet, luz, gas, agua, teléfono, suscripción, renta, seguro, membresía, etc.) → expenseType:"fijo"
@@ -95,7 +89,16 @@ PASO 4 — Devuelve ÚNICAMENTE este objeto JSON. Sin texto adicional, sin comen
   "items": [...]
 }
 
-${FIELDS}
+${FIELDS}`;
+
+// Grouped mode: AI decides when to group (default for normal use)
+const RECEIPT_SYSTEM = RECEIPT_SYSTEM_BASE + `
+
+PASO 3 — Desglosa los artículos (MODO AGRUPADO):
+- Si el ticket tiene ≤6 artículos, crea uno por artículo relevante
+- Si tiene muchos artículos, agrúpalos por categoría (ej: "Alimentos", "Bebidas", "Higiene", "Snacks")
+- Los montos DEBEN sumar exactamente el total del ticket
+- Incluye la fecha del ticket si aparece; si no, usa hoy
 
 Ejemplo:
 {
@@ -104,6 +107,26 @@ Ejemplo:
     {"amount":320,"concept":"Alimentos y despensa","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
     {"amount":85,"concept":"Bebidas","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
     {"amount":95,"concept":"Productos de higiene","category":"hogar","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"}
+  ]
+}`;
+
+// Full-detail mode: every line item, no grouping allowed
+const RECEIPT_SYSTEM_FULL = RECEIPT_SYSTEM_BASE + `
+
+PASO 3 — Desglosa los artículos (MODO COMPLETO — SIN AGRUPAR):
+- Crea UN registro por CADA artículo o línea del ticket, sin excepción.
+- NUNCA agrupes artículos por categoría aunque haya muchos.
+- Si el nombre de un artículo es largo, puedes abreviarlo pero mantenlo reconocible.
+- Los montos de todos los artículos DEBEN sumar exactamente el total del ticket.
+- Incluye la fecha del ticket si aparece; si no, usa hoy.
+
+Ejemplo (artículos individuales):
+{
+  "detectedTotal": 187.50,
+  "items": [
+    {"amount":45.90,"concept":"Leche Lala 1L x3","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
+    {"amount":32.50,"concept":"Pan Bimbo integral","category":"alimentacion","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"},
+    {"amount":109.10,"concept":"Detergente Ariel 1kg","category":"hogar","store":"Walmart","paymentMethod":"tarjeta_debito","date":"2024-01-15","transactionType":"gasto","expenseType":"variable"}
   ]
 }`;
 
@@ -186,15 +209,17 @@ export async function parseReceiptItems(
   apiKey: string,
   today: string,
   transactionType?: 'gasto' | 'ingreso',
+  allowGrouping = true,
 ): Promise<{ items: Partial<Expense>[]; detectedTotal: number | null }> {
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
   const typeHint = transactionType === 'ingreso'
     ? `\nIMPORTANTE: Este documento es un INGRESO (factura cobrada, recibo de pago recibido, estado de honorarios, nómina, etc.). Clasifica TODOS los conceptos con transactionType:"ingreso" y usa categorías de ingreso (salario, freelance, negocio, renta, bono, reembolso, etc.).`
     : '';
+  const systemPrompt = allowGrouping ? RECEIPT_SYSTEM : RECEIPT_SYSTEM_FULL;
   const response = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
-    system: RECEIPT_SYSTEM,
+    max_tokens: allowGrouping ? 4096 : 8000,
+    system: systemPrompt,
     messages: [{
       role: 'user',
       content: [

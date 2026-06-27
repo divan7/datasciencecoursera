@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { Camera, Upload, X, AlertCircle, AlertTriangle, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Expense, User } from '../types/expense';
-import { parseReceiptItems } from '../services/claudeService';
+import { parseReceiptItems, reconcileReceiptItems } from '../services/claudeService';
 import { compressImage, base64SizeBytes } from '../utils/imageCompression';
 import type { SpaceMember, AppSpace } from '../types/space';
 import { MultiExpenseReview, type ExpenseWithSpace } from './MultiExpenseReview';
@@ -33,6 +33,8 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
   const [error, setError] = useState('');
   const [parsedItems, setParsedItems] = useState<Partial<Expense>[] | null>(null);
   const [totalWarning, setTotalWarning] = useState<string | null>(null);
+  const [detectedTotal, setDetectedTotal] = useState<number | null>(null);
+  const [reconciling, setReconciling] = useState(false);
   const [transactionType, setTransactionType] = useState<'gasto' | 'ingreso'>('gasto');
   const [detailMode, setDetailMode] = useState<'detalle' | 'total'>('detalle');
 
@@ -78,6 +80,7 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     setLoading(true);
     setError('');
     setTotalWarning(null);
+    setDetectedTotal(null);
     try {
       const today = format(new Date(), 'yyyy-MM-dd');
       const { items, detectedTotal } = await parseReceiptItems(imageBase64, mediaType, apiKey, today, transactionType);
@@ -120,8 +123,9 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
           }
         } else if (absDiff >= 1) {
           const sign = diff > 0 ? '+' : '';
+          setDetectedTotal(detectedTotal);
           setTotalWarning(
-            `Total del ticket: $${detectedTotal.toFixed(2)} · Suma de artículos: $${sum.toFixed(2)} · Diferencia: $${sign}${diff.toFixed(2)}. Revisa y ajusta los montos antes de guardar.`
+            `Total del ticket: $${detectedTotal.toFixed(2)} · Suma de artículos: $${sum.toFixed(2)} · Diferencia: $${sign}${diff.toFixed(2)}`
           );
         }
       }
@@ -144,9 +148,29 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
     }
   };
 
+  const handleReconcile = async () => {
+    if (!parsedItems || detectedTotal === null || !apiKey || !imageBase64) return;
+    setReconciling(true);
+    setError('');
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { items } = await reconcileReceiptItems(
+        imageBase64, mediaType, apiKey, today, detectedTotal, parsedItems, transactionType
+      );
+      const sum = items.reduce((s, it) => s + (it.amount ?? 0), 0);
+      const diff = Math.abs(detectedTotal - sum);
+      setTotalWarning(diff < 1 ? null : `Diferencia residual de $${diff.toFixed(2)} — ajusta manualmente si es necesario.`);
+      setParsedItems(items);
+    } catch (err) {
+      setError(`Error al corregir: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   const handleClear = () => {
     setImagePreview(null); setImageBase64(''); setParsedItems(null); setError(''); setTotalWarning(null);
-    setTransactionType('gasto'); setDetailMode('detalle');
+    setDetectedTotal(null); setTransactionType('gasto'); setDetailMode('detalle');
     if (fileInputRef.current) fileInputRef.current.value = '';
     if (cameraInputRef.current) cameraInputRef.current.value = '';
   };
@@ -300,9 +324,22 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
       )}
 
       {totalWarning && (
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
-          <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-amber-700">{totalWarning}</p>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-amber-700">{totalWarning}</p>
+          </div>
+          {detectedTotal !== null && (
+            <button
+              onClick={handleReconcile}
+              disabled={reconciling}
+              className="w-full py-2 rounded-xl bg-amber-500 text-white text-xs font-bold flex items-center justify-center gap-2 disabled:opacity-60 active:scale-95 transition-all"
+            >
+              {reconciling
+                ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Corrigiendo errores OCR...</>
+                : '🔍 Corregir automáticamente (re-analizar)'}
+            </button>
+          )}
         </div>
       )}
 

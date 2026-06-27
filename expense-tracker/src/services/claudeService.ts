@@ -307,6 +307,70 @@ Analiza la imagen y responde JSON.`;
   };
 }
 
+/**
+ * Re-reads a receipt image to correct OCR errors when item totals don't match
+ * the detected ticket total. The previous items and the known discrepancy are
+ * sent so the model can focus on likely misread digits.
+ */
+export async function reconcileReceiptItems(
+  base64Image: string,
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+  apiKey: string,
+  today: string,
+  detectedTotal: number,
+  previousItems: Partial<Expense>[],
+  transactionType?: 'gasto' | 'ingreso',
+): Promise<{ items: Partial<Expense>[]; detectedTotal: number | null }> {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+  const prevSum = previousItems.reduce((s, i) => s + (i.amount ?? 0), 0);
+  const diff = (detectedTotal - prevSum).toFixed(2);
+  const prevJson = JSON.stringify(
+    previousItems.map((i) => ({ concept: i.concept, amount: i.amount }))
+  );
+
+  const correctionPrompt = `Hay una discrepancia en la lectura del ticket.
+
+Total real del ticket: $${detectedTotal.toFixed(2)}
+Suma de los artículos en la lectura anterior: $${prevSum.toFixed(2)}
+Diferencia: $${diff}
+
+Artículos leídos antes:
+${prevJson}
+
+TAREA: Vuelve a leer CUIDADOSAMENTE el ticket de la imagen. Presta especial atención a los dígitos que pueden confundirse:
+- 3 vs 8, 5 vs 6, 1 vs 7, 0 vs 6, 4 vs 9
+- Comas vs puntos en los decimales
+- Centavos que pueden interpretarse como pesos
+
+Los montos de los artículos DEBEN sumar exactamente $${detectedTotal.toFixed(2)}.
+Si necesitas ajustar algún monto para cuadrar el total, hazlo en el artículo más probable de error.
+
+Devuelve ÚNICAMENTE el objeto JSON con la misma estructura, corrigiendo los montos:`;
+
+  const response = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2048,
+    system: RECEIPT_SYSTEM,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
+        { type: 'text', text: `Hoy es ${today}.\n\n${correctionPrompt}` },
+      ],
+    }],
+  });
+  const content = response.content[0];
+  if (content.type !== 'text') throw new Error('Respuesta inesperada del modelo');
+  const parsed = JSON.parse(stripJson(content.text));
+  const raw = Array.isArray(parsed)
+    ? { items: parsed, detectedTotal }
+    : { items: Array.isArray(parsed.items) ? parsed.items : [], detectedTotal: typeof parsed.detectedTotal === 'number' ? parsed.detectedTotal : detectedTotal };
+  if (transactionType) {
+    raw.items = raw.items.map((it: Partial<Expense>) => ({ ...it, transactionType }));
+  }
+  return raw;
+}
+
 export async function parseFixedExpensesFromCSV(
   csvText: string,
   apiKey: string,

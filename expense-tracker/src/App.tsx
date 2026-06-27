@@ -953,20 +953,33 @@ export default function App() {
 
       {/* ── Suggest fixed template when fijo expense has no match ── */}
       {suggestQueue[0] && (
-        <FixedTemplateFromExpenseModal
-          key={suggestQueue[0].expense.id}
-          expense={suggestQueue[0].expense}
-          members={currentSpace.members}
-          onSave={(tpl) => {
-            const qItem = suggestQueue[0];
-            const saved = qItem.autoConfirm
-              ? addAndConfirmTemplate(tpl, qItem.expense)
-              : addTemplate(tpl);
-            setSuggestQueue((q) => q.slice(1));
-            setReminderTemplate(saved);
-          }}
-          onClose={() => setSuggestQueue((q) => q.slice(1))}
-        />
+        <ErrorBoundary fallback={
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center space-y-3">
+              <p className="text-2xl">⚠️</p>
+              <p className="font-semibold text-gray-800">Error al abrir el configurador</p>
+              <button onClick={() => setSuggestQueue((q) => q.slice(1))}
+                className="w-full py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        }>
+          <FixedTemplateFromExpenseModal
+            key={suggestQueue[0].expense.id}
+            expense={suggestQueue[0].expense}
+            members={currentSpace.members}
+            onSave={(tpl) => {
+              const qItem = suggestQueue[0];
+              const saved = qItem.autoConfirm
+                ? addAndConfirmTemplate(tpl, qItem.expense)
+                : addTemplate(tpl);
+              setSuggestQueue((q) => q.slice(1));
+              setReminderTemplate(saved);
+            }}
+            onClose={() => setSuggestQueue((q) => q.slice(1))}
+          />
+        </ErrorBoundary>
       )}
     </div>
     </ErrorBoundary>

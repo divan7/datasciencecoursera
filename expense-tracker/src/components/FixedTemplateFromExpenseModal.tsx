@@ -22,7 +22,7 @@ export function FixedTemplateFromExpenseModal({ expense, members, onSave, onClos
   const [concept, setConcept]   = useState(expense.concept);
   const [amount, setAmount]     = useState(String(expense.amount));
   const [paidBy, setPaidBy]     = useState(expense.paidBy);
-  const [frequency, setFreq]    = useState<Frequency>('mensual');
+  const [frequency, setFreq]    = useState<Frequency>(expense.frequency ?? 'mensual');
   const [dayOfMonth, setDom]    = useState('');
   const [dayOfWeek, setDow]     = useState('1');
   const [paymentMonth, setPm]   = useState('1');

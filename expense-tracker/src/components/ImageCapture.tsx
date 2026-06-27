@@ -139,6 +139,8 @@ export function ImageCapture({ currentUser, currentSpaceId, spaces, onSave, onSa
         setError('Sin créditos en tu cuenta Anthropic. Agrega créditos en console.anthropic.com.');
       } else if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed to fetch')) {
         setError('Error de red. Verifica tu conexión a internet.');
+      } else if (msg.includes('JSON') || msg.includes('position') || msg.includes('Unexpected')) {
+        setError('El ticket tiene demasiados artículos y la respuesta se cortó. Prueba con la opción "Solo el total" o recorta la imagen para mostrar menos artículos.');
       } else {
         setError(`Error al analizar: ${msg}`);
       }

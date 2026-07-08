@@ -29,6 +29,23 @@ function formatAmount(n: number) {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
 }
 
+function getSplitNames(e: Expense): string {
+  if (e.splitWith?.length) return e.splitWith.join(', ');
+  if (e.obligations?.length) return e.obligations.map((o) => o.name).join(', ');
+  if (e.payments?.length) return e.payments.map((p) => p.name).join(', ');
+  return '';
+}
+
+function getSplitDetail(e: Expense): string {
+  if (e.obligations?.length) {
+    return e.obligations.map((o) => `${o.name}: ${formatAmount(o.amount)}`).join(', ');
+  }
+  if (e.payments?.length) {
+    return e.payments.map((p) => `${p.name}: ${formatAmount(p.amount)}`).join(', ');
+  }
+  return '';
+}
+
 async function generatePDF(
   rows: (Expense & { spaceName: string })[],
   effectiveFrom: string,
@@ -69,13 +86,14 @@ async function generatePDF(
     doc.text(periodLabel, PW - MR, 10, { align: 'right' });
 
     const cols = [
-      { header: 'Fecha',      key: 'date',           w: 22 },
-      { header: 'Lista',      key: 'spaceName',       w: 30 },
-      { header: 'Concepto',   key: 'concept',         w: 52 },
-      { header: 'Categoría',  key: 'category',        w: 28 },
-      { header: 'Tipo',       key: 'transactionType', w: 14 },
-      { header: 'Forma pago', key: 'paymentMethod',   w: 26 },
-      { header: 'Quién',      key: 'paidBy',          w: 20 },
+      { header: 'Fecha',      key: 'date',           w: 20 },
+      { header: 'Lista',      key: 'spaceName',       w: 26 },
+      { header: 'Concepto',   key: 'concept',         w: 46 },
+      { header: 'Categoría',  key: 'category',        w: 25 },
+      { header: 'Tipo',       key: 'transactionType', w: 13 },
+      { header: 'Forma pago', key: 'paymentMethod',   w: 22 },
+      { header: 'Quién',      key: 'paidBy',          w: 18 },
+      { header: 'División',   key: 'division',        w: 32 },
       { header: 'Monto',      key: 'amount',          w: 26, align: 'right' as const },
     ];
     const totalW = cols.reduce((s, c) => s + c.w, 0);
@@ -123,11 +141,14 @@ async function generatePDF(
       }
       const isIncome = e.transactionType === 'ingreso';
       const catLabel = (CATEGORIES[e.category] ?? e.category).replace(/^\S+\s/, '');
+      const splitNames = getSplitNames(e);
       const values: Record<string, string> = {
         date: e.date, spaceName: e.spaceName, concept: e.concept,
         category: catLabel, transactionType: isIncome ? 'Ingreso' : 'Gasto',
         paymentMethod: pmLabel[e.paymentMethod] ?? e.paymentMethod,
-        paidBy: e.paidBy, amount: formatAmount(e.amount),
+        paidBy: e.paidBy,
+        division: splitNames ? splitNames.replace(/,/g, ' /') : '',
+        amount: formatAmount(e.amount),
       };
       let x = ML;
       for (const col of scaledCols) {
@@ -316,7 +337,7 @@ export function ExportDialog({ spaces, currentSpaceId, currentExpenses, onClose 
         'Lista', 'Fecha', 'Tipo', 'Concepto', 'Monto', 'Categoría',
         'Quién pagó', 'Forma de pago', 'Tarjeta', 'Banco', 'Establecimiento',
         'Tipo gasto', 'Frecuencia', 'MSI', 'Reembolsable', 'Deducible',
-        'Factura', 'Compartido', 'Notas',
+        'Factura', 'Compartido', 'Dividido entre', 'Detalle división', 'Notas',
       ];
       const data = filteredRows.map((e) => [
         e.spaceName, e.date, e.transactionType, e.concept, e.amount,
@@ -325,6 +346,7 @@ export function ExportDialog({ spaces, currentSpaceId, currentExpenses, onClose 
         e.expenseType, e.frequency ?? '', e.installments ?? '',
         e.isReimbursable ? 'Sí' : 'No', e.isTaxDeductible ? 'Sí' : 'No',
         e.invoiceRequested ? 'Sí' : 'No', e.sharedExpense ? 'Sí' : 'No',
+        getSplitNames(e), getSplitDetail(e),
         e.notes ?? '',
       ]);
       const csv = [headers, ...data].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n');

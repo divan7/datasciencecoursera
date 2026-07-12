@@ -18,6 +18,7 @@ interface ExportDialogProps {
 
 type ExportFormat = 'csv' | 'pdf';
 type PhotoOption = 'none' | 'same' | 'separate';
+type TicketMode = 'total' | 'itemized';
 
 function monthLabel(m: string) {
   const [y, mo] = m.split('-');
@@ -44,6 +45,39 @@ function getSplitDetail(e: Expense): string {
     return e.payments.map((p) => `${p.name}: ${formatAmount(p.amount)}`).join(', ');
   }
   return '';
+}
+
+function collapseTickets(rows: (Expense & { spaceName: string })[]): (Expense & { spaceName: string })[] {
+  const result: (Expense & { spaceName: string })[] = [];
+  const ticketMap = new Map<string, (Expense & { spaceName: string })[]>();
+  for (const e of rows) {
+    if (!e.ticketId) {
+      result.push(e);
+    } else {
+      const group = ticketMap.get(e.ticketId) ?? [];
+      group.push(e);
+      ticketMap.set(e.ticketId, group);
+    }
+  }
+  for (const items of ticketMap.values()) {
+    const first = items[0];
+    const total = items.reduce((s, i) => s + i.amount, 0);
+    const imageItem = items.find((i) => i.receiptImageBase64) ?? first;
+    const storeName = items.find((i) => i.store)?.store;
+    const concept = storeName ? `${storeName} (ticket)` : (first.ticketNotes ?? `Ticket ${first.date}`);
+    result.push({ ...first, amount: total, concept, receiptImageBase64: imageItem.receiptImageBase64, ticketId: undefined });
+  }
+  result.sort((a, b) => b.date.localeCompare(a.date));
+  return result;
+}
+
+function buildTicketLabelMap(rows: (Expense & { spaceName: string })[]): Map<string, string> {
+  const map = new Map<string, string>();
+  let counter = 1;
+  for (const e of rows) {
+    if (e.ticketId && !map.has(e.ticketId)) map.set(e.ticketId, `T-${counter++}`);
+  }
+  return map;
 }
 
 async function generatePDF(
@@ -85,16 +119,19 @@ async function generatePDF(
     doc.setFontSize(8.5);
     doc.text(periodLabel, PW - MR, 10, { align: 'right' });
 
-    const cols = [
+    const hasTickets = rows.some((e) => e.ticketId);
+    const ticketLabelMapPDF = buildTicketLabelMap(rows);
+    const cols: { header: string; key: string; w: number; align?: 'right' }[] = [
       { header: 'Fecha',      key: 'date',           w: 20 },
-      { header: 'Lista',      key: 'spaceName',       w: 26 },
-      { header: 'Concepto',   key: 'concept',         w: 46 },
+      { header: 'Lista',      key: 'spaceName',       w: hasTickets ? 20 : 26 },
+      ...(hasTickets ? [{ header: 'Ticket', key: 'ticket', w: 14 }] : []),
+      { header: 'Concepto',   key: 'concept',         w: hasTickets ? 40 : 46 },
       { header: 'Categoría',  key: 'category',        w: 25 },
       { header: 'Tipo',       key: 'transactionType', w: 13 },
       { header: 'Forma pago', key: 'paymentMethod',   w: 22 },
       { header: 'Quién',      key: 'paidBy',          w: 18 },
       { header: 'División',   key: 'division',        w: 32 },
-      { header: 'Monto',      key: 'amount',          w: 26, align: 'right' as const },
+      { header: 'Monto',      key: 'amount',          w: 26, align: 'right' },
     ];
     const totalW = cols.reduce((s, c) => s + c.w, 0);
     const scale = (PW - ML - MR) / totalW;
@@ -147,6 +184,7 @@ async function generatePDF(
         category: catLabel, transactionType: isIncome ? 'Ingreso' : 'Gasto',
         paymentMethod: pmLabel[e.paymentMethod] ?? e.paymentMethod,
         paidBy: e.paidBy,
+        ticket: e.ticketId ? (ticketLabelMapPDF.get(e.ticketId) ?? '') : '',
         division: splitNames ? splitNames.replace(/,/g, ' /') : '',
         amount: formatAmount(e.amount),
       };
@@ -265,6 +303,7 @@ export function ExportDialog({ spaces, currentSpaceId, currentExpenses, onClose 
   const [toMonth, setToMonth] = useState('');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
   const [photoOption, setPhotoOption] = useState<PhotoOption>('none');
+  const [ticketMode, setTicketMode] = useState<TicketMode>('total');
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -326,21 +365,34 @@ export function ExportDialog({ spaces, currentSpaceId, currentExpenses, onClose 
     return rows;
   }, [selectedSpaceIds, allExpenses, effectiveFrom, effectiveTo, spaces]);
 
-  const exportedCount = filteredRows.length;
-  const photosCount = filteredRows.filter((e) => !!e.receiptImageBase64).length;
+  const hasTicketItems = useMemo(() => filteredRows.some((e) => !!e.ticketId), [filteredRows]);
+
+  const processedRows = useMemo(
+    () => (hasTicketItems && ticketMode === 'total' ? collapseTickets(filteredRows) : filteredRows),
+    [filteredRows, hasTicketItems, ticketMode],
+  );
+
+  const exportedCount = processedRows.length;
+  const photosCount = processedRows.filter((e) => !!e.receiptImageBase64).length;
 
   const handleExport = async () => {
     if (exportedCount === 0 || exporting) return;
 
     if (exportFormat === 'csv') {
+      const hasTicketCols = processedRows.some((e) => !!e.ticketId);
+      const ticketLabelMap = hasTicketCols ? buildTicketLabelMap(processedRows) : new Map<string, string>();
       const headers = [
-        'Lista', 'Fecha', 'Tipo', 'Concepto', 'Monto', 'Categoría',
+        'Lista',
+        ...(hasTicketCols ? ['Ticket'] : []),
+        'Fecha', 'Tipo', 'Concepto', 'Monto', 'Categoría',
         'Quién pagó', 'Forma de pago', 'Tarjeta', 'Banco', 'Establecimiento',
         'Tipo gasto', 'Frecuencia', 'MSI', 'Reembolsable', 'Deducible',
         'Factura', 'Compartido', 'Dividido entre', 'Detalle división', 'Notas',
       ];
-      const data = filteredRows.map((e) => [
-        e.spaceName, e.date, e.transactionType, e.concept, e.amount,
+      const data = processedRows.map((e) => [
+        e.spaceName,
+        ...(hasTicketCols ? [e.ticketId ? (ticketLabelMap.get(e.ticketId) ?? '') : ''] : []),
+        e.date, e.transactionType, e.concept, e.amount,
         CATEGORIES[e.category] ?? e.category, e.paidBy, e.paymentMethod,
         e.cardLast4 ?? '', e.bank ?? '', e.store ?? '',
         e.expenseType, e.frequency ?? '', e.installments ?? '',
@@ -362,7 +414,7 @@ export function ExportDialog({ spaces, currentSpaceId, currentExpenses, onClose 
     } else {
       setExporting(true);
       try {
-        await generatePDF(filteredRows, effectiveFrom, effectiveTo, photoOption);
+        await generatePDF(processedRows, effectiveFrom, effectiveTo, photoOption);
       } finally {
         setExporting(false);
       }
@@ -473,6 +525,42 @@ export function ExportDialog({ spaces, currentSpaceId, currentExpenses, onClose 
               </button>
             </div>
           </div>
+
+          {/* Ticket mode (only when there are photo-captured ticket items) */}
+          {hasTicketItems && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-500">Tickets capturados por foto</p>
+                <span className="text-xs text-teal-600 font-medium">
+                  {filteredRows.filter((e) => !!e.ticketId).length} ítems
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setTicketMode('total')}
+                  className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                    ticketMode === 'total'
+                      ? 'border-teal-500 bg-teal-50 text-teal-700'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>🧾 Totalizador</span>
+                  <span className="text-xs font-normal text-gray-400 mt-0.5">Una fila por ticket</span>
+                </button>
+                <button
+                  onClick={() => setTicketMode('itemized')}
+                  className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                    ticketMode === 'itemized'
+                      ? 'border-teal-500 bg-teal-50 text-teal-700'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>📋 Itemizado</span>
+                  <span className="text-xs font-normal text-gray-400 mt-0.5">Cada artículo + col. Ticket</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Photo options (PDF only) */}
           {exportFormat === 'pdf' && (

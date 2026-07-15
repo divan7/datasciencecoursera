@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { User, Plus, Check, Star, ChevronDown, ChevronUp, Bell } from 'lucide-react'
+import { User, Plus, Check, Star, ChevronDown, ChevronUp, Bell, Home, Dumbbell } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import type { InsightCadence } from '../store/useAppStore'
 import { programPhases } from '../data/programs'
 import { muscleFocusGroups, priorityConfig } from '../data/muscleFocus'
+import { phaseEquipmentAdvice } from '../data/equipmentAdvice'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { MuscleFocusId, MusclePriority } from '../types'
@@ -16,13 +17,12 @@ const priorityOrder: MusclePriority[] = ['high', 'medium', 'maintenance']
 
 export default function Profile() {
   const { activeUser, activeProgram, state, setActiveUser, updateUser, insightCadence, setInsightCadence } = useAppStore()
+  const currentPhase = activeProgram ? programPhases[activeProgram.currentPhaseIndex] : null
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [showMuscleEditor, setShowMuscleEditor] = useState(false)
   const [saved] = useState(false)
 
   if (!activeUser) return null
-
-  const currentPhase = activeProgram ? programPhases[activeProgram.currentPhaseIndex] : null
   const startDate = activeProgram ? parseISO(activeProgram.startDate) : null
   const daysSinceStart = startDate
     ? Math.floor((Date.now() - startDate.getTime()) / 86400000)
@@ -74,6 +74,39 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Equipment / active location */}
+      {(() => {
+        const loc = activeUser.activeLocation ?? 'home'
+        const advice = currentPhase ? phaseEquipmentAdvice[currentPhase.id] : null
+        return (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Ubicación de entrenamiento</p>
+            <div className="flex rounded-xl overflow-hidden border border-zinc-700 mb-4">
+              {(['home', 'gym'] as const).map(opt => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => updateUser(activeUser.id, { activeLocation: opt })}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors ${
+                    loc === opt
+                      ? 'bg-cyan-400 text-zinc-950'
+                      : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {opt === 'home' ? <><Home size={15} /> En casa</> : <><Dumbbell size={15} /> Gimnasio</>}
+                </button>
+              ))}
+            </div>
+            {advice && (
+              <div className="text-xs text-zinc-500 leading-relaxed">
+                <span className="text-zinc-400 font-medium">{advice.title} — </span>
+                {loc === 'gym' && advice.gymUpgrade ? advice.gymUpgrade : advice.message}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Muscle priorities — editable */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">

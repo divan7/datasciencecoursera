@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ChevronDown, ChevronUp, CheckCircle2, Circle, Timer,
-  Info, Flame, SkipForward, Star,
+  Info, Flame, SkipForward, Star, AlertTriangle,
 } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { exercises } from '../data/exercises'
@@ -10,6 +10,7 @@ import { allWorkouts } from '../data/programs'
 import { muscleFocusMap } from '../data/muscleFocus'
 import { workoutCoachNotes } from '../data/coachNotes'
 import { CoachNoteCard } from '../components/CoachPanel'
+import { getEquipmentMismatch } from '../data/equipmentAdvice'
 import { format } from 'date-fns'
 import type { ExerciseLog, MuscleGroup, MuscleFocusId } from '../types'
 
@@ -79,6 +80,8 @@ export default function WorkoutPage() {
   }
 
   const currentPhase = activeProgram.phases[activeProgram.currentPhaseIndex]
+  const activeLocation = activeUser.activeLocation ?? 'home'
+  const equipmentConflict = getEquipmentMismatch(currentPhase.id, activeLocation)
 
   function toggleSet(exId: string, setIdx: number, restSecs: number) {
     setCompletedSets(prev => {
@@ -174,6 +177,18 @@ export default function WorkoutPage() {
       )}
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3 pb-32">
+        {/* Equipment conflict warning */}
+        {equipmentConflict && (
+          <div className={`flex gap-3 p-4 rounded-2xl border ${
+            equipmentConflict.severity === 'critical'
+              ? 'bg-red-400/5 border-red-400/30'
+              : 'bg-orange-400/5 border-orange-400/30'
+          }`}>
+            <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${equipmentConflict.severity === 'critical' ? 'text-red-400' : 'text-orange-400'}`} />
+            <p className="text-sm text-zinc-400 leading-relaxed">{equipmentConflict.message}</p>
+          </div>
+        )}
+
         {/* Workout rationale */}
         {workoutCoachNotes[workout.id] && (
           <CoachNoteCard note={workoutCoachNotes[workout.id]} defaultOpen={false} />
@@ -186,6 +201,8 @@ export default function WorkoutPage() {
           const allDone = sets.every(Boolean)
           const isExpanded = expandedEx === ex.id
           const exPriority = getExercisePriority(ex.muscles, activeUser.musclePriorities ?? {})
+          const needsGym = ex.equipment.includes('gym')
+          const gymUnavailable = needsGym && activeLocation === 'home'
 
           return (
             <div
@@ -193,6 +210,8 @@ export default function WorkoutPage() {
               className={`border rounded-2xl overflow-hidden transition-all ${
                 allDone
                   ? 'border-emerald-400/30 bg-emerald-400/5'
+                  : gymUnavailable
+                  ? 'border-orange-400/20 bg-orange-400/3'
                   : exPriority === 'high'
                   ? 'border-cyan-400/30 bg-cyan-400/3'
                   : 'border-zinc-800 bg-zinc-900'
@@ -215,11 +234,16 @@ export default function WorkoutPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className={`font-semibold ${allDone ? 'text-emerald-400' : 'text-white'}`}>
+                    <p className={`font-semibold ${allDone ? 'text-emerald-400' : gymUnavailable ? 'text-orange-300' : 'text-white'}`}>
                       {ex.nameEs}
                     </p>
                     {allDone && <CheckCircle2 size={14} className="text-emerald-400" />}
-                    {!allDone && exPriority === 'high' && (
+                    {!allDone && gymUnavailable && (
+                      <span className="text-xs text-orange-400 bg-orange-400/10 px-1.5 py-0.5 rounded-full">
+                        🏋️ Requiere gym
+                      </span>
+                    )}
+                    {!allDone && !gymUnavailable && exPriority === 'high' && (
                       <span className="flex items-center gap-1 text-xs text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded-full">
                         <Star size={10} fill="currentColor" /> Prioritario
                       </span>

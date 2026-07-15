@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom'
-import { Flame, Trophy, Calendar, ChevronRight, Play, CheckCircle2, AlertCircle, Star } from 'lucide-react'
+import { Flame, Trophy, Calendar, ChevronRight, Play, CheckCircle2, AlertCircle, Star, Home, Dumbbell, AlertTriangle, Info } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { muscleFocusGroups, priorityConfig } from '../data/muscleFocus'
 import { getWeeklyInsight } from '../data/coachNotes'
+import { phaseEquipmentAdvice, getEquipmentMismatch } from '../data/equipmentAdvice'
 import MotivationalBanner from '../components/ui/MotivationalBanner'
 import { WeeklyInsightCard } from '../components/CoachPanel'
 import { format, parseISO } from 'date-fns'
@@ -20,6 +21,7 @@ export default function Dashboard() {
     getWeekCompletionRate,
     shouldShowInsight,
     markInsightShown,
+    updateUser,
   } = useAppStore()
 
   if (!activeUser || !activeProgram) return null
@@ -44,6 +46,15 @@ export default function Dashboard() {
 
   const isRestDay = !todayWorkout
   const isCompleted = !!todayLog?.completed
+
+  const activeLocation = activeUser.activeLocation ?? 'home'
+  const equipAdvice = phaseEquipmentAdvice[currentPhase.id]
+  const mismatch = getEquipmentMismatch(currentPhase.id, activeLocation)
+
+  const userId = activeUser.id
+  function toggleLocation() {
+    updateUser(userId, { activeLocation: activeLocation === 'home' ? 'gym' : 'home' })
+  }
 
   const motCtx = {
     streak,
@@ -98,6 +109,69 @@ export default function Dashboard() {
           color="cyan"
         />
       </div>
+
+      {/* Location toggle */}
+      <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3">
+        <p className="text-sm text-zinc-400">¿Dónde entrenas hoy?</p>
+        <div className="flex rounded-lg overflow-hidden border border-zinc-700">
+          <button
+            type="button"
+            onClick={() => activeLocation !== 'home' && toggleLocation()}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
+              activeLocation === 'home'
+                ? 'bg-cyan-400 text-zinc-950'
+                : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Home size={13} /> Casa
+          </button>
+          <button
+            type="button"
+            onClick={() => activeLocation !== 'gym' && toggleLocation()}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
+              activeLocation === 'gym'
+                ? 'bg-cyan-400 text-zinc-950'
+                : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Dumbbell size={13} /> Gym
+          </button>
+        </div>
+      </div>
+
+      {/* Equipment mismatch — critical warning */}
+      {mismatch && (
+        <div className={`border rounded-2xl p-4 ${
+          mismatch.severity === 'critical'
+            ? 'bg-red-400/5 border-red-400/30'
+            : 'bg-orange-400/5 border-orange-400/30'
+        }`}>
+          <div className="flex gap-3">
+            <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${mismatch.severity === 'critical' ? 'text-red-400' : 'text-orange-400'}`} />
+            <div>
+              <p className={`font-semibold text-sm ${mismatch.severity === 'critical' ? 'text-red-300' : 'text-orange-300'}`}>
+                {mismatch.severity === 'critical' ? 'Esta fase requiere gimnasio' : 'Ajuste de equipamiento recomendado'}
+              </p>
+              <p className="text-zinc-400 text-sm mt-1 leading-relaxed">{mismatch.message}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Equipment tip for phase — only when no conflict */}
+      {!mismatch && equipAdvice && (
+        <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl px-4 py-3 flex gap-3">
+          <Info size={15} className="text-cyan-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs text-cyan-400 font-semibold uppercase tracking-wider">{equipAdvice.title}</p>
+            <p className="text-zinc-500 text-xs mt-1 leading-relaxed">{
+              activeLocation === 'gym' && equipAdvice.gymUpgrade
+                ? equipAdvice.gymUpgrade
+                : equipAdvice.message
+            }</p>
+          </div>
+        </div>
+      )}
 
       {/* Current Phase Card */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">

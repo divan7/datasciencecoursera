@@ -88,6 +88,7 @@ export default function Setup() {
       goals: form.goals,
       targetSport: form.targetSport,
       equipment: form.equipment,
+      activeLocation: form.equipment.includes('gym') ? 'gym' : 'home',
       availableTime: Number(form.availableTime) || 25,
       musclePriorities: form.musclePriorities,
     })

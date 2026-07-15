@@ -32,10 +32,10 @@ function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultState
     const parsed = JSON.parse(raw) as AppState
-    // Backfill musclePriorities for users that predate the feature
     const users = parsed.users?.map(u => ({
       ...u,
       musclePriorities: u.musclePriorities ?? { ...defaultMusclePriorities },
+      activeLocation: (u as UserProfile).activeLocation ?? 'home',
     })) ?? []
     return { ...defaultState, ...parsed, users }
   } catch {

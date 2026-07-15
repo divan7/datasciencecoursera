@@ -39,6 +39,7 @@ export interface UserProfile {
   goals: string[]
   targetSport: string
   equipment: Equipment[]
+  activeLocation: 'home' | 'gym'
   availableTime: number
   musclePriorities: MusclePriorityMap
   createdAt: string

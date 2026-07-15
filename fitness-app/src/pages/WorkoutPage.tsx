@@ -11,6 +11,7 @@ import { muscleFocusMap } from '../data/muscleFocus'
 import { workoutCoachNotes } from '../data/coachNotes'
 import { CoachNoteCard } from '../components/CoachPanel'
 import { getEquipmentMismatch } from '../data/equipmentAdvice'
+import { ExerciseAnimation } from '../components/ExerciseAnimation'
 import { format } from 'date-fns'
 import type { ExerciseLog, MuscleGroup, MuscleFocusId } from '../types'
 
@@ -329,17 +330,22 @@ export default function WorkoutPage() {
                     </div>
                   )}
 
-                  <p className="text-xs text-zinc-600">Fuente: {ex.source}</p>
-
-                  <a
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.videoKeyword)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors"
-                  >
-                    <span>▶</span>
-                    Ver demostración en YouTube ({ex.videoKeyword})
-                  </a>
+                  {/* Animation + YouTube side by side */}
+                  <div className="flex items-center gap-4">
+                    <ExerciseAnimation exerciseId={ex.id} />
+                    <div className="flex flex-col gap-2 flex-1">
+                      <p className="text-xs text-zinc-600">Fuente: {ex.source}</p>
+                      <a
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.videoKeyword)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors"
+                      >
+                        <span>▶</span>
+                        Ver en YouTube
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

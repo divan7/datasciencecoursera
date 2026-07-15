@@ -2,6 +2,9 @@ import { useNavigate } from 'react-router-dom'
 import { Flame, Trophy, Calendar, ChevronRight, Play, CheckCircle2, AlertCircle, Star } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { muscleFocusGroups, priorityConfig } from '../data/muscleFocus'
+import { getWeeklyInsight } from '../data/coachNotes'
+import MotivationalBanner from '../components/ui/MotivationalBanner'
+import { WeeklyInsightCard } from '../components/CoachPanel'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { MuscleFocusId } from '../types'
@@ -15,6 +18,8 @@ export default function Dashboard() {
     getTotalWorkoutsCompleted,
     getCurrentStreak,
     getWeekCompletionRate,
+    shouldShowInsight,
+    markInsightShown,
   } = useAppStore()
 
   if (!activeUser || !activeProgram) return null
@@ -40,6 +45,22 @@ export default function Dashboard() {
   const isRestDay = !todayWorkout
   const isCompleted = !!todayLog?.completed
 
+  const motCtx = {
+    streak,
+    totalWorkouts: totalDone,
+    currentPhase: currentPhase.id,
+    weekRate,
+    daysSinceStart: totalDays,
+    completedToday: isCompleted,
+    isRestDay,
+    justStarted: totalDone <= 3,
+    justAdvancedPhase: false,
+    currentWeek: activeProgram.currentWeek,
+  }
+
+  const weeklyInsight = getWeeklyInsight(currentPhase.id, activeProgram.currentWeek)
+  const showInsight = shouldShowInsight()
+
   return (
     <div className="space-y-6">
       {/* Greeting */}
@@ -47,6 +68,14 @@ export default function Dashboard() {
         <p className="text-zinc-400 text-sm">{format(new Date(), "EEEE, d 'de' MMMM", { locale: es })}</p>
         <h1 className="text-2xl font-bold text-white mt-0.5">Hola, {activeUser.name} 👋</h1>
       </div>
+
+      {/* Motivational phrase */}
+      <MotivationalBanner context={motCtx} compact />
+
+      {/* Weekly insight from coach */}
+      {showInsight && weeklyInsight && (
+        <WeeklyInsightCard insight={weeklyInsight} onDismiss={markInsightShown} />
+      )}
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">

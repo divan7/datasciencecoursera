@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CheckCircle2, Lock, ChevronDown, ChevronUp, Play, Check, AlertTriangle } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
+import { phaseCoachNotes } from '../data/coachNotes'
+import { CoachNoteCard } from '../components/CoachPanel'
 
 export default function Program() {
   const navigate = useNavigate()
@@ -92,6 +94,11 @@ export default function Program() {
               {isOpen && (
                 <div className="px-5 pb-5 space-y-4">
                   <p className="text-zinc-400 text-sm">{phase.description}</p>
+
+                  {/* Technical coach note */}
+                  {phaseCoachNotes[phase.id] && (
+                    <CoachNoteCard note={phaseCoachNotes[phase.id]} defaultOpen={false} />
+                  )}
 
                   {/* Week schedule */}
                   <div>

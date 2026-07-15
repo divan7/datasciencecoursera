@@ -2,7 +2,20 @@ import { useState, useEffect, useCallback } from 'react'
 import type { AppState, UserProfile, Program, WorkoutLog, BodyMetrics } from '../types'
 import { programPhases } from '../data/programs'
 import { defaultMusclePriorities } from '../data/muscleFocus'
-import { format } from 'date-fns'
+import { format, differenceInDays, parseISO } from 'date-fns'
+
+export type InsightCadence = 'every_workout' | 'weekly' | 'biweekly' | 'manual'
+
+const INSIGHT_CADENCE_KEY = 'fitprogress_insight_cadence'
+const INSIGHT_LAST_SHOWN_KEY = 'fitprogress_insight_last_shown'
+
+function loadInsightCadence(): InsightCadence {
+  return (localStorage.getItem(INSIGHT_CADENCE_KEY) as InsightCadence) ?? 'weekly'
+}
+
+function loadInsightLastShown(): string | null {
+  return localStorage.getItem(INSIGHT_LAST_SHOWN_KEY)
+}
 
 const STORAGE_KEY = 'fitprogress_data'
 
@@ -49,11 +62,24 @@ function setState(updater: (prev: AppState) => AppState) {
 
 export function useAppStore() {
   const [, rerender] = useState(0)
+  const [insightCadence, setInsightCadenceState] = useState<InsightCadence>(loadInsightCadence)
+  const [insightLastShown, setInsightLastShownState] = useState<string | null>(loadInsightLastShown)
 
   useEffect(() => {
     const fn = () => rerender(n => n + 1)
     listeners.add(fn)
     return () => { listeners.delete(fn) }
+  }, [])
+
+  const setInsightCadence = useCallback((c: InsightCadence) => {
+    localStorage.setItem(INSIGHT_CADENCE_KEY, c)
+    setInsightCadenceState(c)
+  }, [])
+
+  const markInsightShown = useCallback(() => {
+    const today = format(new Date(), 'yyyy-MM-dd')
+    localStorage.setItem(INSIGHT_LAST_SHOWN_KEY, today)
+    setInsightLastShownState(today)
   }, [])
 
   const state = globalState
@@ -196,6 +222,17 @@ export function useAppStore() {
     return streak
   }, [state.workoutLogs])
 
+  // Should a coach insight appear right now given the cadence?
+  const shouldShowInsight = useCallback((): boolean => {
+    if (insightCadence === 'manual') return false
+    if (!insightLastShown) return true
+    const daysSince = differenceInDays(new Date(), parseISO(insightLastShown))
+    if (insightCadence === 'every_workout') return true
+    if (insightCadence === 'weekly') return daysSince >= 7
+    if (insightCadence === 'biweekly') return daysSince >= 14
+    return false
+  }, [insightCadence, insightLastShown])
+
   return {
     state,
     activeUser,
@@ -214,5 +251,9 @@ export function useAppStore() {
     getTotalWorkoutsCompleted,
     getCurrentStreak,
     generateId,
+    insightCadence,
+    setInsightCadence,
+    markInsightShown,
+    shouldShowInsight,
   }
 }

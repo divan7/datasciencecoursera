@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { User, Plus, Check, Star, ChevronDown, ChevronUp } from 'lucide-react'
+import { User, Plus, Check, Star, ChevronDown, ChevronUp, Bell } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
+import type { InsightCadence } from '../store/useAppStore'
 import { programPhases } from '../data/programs'
 import { muscleFocusGroups, priorityConfig } from '../data/muscleFocus'
 import { format, parseISO } from 'date-fns'
@@ -14,7 +15,7 @@ const fitnessLabels: Record<number, string> = {
 const priorityOrder: MusclePriority[] = ['high', 'medium', 'maintenance']
 
 export default function Profile() {
-  const { activeUser, activeProgram, state, setActiveUser, updateUser } = useAppStore()
+  const { activeUser, activeProgram, state, setActiveUser, updateUser, insightCadence, setInsightCadence } = useAppStore()
   const [showSwitcher, setShowSwitcher] = useState(false)
   const [showMuscleEditor, setShowMuscleEditor] = useState(false)
   const [saved] = useState(false)
@@ -179,6 +180,38 @@ export default function Profile() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* Coach insight cadence */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <Bell size={15} className="text-violet-400" />
+          <p className="text-sm font-semibold text-zinc-300">Explicaciones del coach</p>
+        </div>
+        <p className="text-xs text-zinc-500 mb-4">Con qué frecuencia mostrar los insights técnicos semanales en el Dashboard</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              { value: 'every_workout', label: 'Cada sesión' },
+              { value: 'weekly', label: 'Semanal' },
+              { value: 'biweekly', label: 'Quincenal' },
+              { value: 'manual', label: 'Solo si pido' },
+            ] as { value: InsightCadence; label: string }[]
+          ).map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setInsightCadence(opt.value)}
+              className={`px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                insightCadence === opt.value
+                  ? 'border-violet-400/60 bg-violet-400/10 text-violet-300'
+                  : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Sources */}

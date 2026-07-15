@@ -8,6 +8,8 @@ import { useAppStore } from '../store/useAppStore'
 import { exercises } from '../data/exercises'
 import { allWorkouts } from '../data/programs'
 import { muscleFocusMap } from '../data/muscleFocus'
+import { workoutCoachNotes } from '../data/coachNotes'
+import { CoachNoteCard } from '../components/CoachPanel'
 import { format } from 'date-fns'
 import type { ExerciseLog, MuscleGroup, MuscleFocusId } from '../types'
 
@@ -172,6 +174,11 @@ export default function WorkoutPage() {
       )}
 
       <div className="max-w-2xl mx-auto px-4 py-4 space-y-3 pb-32">
+        {/* Workout rationale */}
+        {workoutCoachNotes[workout.id] && (
+          <CoachNoteCard note={workoutCoachNotes[workout.id]} defaultOpen={false} />
+        )}
+
         {workout.exercises.map((we, idx) => {
           const ex = exercises.find(e => e.id === we.exerciseId)
           if (!ex) return null

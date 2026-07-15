@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Dumbbell, ChevronRight, ChevronLeft, User, Target, Activity } from 'lucide-react'
+import { Dumbbell, ChevronRight, ChevronLeft, User, Target, Activity, Zap } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
-import type { Gender, FitnessLevel, Equipment } from '../types'
+import type { Gender, FitnessLevel, Equipment, MuscleFocusId, MusclePriority, MusclePriorityMap } from '../types'
+import { muscleFocusGroups, defaultMusclePriorities, priorityConfig } from '../data/muscleFocus'
 
 type FormData = {
   name: string
@@ -15,6 +16,7 @@ type FormData = {
   targetSport: string
   equipment: Equipment[]
   availableTime: string
+  musclePriorities: MusclePriorityMap
 }
 
 const injuryOptions = [
@@ -34,9 +36,12 @@ const fitnessLabels: Record<FitnessLevel, string> = {
   5: 'Muy activo — entrenamiento diario',
 }
 
+const priorityOrder: MusclePriority[] = ['high', 'medium', 'maintenance']
+
 const steps = [
   { title: 'Datos personales', icon: User },
   { title: 'Historial físico', icon: Activity },
+  { title: 'Grupos musculares', icon: Zap },
   { title: 'Tus metas', icon: Target },
 ]
 
@@ -55,10 +60,20 @@ export default function Setup() {
     targetSport: 'Running',
     equipment: ['home'],
     availableTime: '25',
+    musclePriorities: { ...defaultMusclePriorities },
   })
 
   function toggle<T>(arr: T[], val: T): T[] {
     return arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]
+  }
+
+  function cyclePriority(id: MuscleFocusId) {
+    setForm(p => {
+      const current = p.musclePriorities[id]
+      const idx = priorityOrder.indexOf(current)
+      const next = priorityOrder[(idx + 1) % priorityOrder.length]
+      return { ...p, musclePriorities: { ...p.musclePriorities, [id]: next } }
+    })
   }
 
   function handleSubmit() {
@@ -74,19 +89,21 @@ export default function Setup() {
       targetSport: form.targetSport,
       equipment: form.equipment,
       availableTime: Number(form.availableTime) || 25,
+      musclePriorities: form.musclePriorities,
     })
   }
 
   const canNext = () => {
     if (step === 0) return form.name.trim().length > 0
-    if (step === 1) return true
-    return form.goals.length > 0
+    return true
   }
+
+  const highCount = Object.values(form.musclePriorities).filter(p => p === 'high').length
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-4 py-12">
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-10">
+      <div className="flex items-center gap-3 mb-8">
         <div className="w-12 h-12 rounded-2xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center">
           <Dumbbell size={24} className="text-cyan-400" />
         </div>
@@ -97,11 +114,11 @@ export default function Setup() {
       </div>
 
       {/* Step indicator */}
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-2 mb-8">
         {steps.map((s, i) => {
           const Icon = s.icon
           return (
-            <div key={i} className="flex items-center gap-3">
+            <div key={i} className="flex items-center gap-2">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${
                   i === step
@@ -111,10 +128,10 @@ export default function Setup() {
                     : 'bg-zinc-800 border-zinc-700 text-zinc-500'
                 }`}
               >
-                {i < step ? '✓' : <Icon size={14} />}
+                {i < step ? '✓' : <Icon size={13} />}
               </div>
               {i < steps.length - 1 && (
-                <div className={`w-10 h-px ${i < step ? 'bg-cyan-400/40' : 'bg-zinc-700'}`} />
+                <div className={`w-6 h-px ${i < step ? 'bg-cyan-400/40' : 'bg-zinc-700'}`} />
               )}
             </div>
           )
@@ -124,7 +141,7 @@ export default function Setup() {
       <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
         <h2 className="text-lg font-semibold text-white mb-1">{steps[step].title}</h2>
 
-        {/* STEP 0 */}
+        {/* ── STEP 0 — Datos personales ── */}
         {step === 0 && (
           <div className="space-y-4 mt-4">
             <div>
@@ -182,7 +199,7 @@ export default function Setup() {
           </div>
         )}
 
-        {/* STEP 1 */}
+        {/* ── STEP 1 — Historial físico ── */}
         {step === 1 && (
           <div className="space-y-5 mt-4">
             <div>
@@ -194,12 +211,7 @@ export default function Setup() {
                   <button
                     key={inj}
                     type="button"
-                    onClick={() =>
-                      setForm(p => ({
-                        ...p,
-                        injuries: toggle(p.injuries, inj),
-                      }))
-                    }
+                    onClick={() => setForm(p => ({ ...p, injuries: toggle(p.injuries, inj) }))}
                     className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
                       form.injuries.includes(inj)
                         ? 'bg-orange-400/20 border-orange-400/60 text-orange-300'
@@ -249,8 +261,66 @@ export default function Setup() {
           </div>
         )}
 
-        {/* STEP 2 */}
+        {/* ── STEP 2 — Grupos musculares ── */}
         {step === 2 && (
+          <div className="mt-4 space-y-4">
+            <p className="text-sm text-zinc-400">
+              Toca cada grupo para cambiar su prioridad. El programa ajustará el volumen y énfasis en función de estas preferencias.
+            </p>
+
+            <div className="space-y-2">
+              {muscleFocusGroups.map(group => {
+                const priority = form.musclePriorities[group.id]
+                const cfg = priorityConfig[priority]
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    onClick={() => cyclePriority(group.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all ${cfg.bg} ${cfg.border}`}
+                  >
+                    <span className="text-2xl shrink-0">{group.emoji}</span>
+                    <div className="flex-1 text-left">
+                      <p className="text-white font-semibold text-sm">{group.label}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">{group.goal}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className={`text-xs font-bold uppercase tracking-wide ${cfg.color}`}>
+                        {cfg.label}
+                      </span>
+                      <div className="flex gap-1 mt-1 justify-end">
+                        {priorityOrder.map(p => (
+                          <div
+                            key={p}
+                            className={`w-2 h-2 rounded-full ${
+                              priorityOrder.indexOf(p) <= priorityOrder.indexOf(priority)
+                                ? p === 'high' ? 'bg-cyan-400' : p === 'medium' ? 'bg-violet-400' : 'bg-zinc-500'
+                                : 'bg-zinc-700'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {highCount === 0 && (
+              <p className="text-xs text-orange-400/80 bg-orange-400/5 border border-orange-400/20 rounded-lg px-3 py-2">
+                Tip: marca al menos un grupo como "Alta prioridad" para que el programa lo enfatice
+              </p>
+            )}
+            {highCount > 3 && (
+              <p className="text-xs text-zinc-500 bg-zinc-800/60 rounded-lg px-3 py-2">
+                Con muchos grupos en alta prioridad el efecto se diluye — selecciona 1-3 para mejor resultado
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── STEP 3 — Metas ── */}
+        {step === 3 && (
           <div className="space-y-5 mt-4">
             <div>
               <label className="text-xs text-zinc-400 uppercase tracking-wider mb-2 block">

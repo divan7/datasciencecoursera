@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ChevronDown, ChevronUp, CheckCircle2, Circle, Timer,
-  Info, Flame, SkipForward,
+  Info, Flame, SkipForward, Star,
 } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { exercises } from '../data/exercises'
 import { allWorkouts } from '../data/programs'
+import { muscleFocusMap } from '../data/muscleFocus'
 import { format } from 'date-fns'
-import type { ExerciseLog } from '../types'
+import type { ExerciseLog, MuscleGroup, MuscleFocusId } from '../types'
 
 const muscleLabels: Record<string, string> = {
   core: 'Core', glutes: 'Glúteos', quads: 'Cuádriceps', hamstrings: 'Isquiotibiales',
@@ -18,6 +19,21 @@ const muscleLabels: Record<string, string> = {
 
 const difficultyLabel = ['', 'Básico', 'Intermedio', 'Avanzado']
 const difficultyColor = ['', 'text-emerald-400', 'text-orange-400', 'text-red-400']
+
+function getExercisePriority(
+  muscles: MuscleGroup[],
+  priorities: Record<string, string>
+): 'high' | 'medium' | null {
+  let best: 'high' | 'medium' | null = null
+  for (const [focusId, focusMuscles] of Object.entries(muscleFocusMap)) {
+    if (muscles.some(m => focusMuscles.includes(m))) {
+      const p = priorities[focusId as MuscleFocusId]
+      if (p === 'high') return 'high'
+      if (p === 'medium') best = 'medium'
+    }
+  }
+  return best
+}
 
 export default function WorkoutPage() {
   const { workoutId } = useParams()
@@ -162,6 +178,7 @@ export default function WorkoutPage() {
           const sets = completedSets[ex.id] ?? []
           const allDone = sets.every(Boolean)
           const isExpanded = expandedEx === ex.id
+          const exPriority = getExercisePriority(ex.muscles, activeUser.musclePriorities ?? {})
 
           return (
             <div
@@ -169,6 +186,8 @@ export default function WorkoutPage() {
               className={`border rounded-2xl overflow-hidden transition-all ${
                 allDone
                   ? 'border-emerald-400/30 bg-emerald-400/5'
+                  : exPriority === 'high'
+                  ? 'border-cyan-400/30 bg-cyan-400/3'
                   : 'border-zinc-800 bg-zinc-900'
               }`}
             >
@@ -178,15 +197,26 @@ export default function WorkoutPage() {
                 onClick={() => setExpandedEx(isExpanded ? null : ex.id)}
                 className="w-full px-4 py-4 flex items-center gap-3 text-left"
               >
-                <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0 text-sm font-bold text-zinc-400">
+                <div
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-sm font-bold ${
+                    exPriority === 'high'
+                      ? 'bg-cyan-400/20 text-cyan-400'
+                      : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
                   {idx + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className={`font-semibold ${allDone ? 'text-emerald-400' : 'text-white'}`}>
                       {ex.nameEs}
                     </p>
                     {allDone && <CheckCircle2 size={14} className="text-emerald-400" />}
+                    {!allDone && exPriority === 'high' && (
+                      <span className="flex items-center gap-1 text-xs text-cyan-400 bg-cyan-400/10 px-1.5 py-0.5 rounded-full">
+                        <Star size={10} fill="currentColor" /> Prioritario
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-zinc-500 mt-0.5">
                     {we.sets} series × {we.reps} · descanso {we.restSeconds}s

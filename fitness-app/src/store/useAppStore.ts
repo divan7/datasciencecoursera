@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { AppState, UserProfile, Program, WorkoutLog, BodyMetrics } from '../types'
 import { programPhases } from '../data/programs'
+import { defaultMusclePriorities } from '../data/muscleFocus'
 import { format } from 'date-fns'
 
 const STORAGE_KEY = 'fitprogress_data'
@@ -17,7 +18,13 @@ function loadState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return defaultState
-    return { ...defaultState, ...JSON.parse(raw) }
+    const parsed = JSON.parse(raw) as AppState
+    // Backfill musclePriorities for users that predate the feature
+    const users = parsed.users?.map(u => ({
+      ...u,
+      musclePriorities: u.musclePriorities ?? { ...defaultMusclePriorities },
+    })) ?? []
+    return { ...defaultState, ...parsed, users }
   } catch {
     return defaultState
   }

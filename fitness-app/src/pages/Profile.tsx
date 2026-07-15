@@ -1,17 +1,22 @@
 import { useState } from 'react'
-import { User, Plus, Check } from 'lucide-react'
+import { User, Plus, Check, Star, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { programPhases } from '../data/programs'
+import { muscleFocusGroups, priorityConfig } from '../data/muscleFocus'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
+import type { MuscleFocusId, MusclePriority } from '../types'
 
 const fitnessLabels: Record<number, string> = {
   1: 'Sedentario', 2: 'Leve', 3: 'Moderado', 4: 'Activo', 5: 'Muy activo',
 }
 
+const priorityOrder: MusclePriority[] = ['high', 'medium', 'maintenance']
+
 export default function Profile() {
-  const { activeUser, activeProgram, state, setActiveUser } = useAppStore()
+  const { activeUser, activeProgram, state, setActiveUser, updateUser } = useAppStore()
   const [showSwitcher, setShowSwitcher] = useState(false)
+  const [showMuscleEditor, setShowMuscleEditor] = useState(false)
   const [saved] = useState(false)
 
   if (!activeUser) return null
@@ -68,6 +73,87 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Muscle priorities — editable */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowMuscleEditor(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-4"
+        >
+          <div className="flex items-center gap-2">
+            <Star size={15} className="text-cyan-400" />
+            <p className="text-sm font-semibold text-zinc-300">Enfoque muscular</p>
+          </div>
+          {showMuscleEditor ? <ChevronUp size={15} className="text-zinc-500" /> : <ChevronDown size={15} className="text-zinc-500" />}
+        </button>
+
+        {/* Summary chips (always visible) */}
+        <div className="px-5 pb-4 flex flex-wrap gap-2">
+          {muscleFocusGroups.map(group => {
+            const priority = activeUser.musclePriorities?.[group.id as MuscleFocusId] ?? 'medium'
+            const cfg = priorityConfig[priority]
+            return (
+              <span
+                key={group.id}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.border} ${cfg.color}`}
+              >
+                {group.emoji} {group.label}
+                {priority === 'high' && <Star size={8} fill="currentColor" />}
+              </span>
+            )
+          })}
+        </div>
+
+        {showMuscleEditor && (
+          <div className="border-t border-zinc-800 px-5 py-4 space-y-2">
+            <p className="text-xs text-zinc-500 mb-3">Toca para cambiar la prioridad de cada grupo</p>
+            {muscleFocusGroups.map(group => {
+              const priority = activeUser.musclePriorities?.[group.id as MuscleFocusId] ?? 'medium'
+              const cfg = priorityConfig[priority]
+              function cyclePriority() {
+                const idx = priorityOrder.indexOf(priority)
+                const next = priorityOrder[(idx + 1) % priorityOrder.length]
+                updateUser(activeUser!.id, {
+                  musclePriorities: {
+                    ...(activeUser!.musclePriorities ?? {}),
+                    [group.id]: next,
+                  },
+                })
+              }
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={cyclePriority}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all ${cfg.bg} ${cfg.border}`}
+                >
+                  <span className="text-xl shrink-0">{group.emoji}</span>
+                  <div className="flex-1 text-left">
+                    <p className="text-white font-medium text-sm">{group.label}</p>
+                    <p className="text-xs text-zinc-500">{group.goal}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`text-xs font-bold ${cfg.color}`}>{cfg.label}</span>
+                    <div className="flex gap-1 mt-1 justify-end">
+                      {priorityOrder.map(p => (
+                        <div
+                          key={p}
+                          className={`w-2 h-2 rounded-full ${
+                            priorityOrder.indexOf(p) <= priorityOrder.indexOf(priority)
+                              ? p === 'high' ? 'bg-cyan-400' : p === 'medium' ? 'bg-violet-400' : 'bg-zinc-500'
+                              : 'bg-zinc-700'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Goals & injuries */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">

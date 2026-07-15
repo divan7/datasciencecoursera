@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { Flame, Trophy, Calendar, ChevronRight, Play, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Flame, Trophy, Calendar, ChevronRight, Play, CheckCircle2, AlertCircle, Star } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
+import { muscleFocusGroups, priorityConfig } from '../data/muscleFocus'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
+import type { MuscleFocusId } from '../types'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -164,6 +166,38 @@ export default function Dashboard() {
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Muscle priorities summary */}
+      {activeUser.musclePriorities && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Star size={14} className="text-cyan-400" />
+            <p className="text-sm font-semibold text-zinc-300">Enfoque muscular</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {muscleFocusGroups.map(group => {
+              const priority = activeUser.musclePriorities[group.id as MuscleFocusId] ?? 'medium'
+              if (priority === 'maintenance') return null
+              const cfg = priorityConfig[priority]
+              return (
+                <span
+                  key={group.id}
+                  className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.border} ${cfg.color}`}
+                >
+                  {group.emoji} {group.label}
+                  {priority === 'high' && <Star size={9} fill="currentColor" />}
+                </span>
+              )
+            })}
+          </div>
+          <button
+            onClick={() => navigate('/profile')}
+            className="mt-3 text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+          >
+            Editar prioridades →
+          </button>
         </div>
       )}
 

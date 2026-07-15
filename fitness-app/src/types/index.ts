@@ -14,6 +14,19 @@ export type MuscleGroup =
   | 'full_body'
   | 'mobility'
 
+export type MuscleFocusId = 'legs' | 'back' | 'arms' | 'chest' | 'shoulders' | 'core'
+export type MusclePriority = 'high' | 'medium' | 'maintenance'
+
+export interface MuscleFocusConfig {
+  id: MuscleFocusId
+  label: string
+  emoji: string
+  muscles: MuscleGroup[]
+  goal: string
+}
+
+export type MusclePriorityMap = Record<MuscleFocusId, MusclePriority>
+
 export interface UserProfile {
   id: string
   name: string
@@ -27,6 +40,7 @@ export interface UserProfile {
   targetSport: string
   equipment: Equipment[]
   availableTime: number
+  musclePriorities: MusclePriorityMap
   createdAt: string
 }
 

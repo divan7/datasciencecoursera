@@ -21,6 +21,23 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('[ErrorBoundary]', error, info.componentStack);
   }
 
+  clearCacheAndReload() {
+    const p = Promise.resolve()
+      .then(() =>
+        'serviceWorker' in navigator
+          ? navigator.serviceWorker.getRegistrations().then((regs) =>
+              Promise.all(regs.map((r) => r.unregister()))
+            )
+          : undefined
+      )
+      .then(() =>
+        'caches' in window
+          ? caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+          : undefined
+      );
+    p.finally(() => window.location.reload());
+  }
+
   render() {
     if (this.state.error) {
       if (this.props.fallback) return this.props.fallback;
@@ -37,6 +54,12 @@ export class ErrorBoundary extends Component<Props, State> {
               className="w-full py-2.5 rounded-2xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all"
             >
               Recargar app
+            </button>
+            <button
+              onClick={() => this.clearCacheAndReload()}
+              className="w-full py-2.5 rounded-2xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-all"
+            >
+              Limpiar caché y recargar
             </button>
             <button
               onClick={() => this.setState({ error: null })}

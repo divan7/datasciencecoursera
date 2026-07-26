@@ -18,5 +18,40 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- Recovery: if React fails to mount within 6s (bundle error, SW cache stale, etc.) show a clear-cache prompt -->
+    <script>
+      window.addEventListener('load', function () {
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (root && !root.hasChildNodes()) {
+            root.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px;font-family:Nunito,sans-serif;background:#f9fafb;text-align:center;gap:16px';
+            root.innerHTML = '<div style="font-size:48px">⚠️</div>'
+              + '<h2 style="font-size:18px;font-weight:800;color:#1f2937;margin:0">La app no cargó</h2>'
+              + '<p style="font-size:13px;color:#6b7280;margin:0;max-width:280px">Probablemente hay una versión guardada que entró en conflicto. Borra el caché para continuar.</p>'
+              + '<button onclick="window.__clearAndReload()" style="padding:12px 24px;background:#0c6878;color:#fff;border:none;border-radius:16px;font-size:14px;font-weight:700;cursor:pointer">Limpiar caché y recargar</button>'
+              + '<button onclick="window.location.reload()" style="padding:10px 24px;background:transparent;color:#6b7280;border:1px solid #e5e7eb;border-radius:16px;font-size:13px;cursor:pointer">Solo recargar</button>';
+          }
+        }, 6000);
+      });
+
+      window.__clearAndReload = function () {
+        var p = Promise.resolve();
+        if ('serviceWorker' in navigator) {
+          p = p.then(function () {
+            return navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            });
+          });
+        }
+        if ('caches' in window) {
+          p = p.then(function () {
+            return caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            });
+          });
+        }
+        p.then(function () { window.location.reload(); }).catch(function () { window.location.reload(); });
+      };
+    </script>
   </body>
 </html>

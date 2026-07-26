@@ -136,6 +136,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [inputMode, setInputMode] = useState<InputMode>('form');
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
+  const prefillTemplateRef = useRef<FixedExpenseTemplate | null>(null);
+  prefillTemplateRef.current = prefillTemplate;
   const [suggestQueue, setSuggestQueue] = useState<{ expense: Expense; autoConfirm?: boolean }[]>([]);
   const [reminderTemplate, setReminderTemplate] = useState<FixedExpenseTemplate | null>(null);
   const [saveToast, setSaveToast] = useState<string | null>(null);
@@ -410,15 +412,26 @@ export default function App() {
       const saved = addExpense(data);
       const month = data.date.slice(0, 7);
       const matched = tryAutoMatch(saved, month);
-      // Offer to create a fixed template when a fijo expense has no matching template
       if (!matched && data.expenseType === 'fijo') {
-        setSuggestQueue((q) => [...q, { expense: saved }]);
+        const fromPrefill = prefillTemplateRef.current;
+        if (fromPrefill) {
+          // User registered from an existing template. tryAutoMatch may have failed
+          // because the check didn't exist yet for this month (checklist not visited).
+          // Find its pending check and confirm it directly; never suggest creating
+          // a duplicate template.
+          const pendingCheck = checks.find(
+            (c) => c.templateId === fromPrefill.id && c.month === month && c.status === 'pendiente'
+          );
+          if (pendingCheck) confirmCheck(pendingCheck.id, saved.id, saved.amount);
+        } else {
+          setSuggestQueue((q) => [...q, { expense: saved }]);
+        }
       }
       setPrefillTemplate(null);
       setActiveTab('list');
       showSaveToast(data.transactionType === 'ingreso' ? 'Ingreso guardado' : 'Gasto guardado');
     },
-    [addExpense, tryAutoMatch, showSaveToast]
+    [addExpense, tryAutoMatch, showSaveToast, checks, confirmCheck]
   );
 
   const handleSaveExpenseMultiple = useCallback(

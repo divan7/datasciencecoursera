@@ -240,7 +240,16 @@ export function checkAndFireNotifications(templates: FixedExpenseTemplate[]) {
         ? `Hoy vence el pago de ${tpl.concept} · $${tpl.expectedAmount.toLocaleString('es-MX')}`
         : `El pago de ${tpl.concept} vence en ${daysUntil} día${daysUntil > 1 ? 's' : ''} · $${tpl.expectedAmount.toLocaleString('es-MX')}`;
 
-      new Notification('Orden Casa — Recordatorio', { body, tag: key });
+      // iOS PWA prohibits new Notification() — use SW registration instead.
+      try {
+        new Notification('Orden Casa — Recordatorio', { body, tag: key });
+      } catch {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready
+            .then((reg) => reg.showNotification('Orden Casa — Recordatorio', { body, tag: key }))
+            .catch(() => {});
+        }
+      }
       markNotified(key);
     }
   }

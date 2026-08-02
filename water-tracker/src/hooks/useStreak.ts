@@ -28,6 +28,9 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
   const [streakLoaded, setStreakLoaded] = useState(false);
 
   const loadedForRef = useRef<string | null | undefined>(undefined);
+  const dataRef = useRef(data);
+
+  useEffect(() => { dataRef.current = data; }, [data]);
 
   useEffect(() => {
     if (loadedForRef.current === userId) return;
@@ -79,16 +82,17 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
   useEffect(() => {
     if (!streakLoaded) return;
     if (goalMl <= 0 || totalMl < goalMl) return;
-    if (data.lastCompletedDate === today) return;
+    const d = dataRef.current;
+    if (d.lastCompletedDate === today) return;
 
     const isConsecutive =
-      data.lastCompletedDate !== null &&
-      isYesterday(parseISO(data.lastCompletedDate));
+      d.lastCompletedDate !== null &&
+      isYesterday(parseISO(d.lastCompletedDate));
 
-    const newStreak = isConsecutive ? data.currentStreak + 1 : 1;
+    const newStreak = isConsecutive ? d.currentStreak + 1 : 1;
     const updated: StreakData = {
       currentStreak: newStreak,
-      longestStreak: Math.max(newStreak, data.longestStreak),
+      longestStreak: Math.max(newStreak, d.longestStreak),
       lastCompletedDate: today,
     };
     setData(updated);
@@ -102,7 +106,7 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         .eq('id', userId)
         .then(() => { /* fire-and-forget */ });
     }
-  }, [totalMl, goalMl, today, data, userId, streakLoaded]);
+  }, [totalMl, goalMl, today, userId, streakLoaded]);
 
   const streakBroken =
     data.lastCompletedDate !== null &&

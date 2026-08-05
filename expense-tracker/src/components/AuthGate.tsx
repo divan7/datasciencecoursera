@@ -66,13 +66,13 @@ export function AuthGate({ onSignIn, onSignInPassword, onSignUp }: Props) {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-6 py-10"
-      style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}
+      style={{ background: 'linear-gradient(135deg, #1A2D33 0%, #2C5F6E 100%)' }}
     >
       {/* Logo */}
       <div className="mb-8 flex flex-col items-center gap-3">
         <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
           <circle cx="24" cy="32" r="20" fill="white" opacity="0.9" />
-          <circle cx="40" cy="32" r="20" fill="#f5a884" opacity="0.85" />
+          <circle cx="40" cy="32" r="20" fill="#E8A97A" opacity="0.85" />
           <circle cx="32" cy="20" r="20" fill="white" opacity="0.6" />
         </svg>
         <div className="text-center">
@@ -168,7 +168,7 @@ export function AuthGate({ onSignIn, onSignInPassword, onSignUp }: Props) {
 
             <button type="submit" disabled={loading || !email.trim()}
               className="w-full py-3 rounded-2xl text-white text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 active:scale-95"
-              style={{ backgroundColor: '#0c6878' }}>
+              style={{ backgroundColor: '#2C5F6E' }}>
               {loading
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Procesando...</>
                 : mode === 'login' ? <><LogIn size={16} /> Entrar</>

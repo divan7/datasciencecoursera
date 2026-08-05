@@ -587,7 +587,7 @@ export default function App() {
     if (authLoading || !spacesLoaded) {
       return (
         <div className="min-h-screen flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+          style={{ background: 'linear-gradient(135deg, #1A2D33 0%, #2C5F6E 100%)' }}>
           <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"/>
         </div>
       );
@@ -636,7 +636,7 @@ export default function App() {
   if (isSupabaseConfigured && welcomeMode === 'joined') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10"
-        style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #1A2D33 0%, #2C5F6E 100%)' }}>
         <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-7 space-y-5">
           <div className="text-center space-y-2">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ backgroundColor: '#e6f7f9' }}>
@@ -653,13 +653,13 @@ export default function App() {
             <button
               onClick={() => setWelcomeMode('choosing')}
               className="w-full py-3 rounded-2xl text-white text-sm font-bold flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={{ backgroundColor: '#0c6878' }}>
+              style={{ backgroundColor: '#2C5F6E' }}>
               Ir a {joinedSpaceName} →
             </button>
             <button
               onClick={() => setWelcomeMode('creating')}
               className="w-full py-3 rounded-2xl text-sm font-bold border-2 text-gray-700 flex items-center justify-center gap-2 transition-all active:scale-95"
-              style={{ borderColor: '#0c6878' }}>
+              style={{ borderColor: '#2C5F6E' }}>
               También crear mi propia lista
             </button>
           </div>
@@ -678,7 +678,7 @@ export default function App() {
   if (spaces.length > 0 && session && !currentSpace) {
     return (
       <div className="min-h-screen flex items-center justify-center"
-        style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+        style={{ background: 'linear-gradient(135deg, #1A2D33 0%, #2C5F6E 100%)' }}>
         <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"/>
       </div>
     );

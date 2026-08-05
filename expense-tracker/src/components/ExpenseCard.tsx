@@ -98,12 +98,12 @@ export function ExpenseCard({ expense: e, onDelete, onEdit }: ExpenseCardProps) 
 
               <div className="flex items-center gap-2 flex-shrink-0">
                 {e.transactionType === 'ingreso' && (
-                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#f5ede6', color: '#a85a3a' }}>
+                  <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#F7F4EF', color: '#C47B48' }}>
                     +ingreso
                   </span>
                 )}
                 <span className={`text-base font-bold ${e.transactionType === 'ingreso' ? '' : 'text-gray-900'}`}
-                  style={e.transactionType === 'ingreso' ? { color: '#cc7a55' } : {}}>
+                  style={e.transactionType === 'ingreso' ? { color: '#E8A97A' } : {}}>
                   {e.transactionType === 'ingreso' ? '+' : ''}${e.amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>

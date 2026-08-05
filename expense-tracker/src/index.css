@@ -6,20 +6,23 @@
 
 /* ── SOIHogar brand tokens ─────────────────────────────────── */
 :root {
-  --soi-teal:        #0c6878;   /* Teal Profundo — primario */
-  --soi-teal-mid:    #2b8fa0;   /* Teal Medio */
-  --soi-teal-light:  #7dd4e0;   /* Teal Claro */
-  --soi-terra:       #cc7a55;   /* Terracota — acento */
-  --soi-terra-dark:  #a85a3a;   /* Terracota Oscuro */
-  --soi-cream:       #f5ede6;   /* Crema — fondo acento */
-  --soi-ink:         #162232;   /* Ink — oscuro */
+  --soi-ink:         #1A2D33;   /* Ink — oscuro principal */
+  --soi-ink-soft:    #3A4A52;   /* Ink Suave */
+  --soi-ink-faint:   #7A9099;   /* Ink Tenue */
+  --soi-teal:        #2C5F6E;   /* Teal Profundo — primario */
+  --soi-teal-mid:    #4A9BAA;   /* Teal Medio */
+  --soi-teal-light:  #A8D5DC;   /* Teal Claro */
+  --soi-terra:       #E8A97A;   /* Terracota — acento */
+  --soi-terra-dark:  #C47B48;   /* Terracota Oscuro */
+  --soi-cream:       #F7F4EF;   /* Crema — fondo principal */
+  --soi-cream-warm:  #EFE8DD;   /* Crema Cálida */
 }
 
 body {
   margin: 0;
-  font-family: 'Nunito', system-ui, -apple-system, sans-serif;
-  background-color: #f8fafc;
-  color: #1e293b;
+  font-family: 'Nunito Sans', 'Nunito', system-ui, -apple-system, sans-serif;
+  background-color: #F7F4EF;
+  color: #1A2D33;
 }
 
 #root {

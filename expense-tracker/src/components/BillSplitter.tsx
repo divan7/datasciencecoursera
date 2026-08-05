@@ -317,7 +317,7 @@ export function BillSplitter({ items, members, onClose, onApplySplit, onApplyPro
                     type="button"
                     onClick={() => { onApplySplit(itemObligations); onClose(); }}
                     className="flex-1 py-3 rounded-2xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all active:scale-95"
-                    style={{ backgroundColor: '#0c6878' }}
+                    style={{ backgroundColor: '#2C5F6E' }}
                   >
                     <Check size={16} />
                     Aplicar

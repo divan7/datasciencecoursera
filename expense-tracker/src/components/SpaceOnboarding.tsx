@@ -142,12 +142,12 @@ export function SpaceOnboarding({ onComplete, isSupabaseMode = false }: Props) {
         {/* Header */}
         <div
           className="px-6 py-7 text-white text-center"
-          style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}
+          style={{ background: 'linear-gradient(135deg, #1A2D33 0%, #2C5F6E 100%)' }}
         >
           {/* Logo — overlapping circles, consistent with login screen */}
           <svg width="56" height="56" viewBox="0 0 64 64" fill="none" className="mx-auto mb-3">
             <circle cx="24" cy="34" r="18" fill="white" opacity="0.9" />
-            <circle cx="40" cy="34" r="18" fill="#f5a884" opacity="0.9" />
+            <circle cx="40" cy="34" r="18" fill="#E8A97A" opacity="0.9" />
             <circle cx="32" cy="22" r="18" fill="white" opacity="0.55" />
           </svg>
           <p className="text-white/70 text-[11px] tracking-[0.2em] uppercase font-medium mb-0.5">by SOIHogar</p>

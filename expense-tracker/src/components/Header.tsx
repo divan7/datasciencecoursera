@@ -14,22 +14,22 @@ interface HeaderProps {
   plan?: SpacePlan;
 }
 
-/** Concepto C — "Vínculo": tres círculos superpuestos (marca SOIHogar) */
+/** Isotipo SOIHogar: tres anillos entrelazados sobre fondo Ink */
 function VinculoLogo() {
   return (
     <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="36" height="36" rx="10" fill="white" fillOpacity="0.12" />
-      {/* Circle 1 — teal (condómino) */}
-      <circle cx="13" cy="20" r="8.5" fill="none" stroke="white" strokeWidth="2.2" strokeOpacity="0.95" />
-      {/* Circle 2 — terracotta (comité) */}
-      <circle cx="23" cy="20" r="8.5" fill="none" stroke="#f5a884" strokeWidth="2.2" strokeOpacity="0.9" />
-      {/* Circle 3 — light (administradora) */}
-      <circle cx="18" cy="12" r="8.5" fill="none" stroke="white" strokeWidth="2.2" strokeOpacity="0.5" />
+      <rect width="36" height="36" rx="10" fill="white" fillOpacity="0.10" />
+      {/* Anillo izquierdo — blanco/gris */}
+      <circle cx="13" cy="20" r="8.5" fill="none" stroke="rgba(255,255,255,0.75)" strokeWidth="2.2" />
+      {/* Anillo central — terra #E8A97A */}
+      <circle cx="23" cy="20" r="8.5" fill="none" stroke="#E8A97A" strokeWidth="2.2" />
+      {/* Anillo superior — teal light #A8D5DC */}
+      <circle cx="18" cy="12" r="8.5" fill="none" stroke="#A8D5DC" strokeWidth="2.2" />
     </svg>
   );
 }
 
-const BRAND_BG = '#0c6878';  // Teal Profundo — color primario SOIHogar
+const BRAND_BG = '#1A2D33';  // Ink — color principal SOIHogar
 
 export function Header({
   activeTab, onTabChange,
@@ -63,7 +63,7 @@ export function Header({
                 Orden Casa
               </h1>
               <div className="flex items-center gap-1.5">
-                <p className="text-xs font-semibold leading-none" style={{ color: '#7dd4e0' }}>
+                <p className="text-xs font-semibold leading-none" style={{ color: '#A8D5DC' }}>
                   by SOIHogar
                 </p>
                 {plan === 'free' && (
@@ -88,7 +88,7 @@ export function Header({
           >
             <div className="text-right hidden sm:block">
               <p className="text-xs font-semibold leading-none text-white">{memberName}</p>
-              <p className="text-xs leading-none mt-0.5 truncate max-w-[80px]" style={{ color: '#7dd4e0' }}>
+              <p className="text-xs leading-none mt-0.5 truncate max-w-[80px]" style={{ color: '#A8D5DC' }}>
                 {spaceName}
               </p>
             </div>
@@ -98,7 +98,7 @@ export function Header({
             >
               {initials}
             </div>
-            <ChevronDown size={14} style={{ color: '#7dd4e0' }} className="flex-shrink-0" />
+            <ChevronDown size={14} style={{ color: '#A8D5DC' }} className="flex-shrink-0" />
           </button>
         </div>
 
@@ -110,9 +110,10 @@ export function Header({
               onClick={() => onTabChange(tab.id)}
               className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-lg transition-all ${
                 activeTab === tab.id
-                  ? 'bg-white text-teal-800 shadow-sm'
-                  : 'text-teal-100 hover:bg-white/10'
+                  ? 'bg-white shadow-sm'
+                  : 'hover:bg-white/10'
               }`}
+              style={activeTab === tab.id ? { color: '#1A2D33' } : { color: '#A8D5DC' }}
             >
               {tab.icon}
               <span style={{ fontSize: '9px' }} className="font-semibold">{tab.label}</span>

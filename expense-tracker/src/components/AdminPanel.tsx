@@ -77,7 +77,7 @@ export function AdminPanel() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-2">
-        <Shield size={18} style={{ color: '#0c6878' }} />
+        <Shield size={18} style={{ color: '#2C5F6E' }} />
         <h2 className="text-base font-bold text-gray-800">Panel de Administración</h2>
       </div>
 
@@ -111,9 +111,9 @@ export function AdminPanel() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={<Users size={16}/>} label="Total usuarios" value={total} color="#0c6878"/>
+        <StatCard icon={<Users size={16}/>} label="Total usuarios" value={total} color="#2C5F6E"/>
         <StatCard icon={<TrendingUp size={16}/>} label="Activos (7 días)" value={active7} color="#10b981"/>
-        <StatCard icon={<Crown size={16}/>} label="Premium" value={byPlan.premium} color="#cc7a55"/>
+        <StatCard icon={<Crown size={16}/>} label="Premium" value={byPlan.premium} color="#E8A97A"/>
         <StatCard icon={<Clock size={16}/>} label="Nuevos este mes" value={newThisMonth} color="#8b5cf6"/>
       </div>
 
@@ -130,7 +130,7 @@ export function AdminPanel() {
                 <div className="flex-1 bg-gray-100 rounded-full h-1.5">
                   <div className="h-1.5 rounded-full" style={{
                     width: total ? `${(byPlan[plan] / total) * 100}%` : '0%',
-                    backgroundColor: plan === 'premium' ? '#cc7a55' : plan === 'trial' ? '#f59e0b' : '#9ca3af',
+                    backgroundColor: plan === 'premium' ? '#E8A97A' : plan === 'trial' ? '#f59e0b' : '#9ca3af',
                   }}/>
                 </div>
               </div>
@@ -150,7 +150,7 @@ export function AdminPanel() {
                 className={`px-2 py-0.5 rounded-full text-xs font-semibold transition-all ${
                   filter === f ? 'text-white' : 'text-gray-400 bg-gray-50'
                 }`}
-                style={filter === f ? { backgroundColor: '#0c6878' } : {}}>
+                style={filter === f ? { backgroundColor: '#2C5F6E' } : {}}>
                 {f === 'all' ? 'Todos' : PLAN_LABELS[f].split(' ')[1]}
               </button>
             ))}
@@ -175,7 +175,7 @@ export function AdminPanel() {
               return (
                 <div key={p.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                    style={{ backgroundColor: '#0c6878' }}>
+                    style={{ backgroundColor: '#2C5F6E' }}>
                     {p.displayName.slice(0,1).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">

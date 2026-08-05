@@ -274,7 +274,7 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple: _onSaveMultiple
           type="button"
           onClick={() => handleTransactionSwitch('ingreso')}
           className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${isIncome ? 'text-white shadow-sm' : 'text-gray-500'}`}
-          style={isIncome ? { backgroundColor: '#cc7a55' } : {}}
+          style={isIncome ? { backgroundColor: '#E8A97A' } : {}}
         >
           💰 Ingreso
         </button>
@@ -318,14 +318,14 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple: _onSaveMultiple
 
       {/* Amount */}
       <div className={`rounded-2xl p-4 border-2 ${isIncome ? '' : 'bg-teal-50 border-teal-100'}`}
-        style={isIncome ? { backgroundColor: '#f5ede6', borderColor: '#e8c4a8' } : {}}>
-        <label className={`block text-xs font-semibold uppercase tracking-wide mb-1 ${isIncome ? 'text-[#a85a3a]' : 'text-teal-700'}`}>
+        style={isIncome ? { backgroundColor: '#F7F4EF', borderColor: '#e8c4a8' } : {}}>
+        <label className={`block text-xs font-semibold uppercase tracking-wide mb-1 ${isIncome ? 'text-[#C47B48]' : 'text-teal-700'}`}>
           {splitEnabled && splitParticipants.length > 0
             ? (isIncome ? 'Total recibido (MXN)' : 'Total pagado (MXN)')
             : 'Monto (MXN)'}
         </label>
         <div className="flex items-center gap-2">
-          <span className={`text-2xl font-bold ${isIncome ? 'text-[#cc7a55]' : 'text-teal-800'}`}>$</span>
+          <span className={`text-2xl font-bold ${isIncome ? 'text-[#E8A97A]' : 'text-teal-800'}`}>$</span>
           <input
             type="number"
             inputMode="decimal"
@@ -335,11 +335,11 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple: _onSaveMultiple
             value={form.amount}
             onChange={(e) => set('amount', e.target.value)}
             placeholder="0.00"
-            className={`flex-1 text-3xl font-bold bg-transparent border-none outline-none ${isIncome ? 'text-[#a85a3a] placeholder-[#e8b89a]' : 'text-teal-900 placeholder-teal-300'}`}
+            className={`flex-1 text-3xl font-bold bg-transparent border-none outline-none ${isIncome ? 'text-[#C47B48] placeholder-[#e8b89a]' : 'text-teal-900 placeholder-teal-300'}`}
           />
         </div>
         {splitEnabled && splitParticipants.length > 0 && totalAmt > 0 && (
-          <p className={`text-xs mt-1 ${isIncome ? 'text-[#a85a3a]' : 'text-teal-600'}`}>
+          <p className={`text-xs mt-1 ${isIncome ? 'text-[#C47B48]' : 'text-teal-600'}`}>
             Tu parte: ${fmt$(userAmount)} · Otros deben: ${fmt$(totalAmt - userAmount)}
           </p>
         )}
@@ -820,8 +820,8 @@ export function QuickForm({ currentUser, onSave, onSaveMultiple: _onSaveMultiple
       <button
         type="submit"
         className={`w-full py-3 rounded-2xl font-bold text-white text-base transition-all ${
-          saved ? 'bg-[#cc7a55]' : isIncome
-            ? 'bg-[#cc7a55] hover:bg-[#a85a3a] active:scale-95'
+          saved ? 'bg-[#E8A97A]' : isIncome
+            ? 'bg-[#E8A97A] hover:bg-[#C47B48] active:scale-95'
             : 'bg-teal-700 hover:bg-teal-800 active:scale-95'
         }`}
       >

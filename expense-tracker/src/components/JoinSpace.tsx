@@ -84,11 +84,11 @@ export function JoinSpace({ profile, onJoined, onBack, initialCode }: Props) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10"
-      style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+      style={{ background: 'linear-gradient(135deg, #1A2D33 0%, #2C5F6E 100%)' }}>
 
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-5 text-white text-center" style={{ backgroundColor: '#0c6878' }}>
+        <div className="px-6 py-5 text-white text-center" style={{ backgroundColor: '#2C5F6E' }}>
           <div className="flex items-center gap-3 mb-2">
             <button onClick={onBack} className="text-white/70 hover:text-white transition-colors">
               <ArrowLeft size={20} />
@@ -97,7 +97,7 @@ export function JoinSpace({ profile, onJoined, onBack, initialCode }: Props) {
               <h1 className="text-lg font-extrabold" style={{ fontFamily: 'Nunito, sans-serif' }}>
                 Unirme a una lista
               </h1>
-              <p className="text-xs" style={{ color: '#7dd4e0' }}>Ingresa el código que te compartieron</p>
+              <p className="text-xs" style={{ color: '#A8D5DC' }}>Ingresa el código que te compartieron</p>
             </div>
           </div>
         </div>
@@ -109,7 +109,7 @@ export function JoinSpace({ profile, onJoined, onBack, initialCode }: Props) {
               <div className="text-center">
                 <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-3"
                   style={{ backgroundColor: '#f0fafa' }}>
-                  <Users size={28} style={{ color: '#0c6878' }} />
+                  <Users size={28} style={{ color: '#2C5F6E' }} />
                 </div>
                 <p className="text-sm text-gray-500">
                   El dueño de la lista te compartió un código de 6 caracteres.
@@ -143,7 +143,7 @@ export function JoinSpace({ profile, onJoined, onBack, initialCode }: Props) {
                 onClick={handleVerify}
                 disabled={formattedCode.length !== 6 || loading}
                 className="w-full py-3 rounded-2xl text-white text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-40 active:scale-95"
-                style={{ backgroundColor: '#0c6878' }}>
+                style={{ backgroundColor: '#2C5F6E' }}>
                 {loading
                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Verificando...</>
                   : <><Search size={16} /> Verificar código</>}
@@ -280,7 +280,7 @@ export function JoinSpace({ profile, onJoined, onBack, initialCode }: Props) {
                   onClick={handleJoin}
                   disabled={!displayName.trim() || loading}
                   className="flex-1 py-3 rounded-2xl text-white text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-40 active:scale-95"
-                  style={{ backgroundColor: '#0c6878' }}>
+                  style={{ backgroundColor: '#2C5F6E' }}>
                   {loading
                     ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Uniéndome...</>
                     : <><CheckCircle size={16} /> Confirmar y unirme</>}

@@ -122,7 +122,7 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Link2 size={15} style={{ color: '#0c6878' }} />
+        <Link2 size={15} style={{ color: '#2C5F6E' }} />
         <p className="text-sm font-bold text-gray-700">Código de invitación</p>
       </div>
 
@@ -157,7 +157,7 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
           <div className="flex gap-2">
             <button onClick={handleCopy}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-semibold border transition-all"
-              style={{ borderColor: '#0c6878', color: copied ? '#10b981' : '#0c6878', backgroundColor: 'white' }}>
+              style={{ borderColor: '#2C5F6E', color: copied ? '#10b981' : '#2C5F6E', backgroundColor: 'white' }}>
               {copied ? <><Check size={14} /> Copiado</> : <><Copy size={14} /> Copiar</>}
             </button>
             <button onClick={handleWhatsApp}
@@ -186,7 +186,7 @@ export function InviteCodePanel({ space, currentMemberId }: Props) {
             onClick={handleGenerate}
             disabled={generating}
             className="flex items-center justify-center gap-2 mx-auto px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-50 active:scale-95"
-            style={{ backgroundColor: '#0c6878' }}>
+            style={{ backgroundColor: '#2C5F6E' }}>
             {generating
               ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Generando...</>
               : <><RefreshCw size={14} /> Generar código</>}

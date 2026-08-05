@@ -8,13 +8,13 @@ interface Props {
 export function WelcomeChoice({ onCreateOwn, onJoin }: Props) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10"
-      style={{ background: 'linear-gradient(135deg, #0c6878 0%, #2b8fa0 100%)' }}>
+      style={{ background: 'linear-gradient(135deg, #1A2D33 0%, #2C5F6E 100%)' }}>
 
       {/* Logo */}
       <div className="mb-8 flex flex-col items-center gap-3">
         <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
           <circle cx="24" cy="32" r="20" fill="white" opacity="0.9"/>
-          <circle cx="40" cy="32" r="20" fill="#f5a884" opacity="0.85"/>
+          <circle cx="40" cy="32" r="20" fill="#E8A97A" opacity="0.85"/>
           <circle cx="32" cy="20" r="20" fill="white" opacity="0.6"/>
         </svg>
         <div className="text-center">
@@ -35,9 +35,9 @@ export function WelcomeChoice({ onCreateOwn, onJoin }: Props) {
           <button
             onClick={onCreateOwn}
             className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all hover:shadow-md active:scale-95 text-left"
-            style={{ borderColor: '#0c6878', backgroundColor: '#f0fafa' }}>
+            style={{ borderColor: '#2C5F6E', backgroundColor: '#f0fafa' }}>
             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: '#0c6878' }}>
+              style={{ backgroundColor: '#2C5F6E' }}>
               <PlusCircle size={22} className="text-white" />
             </div>
             <div>
@@ -52,8 +52,8 @@ export function WelcomeChoice({ onCreateOwn, onJoin }: Props) {
             onClick={onJoin}
             className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-gray-200 transition-all hover:shadow-md active:scale-95 text-left bg-white">
             <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: '#f5ede6' }}>
-              <Users size={22} style={{ color: '#cc7a55' }} />
+              style={{ backgroundColor: '#F7F4EF' }}>
+              <Users size={22} style={{ color: '#E8A97A' }} />
             </div>
             <div>
               <p className="font-bold text-gray-800">Unirme a una lista</p>

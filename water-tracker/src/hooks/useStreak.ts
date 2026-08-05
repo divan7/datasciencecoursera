@@ -29,6 +29,9 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
 
   const loadedForRef = useRef<string | null | undefined>(undefined);
   const dataRef = useRef(data);
+  // Track previous totalMl to detect genuine threshold crossings in this session.
+  // Prevents spurious increments when the app loads with totalMl already >= goalMl.
+  const prevTotalMlRef = useRef(totalMl);
 
   useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -80,10 +83,20 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
   const today = todayDate();
 
   useEffect(() => {
+    const prev = prevTotalMlRef.current;
+    prevTotalMlRef.current = totalMl;
+
     if (!streakLoaded) return;
     if (goalMl <= 0 || totalMl < goalMl) return;
     const d = dataRef.current;
     if (d.lastCompletedDate === today) return;
+
+    // Only fire when totalMl just crossed goalMl from below in this session.
+    // If totalMl was already >= goalMl when the app loaded (prev >= goalMl on the
+    // first run, or on a streakLoaded trigger with no new intake), skip: the
+    // streak was already counted in a prior session and lastCompletedDate === today
+    // would have caught it. This prevents spurious "day 1" initializations on load.
+    if (prev >= goalMl) return;
 
     const isConsecutive =
       d.lastCompletedDate !== null &&

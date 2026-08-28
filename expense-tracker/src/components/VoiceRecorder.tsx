@@ -22,13 +22,39 @@ interface VoiceRecorderProps {
 
 type RecordingState = 'idle' | 'recording' | 'done';
 
-// webkitSpeechRecognition is not in the standard DOM lib
-type SpeechRecognitionCtor = typeof SpeechRecognition;
-type WSpeech = typeof window & { webkitSpeechRecognition?: SpeechRecognitionCtor };
+// Custom interfaces to avoid conflicts with DOM lib SpeechRecognition types
+interface VoiceSRResult {
+  readonly isFinal: boolean;
+  readonly 0: { readonly transcript: string };
+}
+interface VoiceSRResultList {
+  readonly length: number;
+  readonly [index: number]: VoiceSRResult;
+}
+interface VoiceSREvent {
+  readonly resultIndex: number;
+  readonly results: VoiceSRResultList;
+}
+interface VoiceSR {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  abort(): void;
+  onresult: ((ev: VoiceSREvent) => void) | null;
+  onerror: ((ev: { error: string }) => void) | null;
+  onend: (() => void) | null;
+}
+type VoiceSRCtor = new () => VoiceSR;
+type WindowWithSpeech = typeof window & {
+  SpeechRecognition?: VoiceSRCtor;
+  webkitSpeechRecognition?: VoiceSRCtor;
+};
 
-function getSpeechRecognitionClass(): SpeechRecognitionCtor | null {
+function getSRClass(): VoiceSRCtor | null {
   if (typeof window === 'undefined') return null;
-  return window.SpeechRecognition ?? (window as WSpeech).webkitSpeechRecognition ?? null;
+  const w = window as WindowWithSpeech;
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
 export function VoiceRecorder({
@@ -42,12 +68,12 @@ export function VoiceRecorder({
   const [error, setError] = useState('');
   const [parsedItems, setParsedItems] = useState<Partial<Expense>[] | null>(null);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<VoiceSR | null>(null);
   const recordingStateRef = useRef<RecordingState>('idle');
   recordingStateRef.current = recordingState;
 
-  const SpeechRecognitionClass = getSpeechRecognitionClass();
-  const supported = !!SpeechRecognitionClass;
+  const SRClass = getSRClass();
+  const supported = !!SRClass;
 
   const stopRecording = useCallback(() => {
     setRecordingState('done');
@@ -59,17 +85,17 @@ export function VoiceRecorder({
   }, []);
 
   const startRecording = useCallback(() => {
-    if (!SpeechRecognitionClass) return;
-    const recognition = new SpeechRecognitionClass();
-    recognition.continuous = false; // false = iOS Safari compatible
-    recognition.interimResults = true;
-    recognition.lang = 'es-MX';
+    if (!SRClass) return;
+    const sr = new SRClass();
+    sr.continuous = false; // false = iOS Safari compatible
+    sr.interimResults = true;
+    sr.lang = 'es-MX';
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    sr.onresult = (ev: VoiceSREvent) => {
       let finalText = '';
       let interimText = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const r = event.results[i];
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const r = ev.results[i];
         if (r.isFinal) finalText += r[0].transcript + ' ';
         else interimText += r[0].transcript;
       }
@@ -77,29 +103,29 @@ export function VoiceRecorder({
       setInterim(interimText);
     };
 
-    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      if (event.error === 'no-speech' || event.error === 'aborted') return;
-      setError(`Error de micrófono: ${event.error}`);
+    sr.onerror = (ev: { error: string }) => {
+      if (ev.error === 'no-speech' || ev.error === 'aborted') return;
+      setError(`Error de micrófono: ${ev.error}`);
       setRecordingState('done');
     };
 
-    recognition.onend = () => {
+    sr.onend = () => {
       setInterim('');
       // Auto-restart: iOS stops recognition after ~7s of silence
       if (recordingStateRef.current === 'recording') {
-        try { recognition.start(); } catch { setRecordingState('done'); }
+        try { sr.start(); } catch { setRecordingState('done'); }
       }
     };
 
-    recognitionRef.current = recognition;
+    recognitionRef.current = sr;
     try {
-      recognition.start();
+      sr.start();
       setRecordingState('recording');
       setError('');
     } catch {
       setError('No se pudo iniciar el micrófono. Verifica los permisos.');
     }
-  }, [SpeechRecognitionClass]);
+  }, [SRClass]);
 
   useEffect(() => {
     if (autoStart && supported) startRecording();

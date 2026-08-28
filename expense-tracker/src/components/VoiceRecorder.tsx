@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, MicOff, Sparkles, RotateCcw, AlertCircle, Square } from 'lucide-react';
+import { Mic, Sparkles, RotateCcw, AlertCircle, Square } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Expense, User } from '../types/expense';
 import { parseMultipleExpensesFromText } from '../services/claudeService';
-import type { SpaceMember, AppSpace } from '../types/space';
+import type { AppSpace } from '../types/space';
 import { MultiExpenseReview, type ExpenseWithSpace } from './MultiExpenseReview';
 import type { FiscalProfile } from '../types/fiscal';
 
@@ -14,9 +14,7 @@ interface VoiceRecorderProps {
   onSave: (data: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
   onSaveMultiple: (items: ExpenseWithSpace[]) => void;
   apiKey?: string;
-  members: SpaceMember[];
   fiscalProfile?: FiscalProfile;
-  isOwner?: boolean;
   isAdmin?: boolean;
   hasAiAccess?: boolean;
   autoStart?: boolean;
@@ -24,30 +22,13 @@ interface VoiceRecorderProps {
 
 type RecordingState = 'idle' | 'recording' | 'done';
 
-// Web Speech API type augmentation
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-}
-interface ISpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  abort(): void;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-}
+// webkitSpeechRecognition is not in the standard DOM lib
+type SpeechRecognitionCtor = typeof SpeechRecognition;
+type WSpeech = typeof window & { webkitSpeechRecognition?: SpeechRecognitionCtor };
 
-function getSpeechRecognitionClass(): (new () => ISpeechRecognition) | null {
+function getSpeechRecognitionClass(): SpeechRecognitionCtor | null {
   if (typeof window === 'undefined') return null;
-  return (window as unknown as { SpeechRecognition?: new () => ISpeechRecognition; webkitSpeechRecognition?: new () => ISpeechRecognition })
-    .SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: new () => ISpeechRecognition }).webkitSpeechRecognition ?? null;
+  return window.SpeechRecognition ?? (window as WSpeech).webkitSpeechRecognition ?? null;
 }
 
 export function VoiceRecorder({
@@ -61,8 +42,7 @@ export function VoiceRecorder({
   const [error, setError] = useState('');
   const [parsedItems, setParsedItems] = useState<Partial<Expense>[] | null>(null);
 
-  const recognitionRef = useRef<ISpeechRecognition | null>(null);
-  // Keep a ref so the onend handler can read the latest recording state
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const recordingStateRef = useRef<RecordingState>('idle');
   recordingStateRef.current = recordingState;
 
@@ -81,8 +61,7 @@ export function VoiceRecorder({
   const startRecording = useCallback(() => {
     if (!SpeechRecognitionClass) return;
     const recognition = new SpeechRecognitionClass();
-    // continuous:false is the safest option on iOS Safari
-    recognition.continuous = false;
+    recognition.continuous = false; // false = iOS Safari compatible
     recognition.interimResults = true;
     recognition.lang = 'es-MX';
 
@@ -94,7 +73,7 @@ export function VoiceRecorder({
         if (r.isFinal) finalText += r[0].transcript + ' ';
         else interimText += r[0].transcript;
       }
-      if (finalText) setTranscript((prev) => (prev ? prev + ' ' + finalText.trim() : finalText.trim()));
+      if (finalText) setTranscript((prev) => (prev ? prev.trimEnd() + ' ' + finalText.trim() : finalText.trim()));
       setInterim(interimText);
     };
 
@@ -106,7 +85,7 @@ export function VoiceRecorder({
 
     recognition.onend = () => {
       setInterim('');
-      // Auto-restart to keep recording (iOS stops after ~7s of continuous mode)
+      // Auto-restart: iOS stops recognition after ~7s of silence
       if (recordingStateRef.current === 'recording') {
         try { recognition.start(); } catch { setRecordingState('done'); }
       }
@@ -122,10 +101,9 @@ export function VoiceRecorder({
     }
   }, [SpeechRecognitionClass]);
 
-  // Auto-start when activated from the FAB
   useEffect(() => {
     if (autoStart && supported) startRecording();
-    return () => { if (recognitionRef.current) try { recognitionRef.current.abort(); } catch { /* ignore */ } };
+    return () => { try { recognitionRef.current?.abort(); } catch { /* ignore */ } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -263,7 +241,7 @@ export function VoiceRecorder({
 
           <div className="min-h-[60px] text-sm text-gray-800 leading-relaxed">
             {transcript && <span>{transcript}</span>}
-            {interim && <span className="text-gray-400 italic">{interim}</span>}
+            {interim && <span className="text-gray-400 italic"> {interim}</span>}
             {!hasText && (
               <span className="text-gray-300 italic">El texto aparecerá aquí mientras hablas…</span>
             )}
@@ -292,7 +270,7 @@ export function VoiceRecorder({
         </div>
       )}
 
-      {/* ── Review parsed items ── */}
+      {/* ── Review ── */}
       {parsedItems && (
         <MultiExpenseReview
           items={parsedItems}

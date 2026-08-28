@@ -822,9 +822,7 @@ export default function App() {
                   onSave={handleSaveExpense}
                   onSaveMultiple={handleSaveMultipleExpenses}
                   apiKey={settings.anthropicApiKey}
-                  members={currentSpace.members}
                   fiscalProfile={fiscalProfile}
-                  isOwner={currentMember?.role === 'propietario'}
                   isAdmin={effectiveIsAdmin}
                   hasAiAccess={hasAiAccess}
                   autoStart={voiceAutoStart}

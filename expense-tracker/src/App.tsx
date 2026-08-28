@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { QuickForm } from './components/QuickForm';
 import { TextParser } from './components/TextParser';
 import { ImageCapture } from './components/ImageCapture';
+import { VoiceRecorder } from './components/VoiceRecorder';
 import { ExpenseList } from './components/ExpenseList';
 import { MonthlyReport } from './components/MonthlyReport';
 import { Dashboard } from './components/Dashboard';
@@ -44,7 +45,7 @@ import { format } from 'date-fns';
 import './index.css';
 
 type Tab = 'add' | 'list' | 'dashboard' | 'checklist' | 'report' | 'settings' | 'fiscal' | 'admin';
-type InputMode = 'form' | 'text' | 'image';
+type InputMode = 'form' | 'text' | 'image' | 'audio';
 
 export default function App() {
   // ── Auth ──────────────────────────────────────────────────────
@@ -135,6 +136,7 @@ export default function App() {
   // ── Tab / UI state ────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>('add');
   const [inputMode, setInputMode] = useState<InputMode>('form');
+  const [voiceAutoStart, setVoiceAutoStart] = useState(false);
   const [prefillTemplate, setPrefillTemplate] = useState<FixedExpenseTemplate | null>(null);
   const prefillTemplateRef = useRef<FixedExpenseTemplate | null>(null);
   prefillTemplateRef.current = prefillTemplate;
@@ -580,6 +582,7 @@ export default function App() {
     { id: 'form',  label: 'Formulario', emoji: '📋' },
     { id: 'text',  label: 'Texto',      emoji: '✍️' },
     { id: 'image', label: 'Foto',       emoji: '📷' },
+    { id: 'audio', label: 'Voz',        emoji: '🎙️' },
   ];
 
   // ── Auth gate (when Supabase is configured) ───────────────────
@@ -762,7 +765,7 @@ export default function App() {
             )}
             <div className="flex gap-2 bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm">
               {modeButtons.map((btn) => (
-                <button key={btn.id} onClick={() => { setInputMode(btn.id); setPrefillTemplate(null); }}
+                <button key={btn.id} onClick={() => { setInputMode(btn.id); setVoiceAutoStart(false); setPrefillTemplate(null); }}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     inputMode === btn.id ? 'text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
                   }`}
@@ -808,6 +811,23 @@ export default function App() {
                   isOwner={currentMember?.role === 'propietario'}
                   isAdmin={effectiveIsAdmin}
                   hasAiAccess={hasAiAccess}
+                />
+              )}
+              {inputMode === 'audio' && (
+                <VoiceRecorder
+                  key={voiceAutoStart ? 'autostart' : 'manual'}
+                  currentUser={currentUser}
+                  currentSpaceId={spaceId}
+                  spaces={spaces}
+                  onSave={handleSaveExpense}
+                  onSaveMultiple={handleSaveMultipleExpenses}
+                  apiKey={settings.anthropicApiKey}
+                  members={currentSpace.members}
+                  fiscalProfile={fiscalProfile}
+                  isOwner={currentMember?.role === 'propietario'}
+                  isAdmin={effectiveIsAdmin}
+                  hasAiAccess={hasAiAccess}
+                  autoStart={voiceAutoStart}
                 />
               )}
             </div>
@@ -993,6 +1013,28 @@ export default function App() {
             onClose={() => setSuggestQueue((q) => q.slice(1))}
           />
         </ErrorBoundary>
+      )}
+      {/* ── Floating mic FAB ── */}
+      {!(activeTab === 'add' && inputMode === 'audio') && (
+        <button
+          onClick={() => {
+            setActiveTab('add');
+            setVoiceAutoStart(true);
+            setInputMode('audio');
+            // Reset autoStart flag after a tick so re-entering audio tab doesn't re-start
+            setTimeout(() => setVoiceAutoStart(false), 500);
+          }}
+          className="fixed bottom-6 right-4 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-90 hover:scale-105"
+          style={{ backgroundColor: '#1A2D33', border: '2px solid rgba(168,213,220,0.3)' }}
+          aria-label="Registrar gasto por voz"
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="9" y="2" width="6" height="11" rx="3" fill="white" />
+            <path d="M5 11a7 7 0 0 0 14 0" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+            <line x1="12" y1="18" x2="12" y2="22" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+            <line x1="9" y1="22" x2="15" y2="22" stroke="white" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </button>
       )}
     </div>
     </ErrorBoundary>

@@ -1024,8 +1024,8 @@ export default function App() {
             // Reset autoStart flag after a tick so re-entering audio tab doesn't re-start
             setTimeout(() => setVoiceAutoStart(false), 500);
           }}
-          className="fixed bottom-6 right-4 z-40 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-90 hover:scale-105"
-          style={{ backgroundColor: '#1A2D33', border: '2px solid rgba(168,213,220,0.3)' }}
+          className="fixed right-4 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transition-all active:scale-90 hover:scale-105"
+          style={{ backgroundColor: '#2C5F6E', border: '3px solid #A8D5DC', boxShadow: '0 4px 20px rgba(44,95,110,0.5)', bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))' }}
           aria-label="Registrar gasto por voz"
         >
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

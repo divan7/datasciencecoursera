@@ -46,14 +46,11 @@ interface VoiceSR {
   onend: (() => void) | null;
 }
 type VoiceSRCtor = new () => VoiceSR;
-type WindowWithSpeech = typeof window & {
-  SpeechRecognition?: VoiceSRCtor;
-  webkitSpeechRecognition?: VoiceSRCtor;
-};
+type WindowWithSpeech = { SpeechRecognition?: VoiceSRCtor; webkitSpeechRecognition?: VoiceSRCtor };
 
 function getSRClass(): VoiceSRCtor | null {
   if (typeof window === 'undefined') return null;
-  const w = window as WindowWithSpeech;
+  const w = window as unknown as WindowWithSpeech;
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 

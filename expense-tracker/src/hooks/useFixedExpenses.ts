@@ -188,7 +188,7 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveChecks(updated, spaceId);
       const check = updated.find((c) => c.id === checkId);
       if (isSupabaseConfigured && check) {
-        fixedDb.updateCheck(check, spaceId).catch(console.error);
+        fixedDb.upsertChecks(spaceId, [check]).catch(console.error);
       }
       return updated;
     });
@@ -202,7 +202,7 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveChecks(updated, spaceId);
       const check = updated.find((c) => c.id === checkId);
       if (isSupabaseConfigured && check) {
-        fixedDb.updateCheck(check, spaceId).catch(console.error);
+        fixedDb.upsertChecks(spaceId, [check]).catch(console.error);
       }
       return updated;
     });
@@ -218,7 +218,7 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveChecks(updated, spaceId);
       const check = updated.find((c) => c.id === checkId);
       if (isSupabaseConfigured && check) {
-        fixedDb.updateCheck(check, spaceId).catch(console.error);
+        fixedDb.upsertChecks(spaceId, [check]).catch(console.error);
       }
       return updated;
     });

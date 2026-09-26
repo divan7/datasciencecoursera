@@ -482,23 +482,6 @@ export const fixedDb = {
     if (error) throw new Error(error.message);
   },
 
-  // Updates status (and related fields) for an existing check, matched by template+month.
-  // Uses UPDATE rather than upsert to avoid mutating the primary key column.
-  async updateCheck(check: MonthlyCheck, spaceId: string): Promise<void> {
-    if (!supabase) return;
-    const { error } = await supabase.from('fixed_expense_checks')
-      .update({
-        status: check.status,
-        expense_id: check.expenseId ?? null,
-        actual_amount: check.actualAmount ?? null,
-        confirmed_at: check.confirmedAt ?? null,
-        notes: check.notes ?? null,
-      })
-      .eq('space_id', spaceId)
-      .eq('template_id', check.templateId)
-      .eq('month', check.month);
-    if (error) throw new Error(error.message);
-  },
 };
 
 // ─── Space settings ───────────────────────────────────────────────────────────

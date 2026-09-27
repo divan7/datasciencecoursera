@@ -21,37 +21,35 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     clearErrorTimer.current = setTimeout(() => setCloudSyncError(null), 8000);
   }, []);
 
-  useEffect(() => {
-    if (!spaceId) return;
-
+  const syncFromRemote = useCallback((currentSpaceId: string) => {
     // Fast path: load local cache immediately
-    const localTemplates = loadTemplates(spaceId);
-    const localChecks    = loadChecks(spaceId);
+    const localTemplates = loadTemplates(currentSpaceId);
+    const localChecks    = loadChecks(currentSpaceId);
     setTemplates(localTemplates);
     setChecks(localChecks);
 
     if (!isSupabaseConfigured) return;
 
     // Templates — non-destructive merge (same pattern as expenses)
-    fixedDb.listTemplates(spaceId).then((remote) => {
+    fixedDb.listTemplates(currentSpaceId).then((remote) => {
       const remoteIds = new Set(remote.map((t) => t.id));
       const localOnly = localTemplates.filter((t) => !remoteIds.has(t.id));
       // Re-upload templates that only exist locally
       if (localOnly.length > 0) {
-        Promise.all(localOnly.map((t) => fixedDb.createTemplate(spaceId, t)))
+        Promise.all(localOnly.map((t) => fixedDb.createTemplate(currentSpaceId, t)))
           .catch((err) => console.error('Re-sync plantillas locales fallido:', err));
       }
       const merged = [...remote, ...localOnly];
       setTemplates(merged);
-      saveTemplates(merged, spaceId);
+      saveTemplates(merged, currentSpaceId);
     }).catch((err) => console.error('No se leyeron plantillas remotas, se mantienen las locales:', err));
 
     // Checks — status-aware merge: confirmado > omitido > pendiente
-    fixedDb.listChecks(spaceId).then((remote) => {
-      // Re-read localStorage here — not the stale closure captured at effect start.
+    fixedDb.listChecks(currentSpaceId).then((remote) => {
+      // Re-read localStorage here — not the stale closure captured at call time.
       // The user may have confirmed a check while listChecks was in-flight; saveChecks
       // is synchronous so localStorage always reflects the latest state by this point.
-      const currentLocalChecks = loadChecks(spaceId);
+      const currentLocalChecks = loadChecks(currentSpaceId);
 
       const STATUS_PRIORITY: Record<string, number> = { confirmado: 2, omitido: 1, pendiente: 0 };
       const mergeKey = (c: MonthlyCheck) => `${c.templateId}_${c.month}`;
@@ -79,20 +77,34 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       const confirmedOrSkipped = toUpload.filter((c) => c.status !== 'pendiente');
       // New pendiente checks: insert only, never overwrite a confirmed row
       if (pendingOnly.length > 0) {
-        fixedDb.insertChecksIfNew(spaceId, pendingOnly)
+        fixedDb.insertChecksIfNew(currentSpaceId, pendingOnly)
           .catch((err) => console.error('Re-sync checks pendientes fallido:', err));
       }
       // Confirmed/skipped local wins: push the update to remote
       if (confirmedOrSkipped.length > 0) {
-        fixedDb.upsertChecks(spaceId, confirmedOrSkipped)
+        fixedDb.upsertChecks(currentSpaceId, confirmedOrSkipped)
           .catch((err) => console.error('Re-sync checks confirmados fallido:', err));
       }
 
       setChecks(merged);
-      saveChecks(merged, spaceId);
+      saveChecks(merged, currentSpaceId);
     }).catch((err) => console.error('No se leyeron checks remotos, se mantienen los locales:', err));
+  }, []);
 
-  }, [spaceId]);
+  useEffect(() => {
+    if (!spaceId) return;
+    syncFromRemote(spaceId);
+
+    // Re-run on every return to foreground — an installed PWA can stay resident
+    // for days without a full reload, so this is the only chance to push local
+    // confirmations that a prior sync attempt failed to upload, and to pull in
+    // confirmations made from another device in the meantime.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') syncFromRemote(spaceId);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [spaceId, syncFromRemote]);
 
   // ── Template CRUD ──────────────────────────────────────────────
   const addTemplate = useCallback((t: Omit<FixedExpenseTemplate, 'id' | 'createdAt'>) => {

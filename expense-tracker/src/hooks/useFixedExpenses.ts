@@ -16,9 +16,12 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
   const clearErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const reportSyncError = useCallback((msg: string) => {
-    setCloudSyncError(msg);
+    // Append rather than replace: a single sync pass can hit more than one
+    // failure (e.g. a template AND its checks), and the second report would
+    // otherwise blow away the first before anyone reads it.
+    setCloudSyncError((prev) => (prev ? `${prev}\n\n${msg}` : msg));
     if (clearErrorTimer.current) clearTimeout(clearErrorTimer.current);
-    clearErrorTimer.current = setTimeout(() => setCloudSyncError(null), 8000);
+    clearErrorTimer.current = setTimeout(() => setCloudSyncError(null), 20000);
   }, []);
 
   const syncFromRemote = useCallback((currentSpaceId: string) => {
@@ -38,8 +41,17 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       const remoteIds = new Set(remote.map((t) => t.id));
       const localOnly = localTemplates.filter((t) => !remoteIds.has(t.id));
       if (localOnly.length > 0) {
-        await Promise.all(localOnly.map((t) => fixedDb.createTemplate(currentSpaceId, t)))
-          .catch((err) => console.error('Re-sync plantillas locales fallido:', err));
+        const results = await Promise.allSettled(localOnly.map((t) => fixedDb.createTemplate(currentSpaceId, t)));
+        const failed = results
+          .map((r, i) => (r.status === 'rejected' ? { t: localOnly[i], reason: r.reason } : null))
+          .filter((x): x is { t: FixedExpenseTemplate; reason: unknown } => x !== null);
+        if (failed.length > 0) {
+          console.error('Re-sync plantillas locales fallido:', failed);
+          const detail = failed
+            .map((f) => `${f.t.concept} (${f.t.id}): ${f.reason instanceof Error ? f.reason.message : String(f.reason)}`)
+            .join(' | ');
+          reportSyncError(`No se pudieron subir estas plantillas a la nube: ${detail}`);
+        }
       }
       const merged = [...remote, ...localOnly];
       setTemplates(merged);

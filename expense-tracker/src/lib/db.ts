@@ -598,7 +598,7 @@ export const invitesDb = {
     return {
       spaceId:   d.spaceId,
       spaceName: d.spaceName,
-      members:   (d.members ?? []).map((m: any) => ({
+      members:   (d.members ?? []).map((m: InvitePreviewMember) => ({
         id:         m.id,
         name:       m.name,
         colorIndex: m.colorIndex ?? 0,

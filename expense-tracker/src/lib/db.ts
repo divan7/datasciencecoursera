@@ -426,7 +426,12 @@ export const fixedDb = {
 
   async createTemplate(spaceId: string, t: FixedExpenseTemplate): Promise<void> {
     if (!supabase) return;
-    const { error } = await supabase.from('fixed_expense_templates').insert(templateToRow(spaceId, t));
+    // Upsert, not insert: a plain insert fails permanently on retry if an earlier
+    // attempt actually landed (e.g. a race with another device, or a prior sync
+    // that errored after the row was written) — every subsequent reconciliation
+    // would then keep failing on the same "already exists" error forever.
+    const { error } = await supabase.from('fixed_expense_templates')
+      .upsert(templateToRow(spaceId, t), { onConflict: 'id' });
     if (error) throw new Error(error.message);
   },
 

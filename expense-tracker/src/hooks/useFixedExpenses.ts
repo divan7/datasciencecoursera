@@ -30,13 +30,15 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
 
     if (!isSupabaseConfigured) return;
 
-    // Templates — non-destructive merge (same pattern as expenses)
-    fixedDb.listTemplates(currentSpaceId).then((remote) => {
+    // Templates — non-destructive merge (same pattern as expenses). Checks have a
+    // NOT NULL FK to template_id, so they must not be synced until any local-only
+    // template has actually landed in Supabase — otherwise the check upsert fails
+    // with a foreign-key violation for every check tied to that template.
+    const templatesSynced = fixedDb.listTemplates(currentSpaceId).then(async (remote) => {
       const remoteIds = new Set(remote.map((t) => t.id));
       const localOnly = localTemplates.filter((t) => !remoteIds.has(t.id));
-      // Re-upload templates that only exist locally
       if (localOnly.length > 0) {
-        Promise.all(localOnly.map((t) => fixedDb.createTemplate(currentSpaceId, t)))
+        await Promise.all(localOnly.map((t) => fixedDb.createTemplate(currentSpaceId, t)))
           .catch((err) => console.error('Re-sync plantillas locales fallido:', err));
       }
       const merged = [...remote, ...localOnly];
@@ -45,7 +47,7 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
     }).catch((err) => console.error('No se leyeron plantillas remotas, se mantienen las locales:', err));
 
     // Checks — status-aware merge: confirmado > omitido > pendiente
-    fixedDb.listChecks(currentSpaceId).then((remote) => {
+    templatesSynced.then(() => fixedDb.listChecks(currentSpaceId)).then((remote) => {
       // Re-read localStorage here — not the stale closure captured at call time.
       // The user may have confirmed a check while listChecks was in-flight; saveChecks
       // is synchronous so localStorage always reflects the latest state by this point.

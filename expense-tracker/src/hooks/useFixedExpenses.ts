@@ -83,13 +83,16 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       // Confirmed/skipped local wins: push the update to remote
       if (confirmedOrSkipped.length > 0) {
         fixedDb.upsertChecks(currentSpaceId, confirmedOrSkipped)
-          .catch((err) => console.error('Re-sync checks confirmados fallido:', err));
+          .catch((err) => {
+            console.error('Re-sync checks confirmados fallido:', err);
+            reportSyncError('Hay pagos confirmados en este dispositivo que no se pudieron subir a la nube. Revisa tu conexión y vuelve a abrir la app.');
+          });
       }
 
       setChecks(merged);
       saveChecks(merged, currentSpaceId);
     }).catch((err) => console.error('No se leyeron checks remotos, se mantienen los locales:', err));
-  }, []);
+  }, [reportSyncError]);
 
   useEffect(() => {
     if (!spaceId) return;
@@ -200,11 +203,14 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveChecks(updated, spaceId);
       const check = updated.find((c) => c.id === checkId);
       if (isSupabaseConfigured && check) {
-        fixedDb.upsertChecks(spaceId, [check]).catch(console.error);
+        fixedDb.upsertChecks(spaceId, [check]).catch((err) => {
+          console.error('Error al confirmar gasto fijo en la nube:', err);
+          reportSyncError('No se pudo confirmar el pago en la nube. Se guardó en este dispositivo y se reintentará al reabrir la app.');
+        });
       }
       return updated;
     });
-  }, [spaceId]);
+  }, [spaceId, reportSyncError]);
 
   const skipCheck = useCallback((checkId: string, notes?: string) => {
     setChecks((prev) => {
@@ -214,11 +220,14 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveChecks(updated, spaceId);
       const check = updated.find((c) => c.id === checkId);
       if (isSupabaseConfigured && check) {
-        fixedDb.upsertChecks(spaceId, [check]).catch(console.error);
+        fixedDb.upsertChecks(spaceId, [check]).catch((err) => {
+          console.error('Error al omitir gasto fijo en la nube:', err);
+          reportSyncError('No se pudo guardar el cambio en la nube. Se guardó en este dispositivo y se reintentará al reabrir la app.');
+        });
       }
       return updated;
     });
-  }, [spaceId]);
+  }, [spaceId, reportSyncError]);
 
   const resetCheck = useCallback((checkId: string) => {
     setChecks((prev) => {
@@ -230,11 +239,14 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
       saveChecks(updated, spaceId);
       const check = updated.find((c) => c.id === checkId);
       if (isSupabaseConfigured && check) {
-        fixedDb.upsertChecks(spaceId, [check]).catch(console.error);
+        fixedDb.upsertChecks(spaceId, [check]).catch((err) => {
+          console.error('Error al reiniciar gasto fijo en la nube:', err);
+          reportSyncError('No se pudo guardar el cambio en la nube. Se guardó en este dispositivo y se reintentará al reabrir la app.');
+        });
       }
       return updated;
     });
-  }, [spaceId]);
+  }, [spaceId, reportSyncError]);
 
   // ── Auto-match ─────────────────────────────────────────────────
   // Returns true if the expense was matched & confirmed against an existing template

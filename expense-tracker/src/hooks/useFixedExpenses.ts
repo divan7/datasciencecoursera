@@ -85,7 +85,8 @@ export function useFixedExpenses(_expenses: Expense[], spaceId: string) {
         fixedDb.upsertChecks(currentSpaceId, confirmedOrSkipped)
           .catch((err) => {
             console.error('Re-sync checks confirmados fallido:', err);
-            reportSyncError('Hay pagos confirmados en este dispositivo que no se pudieron subir a la nube. Revisa tu conexión y vuelve a abrir la app.');
+            const detail = err instanceof Error ? err.message : String(err);
+            reportSyncError(`Hay pagos confirmados en este dispositivo que no se pudieron subir a la nube: ${detail}`);
           });
       }
 

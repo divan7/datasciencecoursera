@@ -451,18 +451,32 @@ export const fixedDb = {
 
   async upsertChecks(spaceId: string, checks: MonthlyCheck[]): Promise<void> {
     if (!supabase || !checks.length) return;
-    const { error } = await supabase.from('fixed_expense_checks').upsert(
-      checks.map((c) => ({
-        id: c.id, space_id: spaceId, template_id: c.templateId,
-        month: c.month, status: c.status,
-        expense_id: c.expenseId ?? null,
-        actual_amount: c.actualAmount ?? null,
-        confirmed_at: c.confirmedAt ?? null,
-        notes: c.notes ?? null,
-      })),
-      { onConflict: 'template_id,month' }
-    );
-    if (error) throw new Error(error.message);
+    const rows = checks.map((c) => ({
+      id: c.id, space_id: spaceId, template_id: c.templateId,
+      month: c.month, status: c.status,
+      expense_id: c.expenseId ?? null,
+      actual_amount: c.actualAmount ?? null,
+      confirmed_at: c.confirmedAt ?? null,
+      notes: c.notes ?? null,
+    }));
+    const { error } = await supabase.from('fixed_expense_checks')
+      .upsert(rows, { onConflict: 'template_id,month' });
+    if (!error) return;
+
+    // A single bad row (e.g. expense_id pointing at an expense that never
+    // synced) fails the whole batch. Retry one row at a time so the rest
+    // still land, and drop the expense_id link on a row that still fails —
+    // the "confirmado"/"omitido" status matters more than the link.
+    const failures: string[] = [];
+    for (const row of rows) {
+      const { error: rowError } = await supabase.from('fixed_expense_checks')
+        .upsert([row], { onConflict: 'template_id,month' });
+      if (!rowError) continue;
+      const { error: retryError } = await supabase.from('fixed_expense_checks')
+        .upsert([{ ...row, expense_id: null }], { onConflict: 'template_id,month' });
+      if (retryError) failures.push(`${row.id} (${row.status}): ${retryError.message}`);
+    }
+    if (failures.length > 0) throw new Error(`${error.message} | filas fallidas: ${failures.join('; ')}`);
   },
 
   // Inserts new pendiente checks only — does NOT overwrite an existing confirmed/skipped row.

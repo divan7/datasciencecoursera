@@ -4,6 +4,7 @@ import { CheckCircle2, Lock, ChevronDown, ChevronUp, Play, Check, AlertTriangle 
 import { useAppStore } from '../store/useAppStore'
 import { phaseCoachNotes } from '../data/coachNotes'
 import { CoachNoteCard } from '../components/CoachPanel'
+import { computeWeekSchedule, effectiveDaysPerWeek } from '../utils/weekSchedule'
 
 export default function Program() {
   const navigate = useNavigate()
@@ -83,7 +84,7 @@ export default function Program() {
                     {phase.name}
                   </p>
                   <p className="text-xs text-zinc-600 mt-0.5">
-                    {phase.durationWeeks} semanas · {phase.workoutsPerWeek}x/semana · {phase.targetMinutes[0]}-{phase.targetMinutes[1]} min
+                    {phase.durationWeeks} semanas · {effectiveDaysPerWeek(phase, isActive ? activeUser.preferredDaysPerWeek : undefined)}x/semana · {phase.targetMinutes[0]}-{phase.targetMinutes[1]} min
                   </p>
                 </div>
 
@@ -104,7 +105,11 @@ export default function Program() {
                   <div>
                     <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Horario semanal</p>
                     <div className="grid grid-cols-7 gap-1">
-                      {Object.entries(phase.weekSchedule).map(([day, workout]) => (
+                      {Object.entries(
+                        isActive && activeUser.preferredDaysPerWeek
+                          ? computeWeekSchedule(phase, activeUser.preferredDaysPerWeek)
+                          : phase.weekSchedule
+                      ).map(([day, workout]) => (
                         <div
                           key={day}
                           className={`rounded-lg p-1.5 text-center ${

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { User, Plus, Check, Star, ChevronDown, ChevronUp, Bell, Home, Dumbbell } from 'lucide-react'
+import { User, Plus, Check, Star, ChevronDown, ChevronUp, Bell, Home, Dumbbell, Calendar } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import type { InsightCadence } from '../store/useAppStore'
 import { programPhases } from '../data/programs'
@@ -74,6 +74,43 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Training days preference */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <Calendar size={15} className="text-cyan-400" />
+          <p className="text-sm font-semibold text-zinc-300">Días de entrenamiento</p>
+        </div>
+        <p className="text-xs text-zinc-500 mb-4">
+          Cuántos días por semana quieres entrenar. El plan distribuye las sesiones automáticamente.
+        </p>
+        <div className="flex gap-2">
+          {([3, 4, 5, 6] as const).map(n => {
+            const phaseDefault = currentPhase?.workoutsPerWeek ?? 3
+            const current = activeUser.preferredDaysPerWeek ?? phaseDefault
+            const labels: Record<number, string> = { 3: '3 días', 4: '4 días', 5: '5 días', 6: '6 días' }
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => updateUser(activeUser.id, { preferredDaysPerWeek: n })}
+                className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all ${
+                  current === n
+                    ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
+                    : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+                }`}
+              >
+                {labels[n]}
+              </button>
+            )
+          })}
+        </div>
+        {currentPhase && (
+          <p className="text-xs text-zinc-600 mt-2.5">
+            Plan base de esta fase: {currentPhase.workoutsPerWeek} días/semana
+          </p>
+        )}
+      </div>
 
       {/* Equipment / active location */}
       {(() => {

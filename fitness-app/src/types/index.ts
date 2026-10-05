@@ -41,6 +41,7 @@ export interface UserProfile {
   equipment: Equipment[]
   activeLocation: 'home' | 'gym'
   availableTime: number
+  preferredDaysPerWeek?: 3 | 4 | 5 | 6
   musclePriorities: MusclePriorityMap
   createdAt: string
 }

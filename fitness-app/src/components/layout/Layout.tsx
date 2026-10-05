@@ -11,6 +11,7 @@ import {
   Sun,
   Moon,
 } from 'lucide-react'
+import { APP_VERSION } from '../../version'
 
 const navItems = [
   { to: '/', label: 'Inicio', icon: LayoutDashboard, exact: true },
@@ -53,6 +54,7 @@ export default function Layout() {
           <div className="flex items-center gap-2">
             <Dumbbell size={20} className="text-cyan-400" />
             <span className="font-bold text-white tracking-tight">Ponte en Forma</span>
+            <span className="text-[10px] font-mono text-zinc-600 bg-zinc-800 px-1.5 py-0.5 rounded">v{APP_VERSION}</span>
           </div>
           <div className="flex items-center gap-2">
             <button

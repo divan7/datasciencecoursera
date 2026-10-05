@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ChevronDown, ChevronUp, CheckCircle2, Circle, Timer,
   Info, Flame, SkipForward, Star, AlertTriangle,
+  Volume2, VolumeX, Mic, PlayCircle,
 } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { exercises } from '../data/exercises'
@@ -11,7 +12,7 @@ import { muscleFocusMap } from '../data/muscleFocus'
 import { workoutCoachNotes } from '../data/coachNotes'
 import { CoachNoteCard } from '../components/CoachPanel'
 import { getEquipmentMismatch } from '../data/equipmentAdvice'
-import { ExerciseAnimation } from '../components/ExerciseAnimation'
+import { useWorkoutSpeech, type AudioMode } from '../hooks/useWorkoutSpeech'
 import { format } from 'date-fns'
 import type { ExerciseLog, MuscleGroup, MuscleFocusId } from '../types'
 
@@ -23,6 +24,13 @@ const muscleLabels: Record<string, string> = {
 
 const difficultyLabel = ['', 'Básico', 'Intermedio', 'Avanzado']
 const difficultyColor = ['', 'text-emerald-400', 'text-orange-400', 'text-red-400']
+
+const COACH_SET_MSGS = [
+  (rest: number) => `¡Bien hecho! Descansa ${rest} segundos.`,
+  (rest: number) => `Serie completada. ${rest} segundos de descanso.`,
+  (rest: number) => `Excelente técnica. Descansa ${rest} segundos.`,
+  (rest: number) => `Perfecta ejecución. ${rest} segundos y volvemos.`,
+]
 
 function getExercisePriority(
   muscles: MuscleGroup[],
@@ -43,6 +51,7 @@ export default function WorkoutPage() {
   const { workoutId } = useParams()
   const navigate = useNavigate()
   const { activeUser, activeProgram, logWorkout } = useAppStore()
+  const { speak, speakSequence, stop, isSupported: speechSupported } = useWorkoutSpeech()
 
   const workout = allWorkouts.find(w => w.id === workoutId)
   const [expandedEx, setExpandedEx] = useState<string | null>(null)
@@ -51,8 +60,14 @@ export default function WorkoutPage() {
   const [overallFeel, setOverallFeel] = useState<1 | 2 | 3 | 4 | 5>(3)
   const [startTime] = useState(Date.now())
   const [restTimer, setRestTimer] = useState<number | null>(null)
+  const [restCoachTip, setRestCoachTip] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
+  const [audioMode, setAudioMode] = useState<AudioMode>('off')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const audioModeRef = useRef<AudioMode>('off')
+  audioModeRef.current = audioMode
+  const speakRef = useRef(speak)
+  speakRef.current = speak
 
   useEffect(() => {
     if (!workout) return
@@ -68,6 +83,10 @@ export default function WorkoutPage() {
       timerRef.current = setTimeout(() => setRestTimer(t => (t ?? 1) - 1), 1000)
     } else if (restTimer === 0) {
       setRestTimer(null)
+      setRestCoachTip(null)
+      if (audioModeRef.current === 'coach') {
+        speakRef.current('¡Tiempo! A por la siguiente serie.')
+      }
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [restTimer])
@@ -84,16 +103,78 @@ export default function WorkoutPage() {
   const activeLocation = activeUser.activeLocation ?? 'home'
   const equipmentConflict = getEquipmentMismatch(currentPhase.id, activeLocation)
 
+  function cycleAudioMode() {
+    const next: AudioMode = audioMode === 'off' ? 'guide' : audioMode === 'guide' ? 'coach' : 'off'
+    setAudioMode(next)
+    if (next === 'off') {
+      stop()
+    } else if (next === 'guide') {
+      speak('Modo guiado activado. Toca el botón de audio en cada ejercicio para escuchar las instrucciones.')
+    } else {
+      speak('Modo entrenador activado. Te acompaño durante todo el entrenamiento.')
+    }
+  }
+
+  function handleExerciseExpand(exId: string) {
+    const isOpening = expandedEx !== exId
+    setExpandedEx(isOpening ? exId : null)
+    if (isOpening && audioMode === 'coach') {
+      const ex = exercises.find(e => e.id === exId)
+      const we = workout!.exercises.find(w => w.exerciseId === exId)
+      if (ex && we) {
+        speak(`${ex.nameEs}. ${we.sets} series de ${we.reps}. ${ex.instructions[0]}`)
+      }
+    }
+  }
+
+  function playExerciseGuide(exId: string) {
+    const ex = exercises.find(e => e.id === exId)
+    if (!ex) return
+    const texts = [
+      ex.nameEs,
+      ...ex.instructions,
+      ...(ex.tips.length > 0 ? [`Consejos: ${ex.tips.slice(0, 2).join('. ')}`] : []),
+    ]
+    speakSequence(texts)
+  }
+
   function toggleSet(exId: string, setIdx: number, restSecs: number) {
+    const currentSets = completedSets[exId] ?? []
+    const wasCompleted = currentSets[setIdx]
+
     setCompletedSets(prev => {
       const newSets = [...(prev[exId] ?? [])]
-      const wasCompleted = newSets[setIdx]
-      newSets[setIdx] = !wasCompleted
-      if (!wasCompleted) {
-        setRestTimer(restSecs)
-      }
+      newSets[setIdx] = !newSets[setIdx]
       return { ...prev, [exId]: newSets }
     })
+
+    if (!wasCompleted) {
+      setRestTimer(restSecs)
+
+      if (audioMode === 'coach') {
+        const newCount = currentSets.filter(Boolean).length + 1
+        const total = currentSets.length
+        const ex = exercises.find(e => e.id === exId)
+
+        if (newCount === total && ex) {
+          const weIdx = workout!.exercises.findIndex(we => we.exerciseId === exId)
+          const nextWe = workout!.exercises[weIdx + 1]
+          const nextExData = nextWe ? exercises.find(e => e.id === nextWe.exerciseId) : null
+          const tip = ex.tips[0] ? ` Recuerda: ${ex.tips[0]}.` : ''
+          const nextMsg = nextExData
+            ? `Ejercicio completado.${tip} Siguiente: ${nextExData.nameEs}.`
+            : `¡Excelente! Último ejercicio completado.${tip}`
+          speak(nextMsg)
+          if (ex.tips[1]) setRestCoachTip(ex.tips[1])
+        } else {
+          const tip = ex?.tips[newCount % (ex.tips.length || 1)] ?? null
+          const msgFn = COACH_SET_MSGS[(newCount - 1) % COACH_SET_MSGS.length]
+          const tipSuffix = tip ? ` ${tip}` : ''
+          speak(msgFn(restSecs) + tipSuffix)
+          setRestCoachTip(tip)
+        }
+      }
+    }
   }
 
   const totalSets = workout.exercises.reduce((s, we) => s + we.sets, 0)
@@ -109,6 +190,7 @@ export default function WorkoutPage() {
     }))
     setExerciseLogs(logs)
     setShowSummary(true)
+    if (audioMode === 'coach') speak('¡Entrenamiento finalizado! Excelente trabajo.')
   }
 
   function confirmFinish() {
@@ -128,6 +210,24 @@ export default function WorkoutPage() {
     navigate('/')
   }
 
+  const audioIcon = audioMode === 'off'
+    ? <VolumeX size={18} />
+    : audioMode === 'guide'
+    ? <Volume2 size={18} />
+    : <Mic size={18} />
+
+  const audioLabel = audioMode === 'off'
+    ? 'Audio off'
+    : audioMode === 'guide'
+    ? 'Guiado'
+    : 'Coach'
+
+  const audioColors = audioMode === 'off'
+    ? 'bg-zinc-800 border-zinc-700 text-zinc-500'
+    : audioMode === 'guide'
+    ? 'bg-violet-400/20 border-violet-400/40 text-violet-400'
+    : 'bg-cyan-400/20 border-cyan-400/40 text-cyan-400'
+
   return (
     <div className="min-h-screen bg-zinc-950">
       {/* Header */}
@@ -143,6 +243,16 @@ export default function WorkoutPage() {
           <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded-full shrink-0">
             ~{workout.estimatedMinutes} min
           </span>
+          {speechSupported && (
+            <button
+              onClick={cycleAudioMode}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors text-xs font-medium shrink-0 ${audioColors}`}
+              title="Cambiar modo de audio"
+            >
+              {audioIcon}
+              <span className="hidden sm:inline">{audioLabel}</span>
+            </button>
+          )}
         </div>
         {/* Progress bar */}
         <div className="max-w-2xl mx-auto mt-2">
@@ -159,20 +269,25 @@ export default function WorkoutPage() {
       {/* Rest timer */}
       {restTimer !== null && (
         <div className="sticky top-[88px] z-30 bg-zinc-900 border-b border-zinc-800 px-4 py-3">
-          <div className="max-w-2xl mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2 text-cyan-400">
-              <Timer size={16} />
-              <span className="text-sm font-semibold">Descansando...</span>
+          <div className="max-w-2xl mx-auto space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-cyan-400">
+                <Timer size={16} />
+                <span className="text-sm font-semibold">Descansando...</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-bold text-white tabular-nums">{restTimer}s</span>
+                <button
+                  onClick={() => { setRestTimer(null); setRestCoachTip(null) }}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 text-zinc-400 rounded-lg text-xs hover:text-white transition-colors"
+                >
+                  <SkipForward size={12} /> Saltar
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold text-white tabular-nums">{restTimer}s</span>
-              <button
-                onClick={() => setRestTimer(null)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 text-zinc-400 rounded-lg text-xs hover:text-white transition-colors"
-              >
-                <SkipForward size={12} /> Saltar
-              </button>
-            </div>
+            {audioMode === 'coach' && restCoachTip && (
+              <p className="text-xs text-zinc-500 italic border-l-2 border-cyan-400/30 pl-3">{restCoachTip}</p>
+            )}
           </div>
         </div>
       )}
@@ -193,6 +308,20 @@ export default function WorkoutPage() {
         {/* Workout rationale */}
         {workoutCoachNotes[workout.id] && (
           <CoachNoteCard note={workoutCoachNotes[workout.id]} defaultOpen={false} />
+        )}
+
+        {/* Audio mode banner */}
+        {audioMode !== 'off' && speechSupported && (
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${
+            audioMode === 'guide'
+              ? 'bg-violet-400/5 border-violet-400/20 text-violet-300'
+              : 'bg-cyan-400/5 border-cyan-400/20 text-cyan-300'
+          }`}>
+            {audioMode === 'guide' ? <Volume2 size={14} className="shrink-0" /> : <Mic size={14} className="shrink-0" />}
+            {audioMode === 'guide'
+              ? 'Modo guiado: toca el botón de audio en cada ejercicio para escuchar las instrucciones.'
+              : 'Modo entrenador: te acompañaré durante el entrenamiento con indicaciones automáticas.'}
+          </div>
         )}
 
         {workout.exercises.map((we, idx) => {
@@ -221,7 +350,7 @@ export default function WorkoutPage() {
               {/* Exercise header */}
               <button
                 type="button"
-                onClick={() => setExpandedEx(isExpanded ? null : ex.id)}
+                onClick={() => handleExerciseExpand(ex.id)}
                 className="w-full px-4 py-4 flex items-center gap-3 text-left"
               >
                 <div
@@ -299,9 +428,20 @@ export default function WorkoutPage() {
                   <p className="text-zinc-400 text-sm">{ex.description}</p>
 
                   <div>
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <Info size={13} className="text-violet-400" />
-                      <p className="text-xs text-violet-400 font-semibold uppercase tracking-wider">Cómo ejecutarlo</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Info size={13} className="text-violet-400" />
+                        <p className="text-xs text-violet-400 font-semibold uppercase tracking-wider">Cómo ejecutarlo</p>
+                      </div>
+                      {speechSupported && audioMode === 'guide' && (
+                        <button
+                          onClick={() => playExerciseGuide(ex.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-400/10 border border-violet-400/30 rounded-lg text-violet-400 text-xs hover:bg-violet-400/20 transition-colors"
+                        >
+                          <Volume2 size={12} />
+                          Escuchar
+                        </button>
+                      )}
                     </div>
                     <ol className="space-y-1.5">
                       {ex.instructions.map((ins, i) => (
@@ -330,22 +470,17 @@ export default function WorkoutPage() {
                     </div>
                   )}
 
-                  {/* Animation + YouTube side by side */}
-                  <div className="flex items-center gap-4">
-                    <ExerciseAnimation exerciseId={ex.id} />
-                    <div className="flex flex-col gap-2 flex-1">
-                      <p className="text-xs text-zinc-600">Fuente: {ex.source}</p>
-                      <a
-                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.videoKeyword)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-zinc-500 hover:text-white transition-colors"
-                      >
-                        <span>▶</span>
-                        Ver en YouTube
-                      </a>
-                    </div>
-                  </div>
+                  {/* Video link */}
+                  <a
+                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.videoKeyword)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 border border-red-500/25 rounded-xl text-red-400 text-sm hover:bg-red-500/20 transition-colors w-full"
+                  >
+                    <PlayCircle size={15} />
+                    <span className="flex-1">Ver en YouTube</span>
+                    <span className="text-xs text-zinc-600">{ex.videoKeyword}</span>
+                  </a>
                 </div>
               )}
             </div>

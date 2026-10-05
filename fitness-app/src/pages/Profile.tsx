@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { User, Plus, Check, Star, ChevronDown, ChevronUp, Bell, Home, Dumbbell, Calendar } from 'lucide-react'
+import { User, Plus, Check, Star, ChevronDown, ChevronUp, Bell, Home, Dumbbell, Calendar, AlertTriangle } from 'lucide-react'
+import { overloadStatus } from '../utils/weekSchedule'
 import { useAppStore } from '../store/useAppStore'
 import type { InsightCadence } from '../store/useAppStore'
 import { programPhases } from '../data/programs'
@@ -82,34 +83,76 @@ export default function Profile() {
           <p className="text-sm font-semibold text-zinc-300">Días de entrenamiento</p>
         </div>
         <p className="text-xs text-zinc-500 mb-4">
-          Cuántos días por semana quieres entrenar. El plan distribuye las sesiones automáticamente.
+          Cuántos días por semana quieres entrenar. El plan distribuye las sesiones con los descansos correctos entre ellas.
         </p>
-        <div className="flex gap-2">
-          {([3, 4, 5, 6] as const).map(n => {
-            const phaseDefault = currentPhase?.workoutsPerWeek ?? 3
-            const current = activeUser.preferredDaysPerWeek ?? phaseDefault
-            const labels: Record<number, string> = { 3: '3 días', 4: '4 días', 5: '5 días', 6: '6 días' }
-            return (
-              <button
-                key={n}
-                type="button"
-                onClick={() => updateUser(activeUser.id, { preferredDaysPerWeek: n })}
-                className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all ${
-                  current === n
-                    ? 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
-                    : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
-                }`}
-              >
-                {labels[n]}
-              </button>
-            )
-          })}
-        </div>
-        {currentPhase && (
-          <p className="text-xs text-zinc-600 mt-2.5">
-            Plan base de esta fase: {currentPhase.workoutsPerWeek} días/semana
-          </p>
-        )}
+        {(() => {
+          const phaseDefault = currentPhase?.workoutsPerWeek ?? 3
+          const current = activeUser.preferredDaysPerWeek ?? phaseDefault
+          const phaseId = currentPhase?.id ?? 1
+          const status = overloadStatus(phaseId, current)
+          const distributionLabels: Record<number, string> = {
+            3: 'Lun · Mié · Vie',
+            4: 'Lun · Mar · Jue · Vie',
+            5: 'Lun · Mar · Mié · Vie · Sáb',
+            6: 'Lun · Mar · Mié · Jue · Vie · Sáb',
+          }
+          const overloadMessages: Record<'caution' | 'overload', string> = {
+            caution: phaseId <= 2
+              ? 'En fase inicial, 4 días supera el rango óptimo (2-3). El músculo necesita 48-72 h de recuperación (ACSM). Avanza al siguiente nivel primero.'
+              : 'En fase intermedia, 6 días excede el Volumen Máximo Recuperable (RP). Asegúrate de reducir series por sesión para compensar.',
+            overload:
+              'En fase inicial, más de 4 días no permite los 48-72 h de recuperación que requiere el músculo de un principiante (ACSM/RP). Riesgo real de sobreentrenamiento.',
+          }
+          return (
+            <>
+              <div className="flex gap-2">
+                {([3, 4, 5, 6] as const).map(n => {
+                  const s = overloadStatus(phaseId, n)
+                  return (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => updateUser(activeUser.id, { preferredDaysPerWeek: n })}
+                      className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all ${
+                        current === n
+                          ? s === 'overload'
+                            ? 'border-red-400 bg-red-400/10 text-red-400'
+                            : s === 'caution'
+                            ? 'border-amber-400 bg-amber-400/10 text-amber-400'
+                            : 'border-cyan-400 bg-cyan-400/10 text-cyan-400'
+                          : 'border-zinc-700 bg-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+                      }`}
+                    >
+                      {n}d
+                      {s === 'overload' && current === n && <span className="block text-[9px] font-normal leading-tight">⚠</span>}
+                      {s === 'caution' && current === n && <span className="block text-[9px] font-normal leading-tight">~</span>}
+                    </button>
+                  )
+                })}
+              </div>
+              {current in distributionLabels && (
+                <p className="text-xs text-zinc-500 mt-2">
+                  Distribución: <span className="text-zinc-400">{distributionLabels[current]}</span>
+                </p>
+              )}
+              {status && (
+                <div className={`flex items-start gap-2 mt-2.5 rounded-xl p-3 text-xs leading-relaxed ${
+                  status === 'overload'
+                    ? 'bg-red-400/5 border border-red-400/20 text-red-300'
+                    : 'bg-amber-400/5 border border-amber-400/20 text-amber-300'
+                }`}>
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                  <span>{overloadMessages[status]}</span>
+                </div>
+              )}
+              {currentPhase && !status && (
+                <p className="text-xs text-zinc-600 mt-2.5">
+                  Plan base de esta fase: {currentPhase.workoutsPerWeek} días/semana
+                </p>
+              )}
+            </>
+          )
+        })()}
       </div>
 
       {/* Equipment / active location */}

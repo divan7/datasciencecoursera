@@ -67,34 +67,22 @@ function createBeep(freq: number, dur: number, vol: number) {
 }
 
 function VideoCard({ keyword, nameEs }: { keyword: string; nameEs: string }) {
-  const [open, setOpen] = useState(false)
-  const src = `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(keyword)}&rel=0`
+  const url = `https://www.youtube.com/results?search_query=${encodeURIComponent(keyword)}`
   return (
-    <div className="rounded-xl overflow-hidden border border-zinc-700">
-      {open ? (
-        <iframe
-          src={src}
-          title={`Tutorial: ${nameEs}`}
-          className="w-full"
-          style={{ aspectRatio: '16/9' }}
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="w-full relative bg-zinc-800 flex flex-col items-center justify-center gap-2 py-6"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-zinc-700/60 to-zinc-900/80" />
-          <div className="relative w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
-            <Play size={20} className="text-white ml-1" fill="white" />
-          </div>
-          <p className="relative text-sm text-zinc-300 font-medium">{nameEs}</p>
-          <p className="relative text-xs text-zinc-500">Toca para ver tutorial en YouTube</p>
-        </button>
-      )}
-    </div>
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 w-full bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-xl px-4 py-3 transition-colors"
+    >
+      <div className="w-9 h-9 bg-red-600 rounded-full flex items-center justify-center shrink-0">
+        <Play size={16} className="text-white ml-0.5" fill="white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-zinc-200 font-medium truncate">Tutorial: {nameEs}</p>
+        <p className="text-xs text-zinc-500">Ver en YouTube →</p>
+      </div>
+    </a>
   )
 }
 

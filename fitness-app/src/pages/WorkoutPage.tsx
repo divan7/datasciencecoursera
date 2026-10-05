@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ChevronDown, ChevronUp, CheckCircle2, Circle, Timer,
   Info, Flame, SkipForward, Star, AlertTriangle,
-  Volume2, VolumeX, Mic, PlayCircle, Bell, BellOff,
+  Volume2, VolumeX, Mic, Play, Bell, BellOff,
 } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { exercises } from '../data/exercises'
@@ -64,6 +64,38 @@ function createBeep(freq: number, dur: number, vol: number) {
     osc.stop(ctx.currentTime + dur / 1000)
     setTimeout(() => ctx.close(), dur + 200)
   } catch (_) {}
+}
+
+function VideoCard({ keyword, nameEs }: { keyword: string; nameEs: string }) {
+  const [open, setOpen] = useState(false)
+  const src = `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(keyword)}&rel=0`
+  return (
+    <div className="rounded-xl overflow-hidden border border-zinc-700">
+      {open ? (
+        <iframe
+          src={src}
+          title={`Tutorial: ${nameEs}`}
+          className="w-full"
+          style={{ aspectRatio: '16/9' }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="w-full relative bg-zinc-800 flex flex-col items-center justify-center gap-2 py-6"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-700/60 to-zinc-900/80" />
+          <div className="relative w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+            <Play size={20} className="text-white ml-1" fill="white" />
+          </div>
+          <p className="relative text-sm text-zinc-300 font-medium">{nameEs}</p>
+          <p className="relative text-xs text-zinc-500">Toca para ver tutorial en YouTube</p>
+        </button>
+      )}
+    </div>
+  )
 }
 
 export default function WorkoutPage() {
@@ -482,6 +514,13 @@ export default function WorkoutPage() {
                     <span>{ex.tips[0]}</span>
                   </p>
                 )}
+
+                {/* Video card — always visible for basic (difficulty 1) exercises */}
+                {ex.difficulty === 1 && (
+                  <div className="mt-3">
+                    <VideoCard keyword={ex.videoKeyword} nameEs={ex.nameEs} />
+                  </div>
+                )}
               </div>
 
               {/* Exercise detail (expanded) */}
@@ -548,17 +587,10 @@ export default function WorkoutPage() {
                     </div>
                   )}
 
-                  {/* Video link */}
-                  <a
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(ex.videoKeyword)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 border border-red-500/25 rounded-xl text-red-400 text-sm hover:bg-red-500/20 transition-colors w-full"
-                  >
-                    <PlayCircle size={15} />
-                    <span className="flex-1">Ver en YouTube</span>
-                    <span className="text-xs text-zinc-600">{ex.videoKeyword}</span>
-                  </a>
+                  {/* Video — shown in expanded panel for intermediate/advanced; basic shows it above */}
+                  {ex.difficulty > 1 && (
+                    <VideoCard keyword={ex.videoKeyword} nameEs={ex.nameEs} />
+                  )}
                 </div>
               )}
             </div>

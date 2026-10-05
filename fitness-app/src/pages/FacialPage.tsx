@@ -2,10 +2,35 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Volume2, VolumeX, Mic,
-  SkipForward, RotateCcw, ChevronDown, ChevronUp,
+  SkipForward, RotateCcw, ChevronDown, ChevronUp, Play,
 } from 'lucide-react'
 import { facialExercises } from '../data/facialExercises'
 import { useWorkoutSpeech, type AudioMode } from '../hooks/useWorkoutSpeech'
+
+function VideoCard({ keyword, nameEs }: { keyword: string; nameEs: string }) {
+  const [open, setOpen] = useState(false)
+  const src = `https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(keyword)}&rel=0`
+  return (
+    <div className="rounded-xl overflow-hidden border border-zinc-700">
+      {open ? (
+        <iframe src={src} title={`Tutorial: ${nameEs}`} className="w-full"
+          style={{ aspectRatio: '16/9' }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen />
+      ) : (
+        <button type="button" onClick={() => setOpen(true)}
+          className="w-full relative bg-zinc-800 flex flex-col items-center justify-center gap-2 py-6">
+          <div className="absolute inset-0 bg-gradient-to-br from-zinc-700/60 to-zinc-900/80" />
+          <div className="relative w-12 h-12 bg-red-600 rounded-full flex items-center justify-center shadow-lg">
+            <Play size={20} className="text-white ml-1" fill="white" />
+          </div>
+          <p className="relative text-sm text-zinc-300 font-medium">{nameEs}</p>
+          <p className="relative text-xs text-zinc-500">Toca para ver tutorial en YouTube</p>
+        </button>
+      )}
+    </div>
+  )
+}
 
 function createBeep(freq: number, dur: number, vol: number) {
   try {
@@ -325,6 +350,12 @@ export default function FacialPage() {
                       ))}
                     </ol>
                   </div>
+                  {ex.videoKeyword && (
+                    <div>
+                      <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2">Tutorial en video</p>
+                      <VideoCard keyword={ex.videoKeyword} nameEs={ex.nameEs} />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

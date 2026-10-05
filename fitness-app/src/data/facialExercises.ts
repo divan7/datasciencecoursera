@@ -7,6 +7,7 @@ export interface FacialExercise {
   benefit: string
   instructions: string[]
   tips: string[]
+  videoKeyword: string
 }
 
 export const facialExercises: FacialExercise[] = [
@@ -27,6 +28,7 @@ export const facialExercises: FacialExercise[] = [
       'Imagina que tienes un hilo en la coronilla que te jala hacia arriba.',
       'No bajes la barbilla — la cabeza se mueve hacia atrás en horizontal.',
     ],
+    videoKeyword: 'chin tuck exercise double chin tutorial',
   },
   {
     id: 'tongue_roof',
@@ -45,6 +47,7 @@ export const facialExercises: FacialExercise[] = [
       'Cuanto más fuerte presiones la lengua, mayor activación muscular.',
       'Si no sientes tensión bajo la barbilla, presiona más fuerte la lengua.',
     ],
+    videoKeyword: 'tongue to roof of mouth double chin exercise',
   },
   {
     id: 'chin_lift',
@@ -63,6 +66,7 @@ export const facialExercises: FacialExercise[] = [
       'Exagera el movimiento de labios para mayor tensión muscular.',
       'Puedes sentir un leve estiramiento — es normal.',
     ],
+    videoKeyword: 'chin lift neck exercise double chin reduction',
   },
   {
     id: 'platysma',
@@ -81,6 +85,7 @@ export const facialExercises: FacialExercise[] = [
       'Mira en espejo para asegurarte de exponer bien los dientes inferiores.',
       'La tensión debe sentirse en toda la parte frontal del cuello.',
     ],
+    videoKeyword: 'platysma neck exercise jawline definition tutorial',
   },
   {
     id: 'fish_face',
@@ -98,6 +103,7 @@ export const facialExercises: FacialExercise[] = [
     tips: [
       'Entre más fuerte jales las mejillas, mayor trabajo muscular.',
     ],
+    videoKeyword: 'fish face exercise cheeks jawline toning',
   },
   {
     id: 'jaw_release',
@@ -116,6 +122,7 @@ export const facialExercises: FacialExercise[] = [
       'Siente el trabajo en los músculos a los lados de la mandíbula.',
       'La lentitud es clave — rápido no activa igual.',
     ],
+    videoKeyword: 'jaw release exercise jawline definition face slimming',
   },
   {
     id: 'neck_stretch',
@@ -134,6 +141,7 @@ export const facialExercises: FacialExercise[] = [
       'Mantén el hombro del lado que estiras hacia abajo para mayor estiramiento.',
       'Respira profundo durante el estiramiento.',
     ],
+    videoKeyword: 'lateral neck stretch cervical flexibility tutorial',
   },
   {
     id: 'vowel_sounds',
@@ -152,5 +160,6 @@ export const facialExercises: FacialExercise[] = [
       'Mientras más exagerado, mejor resultado.',
       'Puedes hacerlo en privado — ¡no importa cómo te veas!',
     ],
+    videoKeyword: 'facial yoga vowel sounds exercise face muscles',
   },
 ]

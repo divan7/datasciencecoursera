@@ -9,7 +9,11 @@ export function useWorkoutSpeech() {
   function getVoice(): SpeechSynthesisVoice | null {
     if (voiceRef.current) return voiceRef.current
     const voices = window.speechSynthesis.getVoices()
-    const es = voices.find(v => v.lang.startsWith('es') && v.localService)
+    // Prefer Mexican Spanish, then any Spanish
+    const es = voices.find(v => v.lang === 'es-MX' && v.localService)
+      ?? voices.find(v => v.lang === 'es-MX')
+      ?? voices.find(v => v.lang === 'es-419' && v.localService)
+      ?? voices.find(v => v.lang.startsWith('es') && v.localService)
       ?? voices.find(v => v.lang.startsWith('es'))
       ?? null
     voiceRef.current = es
@@ -18,7 +22,7 @@ export function useWorkoutSpeech() {
 
   function makeUtterance(text: string, rate = 0.92): SpeechSynthesisUtterance {
     const utt = new SpeechSynthesisUtterance(text)
-    utt.lang = 'es-ES'
+    utt.lang = 'es-MX'
     utt.rate = rate
     utt.pitch = 1.0
     utt.volume = 1.0

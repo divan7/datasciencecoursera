@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
-        name: 'Fitness Conditioning',
-        short_name: 'Fitness',
+        name: 'Ponte en Forma',
+        short_name: 'Ponte en Forma',
         description: 'Tu app de acondicionamiento físico personalizado',
         theme_color: '#0f172a',
         background_color: '#0f172a',

@@ -8,6 +8,7 @@ import WorkoutPage from './pages/WorkoutPage'
 import CheckIn from './pages/CheckIn'
 import Progress from './pages/Progress'
 import Profile from './pages/Profile'
+import FacialPage from './pages/FacialPage'
 
 export default function App() {
   const { activeUser } = useAppStore()
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/checkin" element={<CheckIn />} />
             <Route path="/progress" element={<Progress />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/facial" element={<FacialPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         )}

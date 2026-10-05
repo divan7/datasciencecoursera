@@ -27,3 +27,39 @@ html, body {
 
 h1, h2, h3, h4, h5, h6 { margin: 0; font-weight: 600; color: #f4f4f5; }
 p { margin: 0; }
+
+/* ─── Light mode ─────────────────────────────────────────────────────────── */
+html[data-theme="light"] {
+  background-color: #f1f5f9;
+  color: #0f172a;
+
+  /* Flip zinc dark → light so all Tailwind zinc utilities adapt */
+  --color-zinc-950: oklch(97.3% 0.001 264.542);
+  --color-zinc-900: oklch(94.1% 0.002 264.542);
+  --color-zinc-800: oklch(88.6% 0.004 264.542);
+  --color-zinc-700: oklch(82.4% 0.006 264.542);
+  /* Flip text zinks dark for legibility */
+  --color-zinc-600: oklch(38.2% 0.013 264.531);
+  --color-zinc-500: oklch(28.0% 0.008 264.531);
+  --color-zinc-400: oklch(21.5% 0.006 264.542);
+  --color-zinc-300: oklch(17.0% 0.004 264.531);
+  /* "white" text → near-black in light mode */
+  --color-white: oklch(14.5% 0.004 264.531);
+}
+
+html[data-theme="light"] body {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+html[data-theme="light"] ::-webkit-scrollbar-track { background: #e2e8f0; }
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #94a3b8; }
+
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] h4,
+html[data-theme="light"] h5,
+html[data-theme="light"] h6 {
+  color: #0f172a;
+}

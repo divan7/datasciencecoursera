@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ChevronDown, ChevronUp, CheckCircle2, Circle, Timer,
   Info, Flame, SkipForward, Star, AlertTriangle,
-  Volume2, VolumeX, Mic, PlayCircle,
+  Volume2, VolumeX, Mic, PlayCircle, Bell, BellOff,
 } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { exercises } from '../data/exercises'
@@ -47,6 +47,25 @@ function getExercisePriority(
   return best
 }
 
+function createBeep(freq: number, dur: number, vol: number) {
+  try {
+    const ACtx = window.AudioContext
+      ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    const ctx = new ACtx()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.value = freq
+    gain.gain.setValueAtTime(vol, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur / 1000)
+    osc.start()
+    osc.stop(ctx.currentTime + dur / 1000)
+    setTimeout(() => ctx.close(), dur + 200)
+  } catch (_) {}
+}
+
 export default function WorkoutPage() {
   const { workoutId } = useParams()
   const navigate = useNavigate()
@@ -63,11 +82,16 @@ export default function WorkoutPage() {
   const [restCoachTip, setRestCoachTip] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
   const [audioMode, setAudioMode] = useState<AudioMode>('off')
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [beepEnabled, setBeepEnabled] = useState(true)
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audioModeRef = useRef<AudioMode>('off')
   audioModeRef.current = audioMode
   const speakRef = useRef(speak)
   speakRef.current = speak
+  const beepEnabledRef = useRef(true)
+  beepEnabledRef.current = beepEnabled
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     if (!workout) return
@@ -78,14 +102,52 @@ export default function WorkoutPage() {
     setCompletedSets(init)
   }, [workout])
 
+  /* Keep audio alive when screen dims (silent loop + wake lock) */
   useEffect(() => {
-    if (restTimer !== null && restTimer > 0) {
+    if (audioMode === 'off') {
+      silentAudioRef.current?.pause()
+      return
+    }
+    const audio = new Audio(
+      'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+    )
+    audio.loop = true
+    audio.volume = 0.001
+    silentAudioRef.current = audio
+    audio.play().catch(() => {})
+
+    let wl: { release(): Promise<void> } | null = null
+    const nav = navigator as Navigator & {
+      wakeLock?: { request(type: string): Promise<{ release(): Promise<void> }> }
+    }
+    if (nav.wakeLock) {
+      nav.wakeLock.request('screen').then(w => { wl = w }).catch(() => {})
+    }
+
+    return () => {
+      audio.pause()
+      wl?.release().catch(() => {})
+    }
+  }, [audioMode])
+
+  /* Rest countdown with beeps */
+  useEffect(() => {
+    if (restTimer === null) return
+    if (restTimer > 0) {
       timerRef.current = setTimeout(() => setRestTimer(t => (t ?? 1) - 1), 1000)
-    } else if (restTimer === 0) {
+      if (beepEnabledRef.current) {
+        if (restTimer === 10) createBeep(660, 120, 0.25)
+        else if (restTimer <= 5) createBeep(880, 100, 0.4)
+      }
+    } else {
       setRestTimer(null)
       setRestCoachTip(null)
       if (audioModeRef.current === 'coach') {
         speakRef.current('¡Tiempo! A por la siguiente serie.')
+      }
+      if (beepEnabledRef.current) {
+        createBeep(1047, 200, 0.5)
+        setTimeout(() => createBeep(1047, 200, 0.5), 300)
       }
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
@@ -216,11 +278,7 @@ export default function WorkoutPage() {
     ? <Volume2 size={18} />
     : <Mic size={18} />
 
-  const audioLabel = audioMode === 'off'
-    ? 'Audio off'
-    : audioMode === 'guide'
-    ? 'Guiado'
-    : 'Coach'
+  const audioLabel = audioMode === 'off' ? 'Audio off' : audioMode === 'guide' ? 'Guiado' : 'Coach'
 
   const audioColors = audioMode === 'off'
     ? 'bg-zinc-800 border-zinc-700 text-zinc-500'
@@ -274,9 +332,23 @@ export default function WorkoutPage() {
               <div className="flex items-center gap-2 text-cyan-400">
                 <Timer size={16} />
                 <span className="text-sm font-semibold">Descansando...</span>
+                {restTimer <= 10 && restTimer > 0 && (
+                  <span className="text-xs text-amber-400 animate-pulse">¡Prepárate!</span>
+                )}
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl font-bold text-white tabular-nums">{restTimer}s</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-2xl font-bold tabular-nums ${restTimer <= 5 ? 'text-amber-400' : 'text-white'}`}>
+                  {restTimer}s
+                </span>
+                <button
+                  onClick={() => setBeepEnabled(b => !b)}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    beepEnabled ? 'bg-cyan-400/10 text-cyan-400' : 'bg-zinc-800 text-zinc-600'
+                  }`}
+                  title={beepEnabled ? 'Silenciar alertas' : 'Activar alertas'}
+                >
+                  {beepEnabled ? <Bell size={14} /> : <BellOff size={14} />}
+                </button>
                 <button
                   onClick={() => { setRestTimer(null); setRestCoachTip(null) }}
                   className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 text-zinc-400 rounded-lg text-xs hover:text-white transition-colors"
@@ -386,9 +458,9 @@ export default function WorkoutPage() {
                 {isExpanded ? <ChevronUp size={16} className="text-zinc-500 shrink-0" /> : <ChevronDown size={16} className="text-zinc-500 shrink-0" />}
               </button>
 
-              {/* Sets */}
+              {/* Sets + inline tip */}
               <div className="px-4 pb-4">
-                <div className="flex gap-2 flex-wrap mb-3">
+                <div className="flex gap-2 flex-wrap mb-2">
                   {sets.map((done, i) => (
                     <button
                       key={i}
@@ -403,10 +475,16 @@ export default function WorkoutPage() {
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-zinc-600">Toca cada cuadro al completar la serie</p>
+                {/* Always-visible first tip */}
+                {ex.tips.length > 0 && (
+                  <p className="text-[11px] text-amber-400/80 flex gap-1.5 items-start mt-1">
+                    <span className="shrink-0">💡</span>
+                    <span>{ex.tips[0]}</span>
+                  </p>
+                )}
               </div>
 
-              {/* Exercise detail */}
+              {/* Exercise detail (expanded) */}
               {isExpanded && (
                 <div className="border-t border-zinc-800 px-4 py-4 space-y-4">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -453,14 +531,14 @@ export default function WorkoutPage() {
                     </ol>
                   </div>
 
-                  {ex.tips.length > 0 && (
+                  {ex.tips.length > 1 && (
                     <div>
                       <div className="flex items-center gap-1.5 mb-2">
                         <Flame size={13} className="text-orange-400" />
-                        <p className="text-xs text-orange-400 font-semibold uppercase tracking-wider">Tips clave</p>
+                        <p className="text-xs text-orange-400 font-semibold uppercase tracking-wider">Tips adicionales</p>
                       </div>
                       <ul className="space-y-1">
-                        {ex.tips.map((tip, i) => (
+                        {ex.tips.slice(1).map((tip, i) => (
                           <li key={i} className="text-sm text-zinc-400 flex gap-2">
                             <span className="text-orange-400 shrink-0">→</span>
                             {tip}

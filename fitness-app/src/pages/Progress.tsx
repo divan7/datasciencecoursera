@@ -4,8 +4,10 @@ import {
   ResponsiveContainer, BarChart, Bar, Legend,
 } from 'recharts'
 import { useAppStore } from '../store/useAppStore'
+import { useNavigate } from 'react-router-dom'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { TrendingDown, TrendingUp, Minus } from 'lucide-react'
 
 type Tab = 'body' | 'workouts' | 'wellbeing'
 
@@ -28,6 +30,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 }
 
 export default function Progress() {
+  const navigate = useNavigate()
   const { activeUser, getUserMetrics, getUserWorkoutLogs } = useAppStore()
   const [tab, setTab] = useState<Tab>('body')
 
@@ -66,6 +69,20 @@ export default function Progress() {
     ? (metrics[metrics.length - 1].weight - metrics[0].weight).toFixed(1)
     : null
   const totalWorkouts = logs.length
+
+  const latest = metrics.length > 0 ? metrics[metrics.length - 1] : null
+  const prev = metrics.length > 1 ? metrics[metrics.length - 2] : null
+
+  function delta(curr: number | undefined, before: number | undefined) {
+    if (curr == null || before == null) return null
+    return +(curr - before).toFixed(1)
+  }
+  const measurementStats = [
+    { key: 'weight', label: 'Peso', unit: 'kg', value: latest?.weight, d: delta(latest?.weight, prev?.weight), lower: true },
+    { key: 'waist', label: 'Cintura', unit: 'cm', value: latest?.waist, d: delta(latest?.waist, prev?.waist), lower: true },
+    { key: 'hips', label: 'Cadera', unit: 'cm', value: latest?.hips, d: delta(latest?.hips, prev?.hips), lower: true },
+    { key: 'thigh', label: 'Muslo', unit: 'cm', value: latest?.thigh, d: delta(latest?.thigh, prev?.thigh), lower: false },
+  ].filter(s => s.value != null)
 
   return (
     <div className="space-y-6">
@@ -114,8 +131,48 @@ export default function Progress() {
       {/* Charts */}
       {tab === 'body' && (
         <div className="space-y-4">
+          {/* Measurement stat cards */}
+          {measurementStats.length > 0 ? (
+            <div className={`grid gap-3 ${measurementStats.length >= 4 ? 'grid-cols-2' : `grid-cols-${measurementStats.length}`}`}>
+              {measurementStats.map(s => {
+                const improved = s.d != null && (s.lower ? s.d < 0 : s.d > 0)
+                const worsened = s.d != null && (s.lower ? s.d > 0 : s.d < 0)
+                return (
+                  <div key={s.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                    <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
+                    <p className="text-xl font-bold text-white">{s.value} <span className="text-sm font-normal text-zinc-500">{s.unit}</span></p>
+                    {s.d != null ? (
+                      <div className={`flex items-center gap-1 mt-1 text-xs ${improved ? 'text-emerald-400' : worsened ? 'text-red-400' : 'text-zinc-500'}`}>
+                        {improved ? <TrendingDown size={11} /> : worsened ? <TrendingUp size={11} /> : <Minus size={11} />}
+                        <span>{s.d > 0 ? `+${s.d}` : s.d} {s.unit} vs anterior</span>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-600 mt-1">Sin comparación aún</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 text-center">
+              <p className="text-3xl mb-2">📏</p>
+              <p className="text-zinc-400 text-sm mb-3">Aún no hay medidas registradas.</p>
+              <button
+                onClick={() => navigate('/checkin')}
+                className="px-4 py-2 bg-cyan-400/10 border border-cyan-400/30 text-cyan-400 rounded-xl text-sm hover:bg-cyan-400/20 transition-colors"
+              >
+                Registrar primera medida →
+              </button>
+            </div>
+          )}
+
+          {/* Charts */}
           {bodyData.length < 2 ? (
-            <EmptyChart message="Necesitas al menos 2 check-ins para ver la gráfica de peso" />
+            metrics.length === 1 && (
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-xs text-zinc-500">
+                Registra un segundo check-in para ver la gráfica de tendencia.
+              </div>
+            )
           ) : (
             <>
               <ChartCard title="Peso corporal (kg)">
@@ -157,6 +214,58 @@ export default function Progress() {
                 </ChartCard>
               )}
             </>
+          )}
+
+          {/* Measurement history table */}
+          {metrics.length > 0 && (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+                <p className="text-sm font-semibold text-zinc-300">Historial de medidas</p>
+                <button
+                  onClick={() => navigate('/checkin')}
+                  className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                >
+                  + Registrar
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-800">
+                      <th className="text-left px-4 py-2 text-zinc-500 font-medium">Fecha</th>
+                      <th className="text-right px-3 py-2 text-zinc-500 font-medium">Peso</th>
+                      {metrics.some(m => m.waist) && <th className="text-right px-3 py-2 text-zinc-500 font-medium">Cintura</th>}
+                      {metrics.some(m => m.hips) && <th className="text-right px-3 py-2 text-zinc-500 font-medium">Cadera</th>}
+                      {metrics.some(m => m.thigh) && <th className="text-right px-3 py-2 text-zinc-500 font-medium">Muslo</th>}
+                      <th className="text-right px-3 py-2 text-zinc-500 font-medium">Δ Peso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {metrics.slice(-8).reverse().map((m, i, arr) => {
+                      const prevEntry = arr[i + 1]
+                      const weightDelta = prevEntry ? +(m.weight - prevEntry.weight).toFixed(1) : null
+                      return (
+                        <tr key={m.id} className="border-b border-zinc-800/50 last:border-0">
+                          <td className="px-4 py-2.5 text-zinc-400">{format(parseISO(m.date), "d MMM", { locale: es })}</td>
+                          <td className="px-3 py-2.5 text-right text-white font-medium">{m.weight} kg</td>
+                          {metrics.some(x => x.waist) && <td className="px-3 py-2.5 text-right text-zinc-400">{m.waist ?? '—'}</td>}
+                          {metrics.some(x => x.hips) && <td className="px-3 py-2.5 text-right text-zinc-400">{m.hips ?? '—'}</td>}
+                          {metrics.some(x => x.thigh) && <td className="px-3 py-2.5 text-right text-zinc-400">{m.thigh ?? '—'}</td>}
+                          <td className={`px-3 py-2.5 text-right font-medium ${
+                            weightDelta == null ? 'text-zinc-600'
+                              : weightDelta < 0 ? 'text-emerald-400'
+                              : weightDelta > 0 ? 'text-red-400'
+                              : 'text-zinc-500'
+                          }`}>
+                            {weightDelta == null ? '—' : weightDelta > 0 ? `+${weightDelta}` : weightDelta}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
         </div>
       )}

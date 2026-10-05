@@ -1,17 +1,36 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Flame, Trophy, Calendar, ChevronRight, Play, CheckCircle2, AlertCircle, Star, Home, Dumbbell, AlertTriangle, Info } from 'lucide-react'
+import { Flame, Trophy, Calendar, ChevronRight, Play, CheckCircle2, AlertCircle, Star, Home, Dumbbell, AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAppStore } from '../store/useAppStore'
 import { muscleFocusGroups, priorityConfig } from '../data/muscleFocus'
 import { getWeeklyInsight } from '../data/coachNotes'
 import { phaseEquipmentAdvice, getEquipmentMismatch } from '../data/equipmentAdvice'
 import MotivationalBanner from '../components/ui/MotivationalBanner'
 import { WeeklyInsightCard } from '../components/CoachPanel'
+import { computeWeekSchedule } from '../utils/weekSchedule'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import type { MuscleFocusId } from '../types'
 
+const ACTIVE_RECOVERY = [
+  { emoji: '🚶', title: 'Caminata ligera', duration: '15-20 min', benefit: 'Activa la circulación y elimina metabolitos de fatiga muscular' },
+  { emoji: '🧘', title: 'Yoga / movilidad', duration: '20 min', benefit: 'Reduce DOMS y mejora rango articular sin generar nuevo daño' },
+  { emoji: '🫧', title: 'Rodillo de espuma', duration: '10 min', benefit: 'Liberación miofascial: reduce rigidez sin comprometer recuperación' },
+  { emoji: '🤸', title: 'Estiramientos suaves', duration: '10-15 min', benefit: 'Mejora flexibilidad activa; intensidad insuficiente para interferir con el descanso' },
+]
+
+// Training day indices (Mon=0 … Sun=6) per preferred days count
+const SCHEDULE_INDICES: Record<number, number[]> = {
+  2: [0, 3],
+  3: [0, 2, 4],
+  4: [0, 1, 3, 4],
+  5: [0, 1, 2, 4, 5],
+  6: [0, 1, 2, 3, 4, 5],
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
+  const [showRecovery, setShowRecovery] = useState(false)
   const {
     activeUser,
     activeProgram,
@@ -35,17 +54,32 @@ export default function Dashboard() {
   const startDate = parseISO(activeProgram.startDate)
   const totalDays = Math.floor((Date.now() - startDate.getTime()) / 86400000)
 
-  // Determine today's workout
+  // Determine today's workout using the effective schedule (respects preferredDaysPerWeek)
   const dayOfWeek = format(new Date(), 'EEE', { locale: es })
   const dayMap: Record<string, string> = {
     lun: 'Lun', mar: 'Mar', mié: 'Mie', jue: 'Jue', vie: 'Vie', sáb: 'Sab', dom: 'Dom',
   }
   const todayKey = dayMap[dayOfWeek.toLowerCase()] ?? ''
-  const todayWorkoutLabel = currentPhase.weekSchedule[todayKey] ?? 'Descanso'
+  const effectiveSchedule = activeUser.preferredDaysPerWeek
+    ? computeWeekSchedule(currentPhase, activeUser.preferredDaysPerWeek)
+    : currentPhase.weekSchedule
+  const todayWorkoutLabel = effectiveSchedule[todayKey] ?? 'Descanso'
   const todayWorkout = currentPhase.workouts.find(w => w.dayLabel === todayWorkoutLabel)
 
   const isRestDay = !todayWorkout
   const isCompleted = !!todayLog?.completed
+
+  // Missed sessions — check if behind schedule late in the week
+  const effectiveDays = activeUser.preferredDaysPerWeek ?? currentPhase.workoutsPerWeek
+  const dayJS = new Date().getDay() // 0=Sun…6=Sat
+  const dayMon0 = dayJS === 0 ? 6 : dayJS - 1 // Mon=0…Sun=6
+  const scheduleIdx = SCHEDULE_INDICES[effectiveDays] ?? [0, 2, 4]
+  const sessionsDueByToday = scheduleIdx.filter(d => d <= dayMon0).length
+  const sessionsDone = Math.round(weekRate * effectiveDays)
+  const sessionsBehind = Math.max(0, sessionsDueByToday - sessionsDone)
+  const sessionsLeft = Math.max(0, effectiveDays - sessionsDone)
+  const trainingDaysLeft = scheduleIdx.filter(d => d > dayMon0).length
+  const showMissedWarning = sessionsBehind >= 1 && sessionsLeft > 0
 
   const activeLocation = activeUser.activeLocation ?? 'home'
   const equipAdvice = phaseEquipmentAdvice[currentPhase.id]
@@ -210,6 +244,36 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Missed sessions warning */}
+      {showMissedWarning && (
+        <div className={`border rounded-2xl p-4 ${
+          sessionsBehind >= 2
+            ? 'bg-red-400/5 border-red-400/20'
+            : 'bg-amber-400/5 border-amber-400/20'
+        }`}>
+          <div className="flex gap-3">
+            <AlertTriangle size={18} className={`shrink-0 mt-0.5 ${sessionsBehind >= 2 ? 'text-red-400' : 'text-amber-400'}`} />
+            <div>
+              <p className={`font-semibold text-sm ${sessionsBehind >= 2 ? 'text-red-300' : 'text-amber-300'}`}>
+                {sessionsBehind >= 2
+                  ? `${sessionsBehind} sesiones sin completar`
+                  : 'Llevas una sesión de retraso'}
+              </p>
+              <p className="text-zinc-400 text-sm mt-1 leading-relaxed">
+                {trainingDaysLeft === 0
+                  ? sessionsDone === 0
+                    ? 'No completaste ninguna sesión esta semana. Retoma el próximo lunes — una semana perdida no deshace el progreso acumulado.'
+                    : `Completaste ${sessionsDone} de ${effectiveDays} sesiones. El progreso se mantiene con consistencia a lo largo de semanas, no de días aislados.`
+                  : sessionsLeft <= trainingDaysLeft
+                  ? `Tienes ${trainingDaysLeft} días disponibles para completar las ${sessionsLeft} sesiones restantes. Puedes ponerte al corriente.`
+                  : `Te quedan ${trainingDaysLeft} días hábiles pero ${sessionsLeft} sesiones pendientes. Prioriza la sesión de hoy; si no puedes completar todo, una sesión de menor duración es mejor que ninguna.`
+                }
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Today's Workout */}
       <div>
         <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-3">
@@ -217,12 +281,42 @@ export default function Dashboard() {
         </h2>
 
         {isRestDay ? (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center text-2xl">😴</div>
-            <div>
-              <p className="text-white font-semibold">Día de descanso</p>
-              <p className="text-zinc-500 text-sm mt-0.5">El descanso es parte del entrenamiento</p>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+            <div className="p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center text-2xl shrink-0">😴</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold">Día de descanso</p>
+                <p className="text-zinc-500 text-sm mt-0.5">El descanso activo acelera la recuperación muscular</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRecovery(v => !v)}
+                className="flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 shrink-0 transition-colors"
+              >
+                {showRecovery ? 'Ocultar' : '¿Qué puedo hacer?'}
+                {showRecovery ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              </button>
             </div>
+            {showRecovery && (
+              <div className="border-t border-zinc-800 px-5 pb-5 pt-4 space-y-3">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider">Actividad de recuperación activa</p>
+                <p className="text-xs text-zinc-600 leading-relaxed">Actividad leve aumenta el flujo sanguíneo y elimina metabolitos de fatiga sin generar daño muscular adicional (RP, ACSM).</p>
+                <div className="space-y-2">
+                  {ACTIVE_RECOVERY.map(a => (
+                    <div key={a.title} className="flex items-start gap-3 bg-zinc-800/60 rounded-xl px-3 py-3">
+                      <span className="text-xl shrink-0">{a.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-white">{a.title}</p>
+                          <span className="text-xs text-zinc-500 shrink-0">{a.duration}</span>
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-0.5 leading-relaxed">{a.benefit}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : isCompleted ? (
           <div className="bg-emerald-400/5 border border-emerald-400/30 rounded-2xl p-5 flex items-center gap-4">

@@ -103,8 +103,10 @@ export default function WorkoutPage() {
   const [showSummary, setShowSummary] = useState(false)
   const [audioMode, setAudioMode] = useState<AudioMode>('off')
   const [beepEnabled, setBeepEnabled] = useState(true)
+  const [isoTimer, setIsoTimer] = useState<{ exId: string; setIdx: number; remaining: number; total: number } | null>(null)
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audioModeRef = useRef<AudioMode>('off')
   audioModeRef.current = audioMode
   const speakRef = useRef(speak)
@@ -172,6 +174,29 @@ export default function WorkoutPage() {
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
   }, [restTimer])
+
+  /* Isometric hold countdown */
+  useEffect(() => {
+    if (isoTimer === null) return
+    if (isoTimer.remaining > 0) {
+      isoTimerRef.current = setTimeout(
+        () => setIsoTimer(prev => prev ? { ...prev, remaining: prev.remaining - 1 } : null),
+        1000
+      )
+      if (beepEnabledRef.current && isoTimer.remaining <= 3) createBeep(880, 100, 0.4)
+    } else {
+      const { exId, setIdx } = isoTimer
+      setIsoTimer(null)
+      if (beepEnabledRef.current) {
+        createBeep(1047, 200, 0.5)
+        setTimeout(() => createBeep(1047, 200, 0.5), 300)
+      }
+      const we = workout?.exercises.find(w => w.exerciseId === exId)
+      if (we) toggleSet(exId, setIdx, we.restSeconds)
+    }
+    return () => { if (isoTimerRef.current) clearTimeout(isoTimerRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isoTimer])
 
   if (!workout || !activeUser || !activeProgram) {
     return (
@@ -481,19 +506,73 @@ export default function WorkoutPage() {
               {/* Sets + inline tip */}
               <div className="px-4 pb-4">
                 <div className="flex gap-2 flex-wrap mb-2">
-                  {sets.map((done, i) => (
-                    <button
-                      key={i}
-                      onClick={() => toggleSet(ex.id, i, we.restSeconds)}
-                      className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
-                        done
-                          ? 'bg-emerald-400/20 border-emerald-400 text-emerald-400'
-                          : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:border-zinc-500'
-                      }`}
-                    >
-                      {done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-                    </button>
-                  ))}
+                  {sets.map((done, i) => {
+                    const isRunning = isoTimer?.exId === ex.id && isoTimer.setIdx === i
+                    if (ex.duration) {
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (done) {
+                              toggleSet(ex.id, i, 0)
+                            } else if (isRunning) {
+                              if (isoTimerRef.current) clearTimeout(isoTimerRef.current)
+                              setIsoTimer(null)
+                            } else {
+                              if (isoTimerRef.current) clearTimeout(isoTimerRef.current)
+                              setIsoTimer({ exId: ex.id, setIdx: i, remaining: ex.duration!, total: ex.duration! })
+                            }
+                          }}
+                          className={`relative w-14 h-14 rounded-xl border-2 flex items-center justify-center transition-all overflow-hidden ${
+                            done
+                              ? 'bg-emerald-400/20 border-emerald-400'
+                              : isRunning
+                              ? 'border-cyan-400 bg-zinc-900'
+                              : 'bg-zinc-800 border-zinc-700 hover:border-zinc-500'
+                          }`}
+                        >
+                          {done ? (
+                            <CheckCircle2 size={20} className="text-emerald-400" />
+                          ) : isRunning ? (
+                            <>
+                              <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 56 56">
+                                <circle cx="28" cy="28" r="22" strokeWidth="4" stroke="#27272a" fill="none" />
+                                <circle
+                                  cx="28" cy="28" r="22" strokeWidth="4"
+                                  stroke="#22d3ee" fill="none"
+                                  strokeLinecap="round"
+                                  strokeDasharray={`${2 * Math.PI * 22}`}
+                                  strokeDashoffset={`${2 * Math.PI * 22 * (isoTimer.remaining / isoTimer.total)}`}
+                                  className="transition-all duration-1000"
+                                />
+                              </svg>
+                              <span className="relative text-sm font-bold text-cyan-400 tabular-nums z-10">
+                                {isoTimer.remaining}
+                              </span>
+                            </>
+                          ) : (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <Timer size={14} className="text-zinc-400" />
+                              <span className="text-[10px] text-zinc-500 font-medium">{ex.duration}s</span>
+                            </div>
+                          )}
+                        </button>
+                      )
+                    }
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => toggleSet(ex.id, i, we.restSeconds)}
+                        className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all ${
+                          done
+                            ? 'bg-emerald-400/20 border-emerald-400 text-emerald-400'
+                            : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:border-zinc-500'
+                        }`}
+                      >
+                        {done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                      </button>
+                    )
+                  })}
                 </div>
                 {/* Always-visible first tip */}
                 {ex.tips.length > 0 && (

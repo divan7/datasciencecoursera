@@ -115,6 +115,19 @@ export default function WorkoutPage() {
   beepEnabledRef.current = beepEnabled
   const silentAudioRef = useRef<HTMLAudioElement | null>(null)
 
+  // Stores absolute end timestamps so timers survive tab backgrounding
+  const restEndTimeRef = useRef<number | null>(null)
+  const isoEndTimeRef = useRef<number | null>(null)
+  // Live state refs for visibilitychange closure (avoids stale captures)
+  const isoTimerRef2 = useRef(isoTimer)
+  isoTimerRef2.current = isoTimer
+  const restTimerRef2 = useRef(restTimer)
+  restTimerRef2.current = restTimer
+  const workoutRef = useRef(workout)
+  workoutRef.current = workout
+  const completedSetsRef = useRef(completedSets)
+  completedSetsRef.current = completedSets
+
   useEffect(() => {
     if (!workout) return
     const init: Record<string, boolean[]> = {}
@@ -187,6 +200,7 @@ export default function WorkoutPage() {
     } else {
       const { exId, setIdx } = isoTimer
       setIsoTimer(null)
+      isoEndTimeRef.current = null
       if (beepEnabledRef.current) {
         createBeep(1047, 200, 0.5)
         setTimeout(() => createBeep(1047, 200, 0.5), 300)
@@ -197,6 +211,55 @@ export default function WorkoutPage() {
     return () => { if (isoTimerRef.current) clearTimeout(isoTimerRef.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isoTimer])
+
+  /* Sync timers after tab returns to foreground */
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState !== 'visible') return
+
+      // Sync isometric timer
+      const iso = isoTimerRef2.current
+      if (iso && isoEndTimeRef.current) {
+        const remaining = Math.ceil((isoEndTimeRef.current - Date.now()) / 1000)
+        if (remaining <= 0) {
+          if (isoTimerRef.current) clearTimeout(isoTimerRef.current)
+          isoEndTimeRef.current = null
+          setIsoTimer(null)
+          if (beepEnabledRef.current) {
+            createBeep(1047, 200, 0.5)
+            setTimeout(() => createBeep(1047, 200, 0.5), 300)
+          }
+          // Mark set done directly (toggleSet not accessible here without stale closure)
+          setCompletedSets(prev => {
+            const newSets = [...(prev[iso.exId] ?? [])]
+            newSets[iso.setIdx] = true
+            return { ...prev, [iso.exId]: newSets }
+          })
+          const we = workoutRef.current?.exercises.find(w => w.exerciseId === iso.exId)
+          if (we && we.restSeconds > 0) {
+            restEndTimeRef.current = Date.now() + we.restSeconds * 1000
+            setRestTimer(we.restSeconds)
+          }
+        } else {
+          setIsoTimer(prev => prev ? { ...prev, remaining } : null)
+        }
+      }
+
+      // Sync rest timer
+      const rest = restTimerRef2.current
+      if (rest !== null && restEndTimeRef.current) {
+        const remaining = Math.ceil((restEndTimeRef.current - Date.now()) / 1000)
+        if (remaining <= 0) {
+          setRestTimer(0) // triggers useEffect completion branch
+        } else {
+          setRestTimer(remaining)
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
 
   if (!workout || !activeUser || !activeProgram) {
     return (
@@ -256,6 +319,7 @@ export default function WorkoutPage() {
     })
 
     if (!wasCompleted) {
+      restEndTimeRef.current = restSecs > 0 ? Date.now() + restSecs * 1000 : null
       setRestTimer(restSecs)
 
       if (audioMode === 'coach') {
@@ -517,9 +581,11 @@ export default function WorkoutPage() {
                               toggleSet(ex.id, i, 0)
                             } else if (isRunning) {
                               if (isoTimerRef.current) clearTimeout(isoTimerRef.current)
+                              isoEndTimeRef.current = null
                               setIsoTimer(null)
                             } else {
                               if (isoTimerRef.current) clearTimeout(isoTimerRef.current)
+                              isoEndTimeRef.current = Date.now() + ex.duration! * 1000
                               setIsoTimer({ exId: ex.id, setIdx: i, remaining: ex.duration!, total: ex.duration! })
                             }
                           }}

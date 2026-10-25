@@ -117,7 +117,19 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         .from('water_profiles')
         .update({ streak_data: updated })
         .eq('id', userId)
-        .then(() => { /* fire-and-forget */ });
+        .then(({ error }) => {
+          if (error) {
+            // Retry once after a short delay so a transient network hiccup
+            // doesn't leave Supabase with stale streak data.
+            setTimeout(() => {
+              supabase!
+                .from('water_profiles')
+                .update({ streak_data: updated })
+                .eq('id', userId)
+                .then(() => {});
+            }, 3000);
+          }
+        });
     }
   }, [totalMl, goalMl, today, userId, streakLoaded]);
 

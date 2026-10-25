@@ -44,7 +44,12 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
 
     const scoped = localStorage.getItem(key);
     if (scoped) {
-      try { setData(JSON.parse(scoped) as StreakData); } catch { /* ignore */ }
+      try {
+        const parsed = JSON.parse(scoped) as StreakData;
+        setData(parsed);
+        // If today already completed, block any spurious re-increment on async intake load
+        if (parsed.lastCompletedDate === todayDate()) prevTotalMlRef.current = Infinity;
+      } catch { /* ignore */ }
       setStreakLoaded(true);
       return;
     }
@@ -55,6 +60,7 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         const parsed = JSON.parse(legacy) as StreakData;
         localStorage.setItem(key, legacy);
         setData(parsed);
+        if (parsed.lastCompletedDate === todayDate()) prevTotalMlRef.current = Infinity;
       } catch { /* ignore */ }
       setStreakLoaded(true);
       return;
@@ -75,6 +81,7 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         if (remote) {
           setData(remote);
           localStorage.setItem(key, JSON.stringify(remote));
+          if (remote.lastCompletedDate === todayDate()) prevTotalMlRef.current = Infinity;
         }
         setStreakLoaded(true);
       });

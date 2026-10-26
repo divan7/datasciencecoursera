@@ -29,8 +29,6 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
 
   const loadedForRef = useRef<string | null | undefined>(undefined);
   const dataRef = useRef(data);
-  // Track previous totalMl to detect genuine threshold crossings in this session.
-  // Prevents spurious increments when the app loads with totalMl already >= goalMl.
   const prevTotalMlRef = useRef(totalMl);
 
   useEffect(() => { dataRef.current = data; }, [data]);
@@ -40,37 +38,31 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
     loadedForRef.current = userId;
     setStreakLoaded(false);
 
+    // Reset crossing tracker on every user change so stale values don't
+    // block legitimate goal completions in the new session.
+    prevTotalMlRef.current = 0;
+
     const key = streakKey(userId);
 
-    const scoped = localStorage.getItem(key);
-    if (scoped) {
+    // Show cached data immediately for instant visual feedback
+    const cached = localStorage.getItem(key) ?? localStorage.getItem(LEGACY_KEY);
+    if (cached) {
       try {
-        const parsed = JSON.parse(scoped) as StreakData;
+        const parsed = JSON.parse(cached) as StreakData;
         setData(parsed);
-        // If today already completed, block any spurious re-increment on async intake load
+        // If today is already marked, prevent spurious re-increment on async intake load
         if (parsed.lastCompletedDate === todayDate()) prevTotalMlRef.current = Infinity;
       } catch { /* ignore */ }
-      setStreakLoaded(true);
-      return;
     }
 
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (legacy) {
-      try {
-        const parsed = JSON.parse(legacy) as StreakData;
-        localStorage.setItem(key, legacy);
-        setData(parsed);
-        if (parsed.lastCompletedDate === todayDate()) prevTotalMlRef.current = Infinity;
-      } catch { /* ignore */ }
-      setStreakLoaded(true);
-      return;
-    }
-
+    // Without Supabase, localStorage is the only source
     if (!userId || !isSupabaseConfigured || !supabase) {
       setStreakLoaded(true);
       return;
     }
 
+    // Supabase is always authoritative — fetch even when localStorage had data.
+    // This prevents stale/corrupt local cache from permanently overriding the server.
     supabase
       .from('water_profiles')
       .select('streak_data')
@@ -81,7 +73,9 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         if (remote) {
           setData(remote);
           localStorage.setItem(key, JSON.stringify(remote));
-          if (remote.lastCompletedDate === todayDate()) prevTotalMlRef.current = Infinity;
+          if (remote.lastCompletedDate === todayDate()) {
+            prevTotalMlRef.current = Infinity;
+          }
         }
         setStreakLoaded(true);
       });
@@ -90,19 +84,17 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
   const today = todayDate();
 
   useEffect(() => {
+    // Don't update prevTotalMlRef until streak is loaded.
+    // If intake arrives before streak (race), leaving prev=0 ensures
+    // the crossing is correctly detected when streakLoaded fires.
+    if (!streakLoaded) return;
+
     const prev = prevTotalMlRef.current;
     prevTotalMlRef.current = totalMl;
 
-    if (!streakLoaded) return;
     if (goalMl <= 0 || totalMl < goalMl) return;
     const d = dataRef.current;
     if (d.lastCompletedDate === today) return;
-
-    // Only fire when totalMl just crossed goalMl from below in this session.
-    // If totalMl was already >= goalMl when the app loaded (prev >= goalMl on the
-    // first run, or on a streakLoaded trigger with no new intake), skip: the
-    // streak was already counted in a prior session and lastCompletedDate === today
-    // would have caught it. This prevents spurious "day 1" initializations on load.
     if (prev >= goalMl) return;
 
     const isConsecutive =
@@ -126,8 +118,6 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         .eq('id', userId)
         .then(({ error }) => {
           if (error) {
-            // Retry once after a short delay so a transient network hiccup
-            // doesn't leave Supabase with stale streak data.
             setTimeout(() => {
               supabase!
                 .from('water_profiles')

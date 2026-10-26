@@ -25,36 +25,44 @@ function emptyStreak(): StreakData {
 
 export function useStreak(totalMl: number, goalMl: number, userId: string | null) {
   const [data, setData] = useState<StreakData>(emptyStreak);
+  const [streakLoaded, setStreakLoaded] = useState(false);
 
-  // Track which userId we've already loaded so we reload when userId changes (null → real ID)
   const loadedForRef = useRef<string | null | undefined>(undefined);
+  const dataRef = useRef(data);
+  const prevTotalMlRef = useRef(totalMl);
+
+  useEffect(() => { dataRef.current = data; }, [data]);
 
   useEffect(() => {
     if (loadedForRef.current === userId) return;
     loadedForRef.current = userId;
+    setStreakLoaded(false);
+
+    // Reset crossing tracker on every user change so stale values don't
+    // block legitimate goal completions in the new session.
+    prevTotalMlRef.current = 0;
 
     const key = streakKey(userId);
 
-    // 1. Scoped localStorage key
-    const scoped = localStorage.getItem(key);
-    if (scoped) {
-      try { setData(JSON.parse(scoped) as StreakData); } catch { /* ignore */ }
-      return;
-    }
-
-    // 2. Migrate from legacy unscoped key
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (legacy) {
+    // Show cached data immediately for instant visual feedback
+    const cached = localStorage.getItem(key) ?? localStorage.getItem(LEGACY_KEY);
+    if (cached) {
       try {
-        const parsed = JSON.parse(legacy) as StreakData;
-        localStorage.setItem(key, legacy);
+        const parsed = JSON.parse(cached) as StreakData;
         setData(parsed);
+        // If today is already marked, prevent spurious re-increment on async intake load
+        if (parsed.lastCompletedDate === todayDate()) prevTotalMlRef.current = Infinity;
       } catch { /* ignore */ }
+    }
+
+    // Without Supabase, localStorage is the only source
+    if (!userId || !isSupabaseConfigured || !supabase) {
+      setStreakLoaded(true);
       return;
     }
 
-    // 3. Fetch from Supabase (only when userId is known)
-    if (!userId || !isSupabaseConfigured || !supabase) return;
+    // Supabase is always authoritative — fetch even when localStorage had data.
+    // This prevents stale/corrupt local cache from permanently overriding the server.
     supabase
       .from('water_profiles')
       .select('streak_data')
@@ -65,24 +73,38 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         if (remote) {
           setData(remote);
           localStorage.setItem(key, JSON.stringify(remote));
+          if (remote.lastCompletedDate === todayDate()) {
+            prevTotalMlRef.current = Infinity;
+          }
         }
+        setStreakLoaded(true);
       });
   }, [userId]);
 
   const today = todayDate();
 
   useEffect(() => {
+    // Don't update prevTotalMlRef until streak is loaded.
+    // If intake arrives before streak (race), leaving prev=0 ensures
+    // the crossing is correctly detected when streakLoaded fires.
+    if (!streakLoaded) return;
+
+    const prev = prevTotalMlRef.current;
+    prevTotalMlRef.current = totalMl;
+
     if (goalMl <= 0 || totalMl < goalMl) return;
-    if (data.lastCompletedDate === today) return;
+    const d = dataRef.current;
+    if (d.lastCompletedDate === today) return;
+    if (prev >= goalMl) return;
 
     const isConsecutive =
-      data.lastCompletedDate !== null &&
-      isYesterday(parseISO(data.lastCompletedDate));
+      d.lastCompletedDate !== null &&
+      isYesterday(parseISO(d.lastCompletedDate));
 
-    const newStreak = isConsecutive ? data.currentStreak + 1 : 1;
+    const newStreak = isConsecutive ? d.currentStreak + 1 : 1;
     const updated: StreakData = {
       currentStreak: newStreak,
-      longestStreak: Math.max(newStreak, data.longestStreak),
+      longestStreak: Math.max(newStreak, d.longestStreak),
       lastCompletedDate: today,
     };
     setData(updated);
@@ -94,9 +116,19 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
         .from('water_profiles')
         .update({ streak_data: updated })
         .eq('id', userId)
-        .then(() => { /* fire-and-forget */ });
+        .then(({ error }) => {
+          if (error) {
+            setTimeout(() => {
+              supabase!
+                .from('water_profiles')
+                .update({ streak_data: updated })
+                .eq('id', userId)
+                .then(() => {});
+            }, 3000);
+          }
+        });
     }
-  }, [totalMl, goalMl, today, data, userId]);
+  }, [totalMl, goalMl, today, userId, streakLoaded]);
 
   const streakBroken =
     data.lastCompletedDate !== null &&

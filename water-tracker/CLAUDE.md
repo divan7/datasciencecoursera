@@ -14,7 +14,7 @@
 
 ## Usuario principal
 - email: ivan.porraz@gmail.com
-- user_id (water_profiles): 86e45fff-3a84-459c-a245-418b723157b3
+- user_id (water_profiles): dba28fe7-0a2c-43ab-9223-d7e3afc6853f
 
 ## Edge Function
 La Edge Function `send-water-reminders` NO se despliega automáticamente desde el repo.

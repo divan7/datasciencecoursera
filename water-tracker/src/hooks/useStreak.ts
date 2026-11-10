@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { isYesterday, parseISO } from 'date-fns';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import {
+  addDays,
+  applyCompletion,
+  applyLoss,
+  applySaver,
+  saversRemaining,
+  streakStatus,
+  type StreakData,
+} from '../utils/streakRules';
 
-interface StreakData {
-  currentStreak: number;
-  longestStreak: number;
-  lastCompletedDate: string | null; // "YYYY-MM-DD"
+export interface PendingDay {
+  date: string;
+  totalMl: number;
+  goalMl: number;
 }
 
 function streakKey(userId: string | null) {
@@ -23,11 +31,60 @@ function emptyStreak(): StreakData {
   return { currentStreak: 0, longestStreak: 0, lastCompletedDate: null };
 }
 
+function persistStreak(userId: string | null, updated: StreakData) {
+  localStorage.setItem(streakKey(userId), JSON.stringify(updated));
+  if (!userId || !isSupabaseConfigured || !supabase) return;
+  supabase
+    .from('water_profiles')
+    .update({ streak_data: updated })
+    .eq('id', userId)
+    .then(({ error }) => {
+      if (error) {
+        setTimeout(() => {
+          supabase!
+            .from('water_profiles')
+            .update({ streak_data: updated })
+            .eq('id', userId)
+            .then(() => {});
+        }, 3000);
+      }
+    });
+}
+
+// Total del día indicado: el mayor entre lo guardado en el dispositivo y Supabase,
+// para no perjudicar al usuario si alguno de los dos quedó incompleto.
+async function fetchDayTotal(userId: string | null, date: string): Promise<number> {
+  const [y, m, d] = date.split('-').map(Number);
+  let local = 0;
+  try {
+    const stored = localStorage.getItem(`aquavital-intake-${y}-${m}-${d}`);
+    if (stored) {
+      local = (JSON.parse(stored) as { amount_ml: number }[]).reduce((s, l) => s + l.amount_ml, 0);
+    }
+  } catch { /* ignore */ }
+
+  if (!userId || !isSupabaseConfigured || !supabase) return local;
+
+  const start = new Date(y, m - 1, d, 0, 0, 0, 0);
+  const end = new Date(y, m - 1, d, 23, 59, 59, 999);
+  const { data, error } = await supabase
+    .from('water_intake')
+    .select('amount_ml')
+    .eq('user_id', userId)
+    .gte('logged_at', start.toISOString())
+    .lte('logged_at', end.toISOString());
+  if (error || !data) return local;
+  const remote = (data as { amount_ml: number }[]).reduce((s, l) => s + l.amount_ml, 0);
+  return Math.max(local, remote);
+}
+
 export function useStreak(totalMl: number, goalMl: number, userId: string | null) {
   const [data, setData] = useState<StreakData>(emptyStreak);
   const [streakLoaded, setStreakLoaded] = useState(false);
+  const [pending, setPending] = useState<PendingDay | null>(null);
 
   const loadedForRef = useRef<string | null | undefined>(undefined);
+  const checkedForRef = useRef<string | null>(null);
   const dataRef = useRef(data);
   const prevTotalMlRef = useRef(totalMl);
 
@@ -37,6 +94,8 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
     if (loadedForRef.current === userId) return;
     loadedForRef.current = userId;
     setStreakLoaded(false);
+    setPending(null);
+    checkedForRef.current = null;
 
     // Reset crossing tracker on every user change so stale values don't
     // block legitimate goal completions in the new session.
@@ -62,7 +121,6 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
     }
 
     // Supabase is always authoritative — fetch even when localStorage had data.
-    // This prevents stale/corrupt local cache from permanently overriding the server.
     supabase
       .from('water_profiles')
       .select('streak_data')
@@ -83,57 +141,78 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
 
   const today = todayDate();
 
+  // Ayer quedó sin completar y la racha sigue viva hasta el fin de hoy:
+  // se calcula cuánto faltó para que el usuario decida (confirmar, salvavidas o perder).
+  useEffect(() => {
+    if (!streakLoaded || goalMl <= 0) return;
+    if (streakStatus(dataRef.current.lastCompletedDate, today) !== 'at-risk') return;
+
+    const missed = addDays(today, -1);
+    const checkKey = `${userId}|${missed}`;
+    if (checkedForRef.current === checkKey) return;
+    checkedForRef.current = checkKey;
+
+    fetchDayTotal(userId, missed).then((total) => {
+      const current = dataRef.current;
+      if (streakStatus(current.lastCompletedDate, today) !== 'at-risk') return;
+      if (total >= goalMl) {
+        // Ayer sí llegó a la meta pero no quedó registrado en la racha.
+        const updated = applyCompletion(current, missed);
+        setData(updated);
+        persistStreak(userId, updated);
+        return;
+      }
+      setPending({ date: missed, totalMl: total, goalMl });
+    });
+  }, [streakLoaded, goalMl, today, userId, data.lastCompletedDate]);
+
   useEffect(() => {
     // Don't update prevTotalMlRef until streak is loaded.
     // If intake arrives before streak (race), leaving prev=0 ensures
     // the crossing is correctly detected when streakLoaded fires.
     if (!streakLoaded) return;
 
+    const d = dataRef.current;
+    // Hoy no cuenta hasta resolver ayer; al resolverlo cambia lastCompletedDate
+    // y este efecto vuelve a correr con el cruce de meta aún sin consumir.
+    if (streakStatus(d.lastCompletedDate, today) === 'at-risk') return;
+
     const prev = prevTotalMlRef.current;
     prevTotalMlRef.current = totalMl;
 
     if (goalMl <= 0 || totalMl < goalMl) return;
-    const d = dataRef.current;
     if (d.lastCompletedDate === today) return;
     if (prev >= goalMl) return;
 
-    const isConsecutive =
-      d.lastCompletedDate !== null &&
-      isYesterday(parseISO(d.lastCompletedDate));
-
-    const newStreak = isConsecutive ? d.currentStreak + 1 : 1;
-    const updated: StreakData = {
-      currentStreak: newStreak,
-      longestStreak: Math.max(newStreak, d.longestStreak),
-      lastCompletedDate: today,
-    };
+    const updated = applyCompletion(d, today);
     setData(updated);
-    const key = streakKey(userId);
-    localStorage.setItem(key, JSON.stringify(updated));
+    persistStreak(userId, updated);
+  }, [totalMl, goalMl, today, userId, streakLoaded, data.lastCompletedDate]);
 
-    if (userId && isSupabaseConfigured && supabase) {
-      supabase
-        .from('water_profiles')
-        .update({ streak_data: updated })
-        .eq('id', userId)
-        .then(({ error }) => {
-          if (error) {
-            setTimeout(() => {
-              supabase!
-                .from('water_profiles')
-                .update({ streak_data: updated })
-                .eq('id', userId)
-                .then(() => {});
-            }, 3000);
-          }
-        });
-    }
-  }, [totalMl, goalMl, today, userId, streakLoaded]);
+  function resolve(updated: StreakData) {
+    setData(updated);
+    persistStreak(userId, updated);
+    setPending(null);
+  }
 
-  const streakBroken =
-    data.lastCompletedDate !== null &&
-    data.lastCompletedDate !== today &&
-    !isYesterday(parseISO(data.lastCompletedDate));
+  function confirmForgot() {
+    if (!pending) return;
+    resolve(applyCompletion(dataRef.current, pending.date));
+  }
+
+  function spendSaver() {
+    if (!pending) return;
+    resolve(applySaver(dataRef.current, pending.date, today));
+  }
+
+  function acceptLoss() {
+    if (!pending) return;
+    resolve(applyLoss(dataRef.current));
+  }
+
+  const status = streakStatus(data.lastCompletedDate, today);
+  const streakBroken = status === 'broken';
+  const atRisk = status === 'at-risk';
 
   const currentStreak = streakBroken ? 0 : data.currentStreak;
   const todayCompleted = data.lastCompletedDate === today;
@@ -159,6 +238,12 @@ export function useStreak(totalMl: number, goalMl: number, userId: string | null
     longestStreak: data.longestStreak,
     todayCompleted,
     streakBroken,
+    atRisk,
+    pending,
+    saversRemaining: saversRemaining(data, today),
+    confirmForgot,
+    spendSaver,
+    acceptLoss,
     nextMilestone,
     milestoneProgress,
     level: levelLabel(currentStreak),

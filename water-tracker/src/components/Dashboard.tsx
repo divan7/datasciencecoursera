@@ -7,6 +7,7 @@ import { QuickAdd } from './QuickAdd';
 import { IntakeTimeline } from './IntakeTimeline';
 import { ReminderCard } from './ReminderCard';
 import { HabitCard } from './HabitCard';
+import { StreakRescueCard } from './StreakRescueCard';
 import { DailyMessage } from './DailyMessage';
 import { PlanCard } from './PlanCard';
 import { useIntake } from '../hooks/useIntake';
@@ -273,11 +274,26 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
           />
         )}
 
+        {/* Decisión sobre el día anterior sin completar */}
+        {streak.pending && (
+          <StreakRescueCard
+            key={streak.pending.date}
+            pending={streak.pending}
+            currentStreak={streak.currentStreak}
+            saversRemaining={streak.saversRemaining}
+            onConfirmForgot={streak.confirmForgot}
+            onUseSaver={streak.spendSaver}
+            onAcceptLoss={streak.acceptLoss}
+          />
+        )}
+
         {/* Habit streak tracker */}
         <HabitCard
           currentStreak={streak.currentStreak}
           longestStreak={streak.longestStreak}
           todayCompleted={streak.todayCompleted}
+          atRisk={streak.atRisk}
+          saversRemaining={streak.saversRemaining}
           nextMilestone={streak.nextMilestone}
           milestoneProgress={streak.milestoneProgress}
           level={streak.level}

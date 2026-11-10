@@ -1,9 +1,12 @@
 import { Flame, Trophy } from 'lucide-react';
+import { MAX_SAVERS_PER_MONTH } from '../utils/streakRules';
 
 interface Props {
   currentStreak: number;
   longestStreak: number;
   todayCompleted: boolean;
+  atRisk: boolean;
+  saversRemaining: number;
   nextMilestone: number;
   milestoneProgress: number;
   level: { label: string; emoji: string };
@@ -19,6 +22,8 @@ export function HabitCard({
   currentStreak,
   longestStreak,
   todayCompleted,
+  atRisk,
+  saversRemaining,
   nextMilestone,
   milestoneProgress,
   level,
@@ -61,7 +66,9 @@ export function HabitCard({
             <div className="text-xs text-emerald-400">✓ Meta de hoy completada</div>
           )}
           {!todayCompleted && currentStreak > 0 && (
-            <div className="text-xs text-white/40">Completa hoy para mantener la racha</div>
+            <div className="text-xs text-white/40">
+              {atRisk ? 'Resuelve el día de ayer para mantener la racha' : 'Completa hoy para mantener la racha'}
+            </div>
           )}
         </div>
       </div>
@@ -80,6 +87,9 @@ export function HabitCard({
         </div>
         <p className="text-xs text-white/30 leading-snug">
           {MILESTONE_LABELS[nextMilestone]}
+        </p>
+        <p className="text-xs text-white/40 pt-1">
+          🛟 Salvavidas este mes: {saversRemaining} de {MAX_SAVERS_PER_MONTH}
         </p>
       </div>
     </div>

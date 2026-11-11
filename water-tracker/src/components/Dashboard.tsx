@@ -339,6 +339,8 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
             )}
           </div>
         )}
+
+        <p className="text-center text-white/20 text-xs pt-2">Versión {__APP_VERSION__}</p>
       </div>
     </div>
   );

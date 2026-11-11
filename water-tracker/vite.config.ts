@@ -3,7 +3,15 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env
+const commitSha = env?.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'dev'
+
+const buildDate = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(`${commitSha} · ${buildDate}`),
+  },
   plugins: [
     tailwindcss(),
     react(),

@@ -202,6 +202,19 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 pb-10 space-y-4" style={{ scrollbarWidth: 'none' }}>
 
+        {/* Decisión sobre el día anterior sin completar */}
+        {streak.pending && (
+          <StreakRescueCard
+            key={streak.pending.date}
+            pending={streak.pending}
+            currentStreak={streak.currentStreak}
+            saversRemaining={streak.saversRemaining}
+            onConfirmForgot={streak.confirmForgot}
+            onUseSaver={streak.spendSaver}
+            onAcceptLoss={streak.acceptLoss}
+          />
+        )}
+
         {/* Daily motivational message */}
         <DailyMessage />
 
@@ -271,19 +284,6 @@ export function Dashboard({ profile, plan, journal, userId, onEditProfile, onLog
             isOnFinalGoal={plan.isOnFinalGoal}
             daysIntoWeek={plan.daysIntoWeek}
             glassSizeMl={profile.glass_size_ml}
-          />
-        )}
-
-        {/* Decisión sobre el día anterior sin completar */}
-        {streak.pending && (
-          <StreakRescueCard
-            key={streak.pending.date}
-            pending={streak.pending}
-            currentStreak={streak.currentStreak}
-            saversRemaining={streak.saversRemaining}
-            onConfirmForgot={streak.confirmForgot}
-            onUseSaver={streak.spendSaver}
-            onAcceptLoss={streak.acceptLoss}
           />
         )}
 
